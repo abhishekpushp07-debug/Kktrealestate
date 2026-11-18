@@ -197,11 +197,13 @@ _REBUILD_LOCKS: dict[str, asyncio.Lock] = {}
 
 
 async def rebuild(booking_id: str) -> list[dict]:
-    """Serialised per booking: two overlapping rebuilds (e.g. a void's after-commit drain and the unvoid that
-    follows) must not let the older read land last and overwrite the newer summary."""
+    """Serialised per booking across processes (3G: Mongo lease) and within one (asyncio lock): two overlapping
+    rebuilds must not interleave delete + insert (duplicate seqs) or let the older read land last."""
+    from services.booking_lock import booking_lock
+
     lock = _REBUILD_LOCKS.setdefault(booking_id, asyncio.Lock())
     try:
-        async with lock:
+        async with booking_lock(booking_id), lock:
             return await _rebuild(booking_id)
     finally:
         if not lock.locked() and not getattr(lock, "_waiters", None):

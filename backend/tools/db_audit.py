@@ -168,7 +168,7 @@ UNIQUE_KEYS = [
     ("demand (bill) number", "demands", ["demand_number"], {}),
     ("waiver number", "waivers", ["waiver_number"], {}),
     ("credit-note number", "waivers", ["cn_number"], {"cn_number": {"$type": "string"}}),
-    ("refund number", "refunds", ["refund_number"], {}),
+    ("refund number", "refunds", ["refund_number", "bucket"], {}),
     ("customer code", "customers", ["customer_code"], {}),
     ("user email", "users", ["email"], {}),
     ("ledger line booking + seq", "ledger_entries", ["booking_id", "seq"], {}),
@@ -181,7 +181,7 @@ UNIQUE_KEYS = [
     ("idempotency key per user", "idempotency_keys", ["user_id", "key"], {}),
     ("receipt idempotency key", "payments", ["idempotency_key"], {"idempotency_key": {"$type": "string"}}),
     ("active customer phone", "customers", ["company_id", "phone"], {"is_active": True}),
-    ("generated document number", "generated_documents", ["number"], {"number": {"$type": "string"}}),
+    ("generated document number", "generated_documents", ["number"], {"number": {"$regex": r"\d"}}),  # labels like "Cost sheet" are not serials
     ("project code per company", "projects", ["company_id", "code"], {}),
     ("tower code per project", "blocks", ["project_id", "code"], {}),
     ("lead number", "leads", ["lead_number"], {"lead_number": {"$type": "string"}}),
@@ -340,7 +340,8 @@ def references(db) -> dict:
     path("site_visits.lead_id→leads", "site_visits", "lead_id", ids["leads"])
     path("generated_documents.booking_id→bookings", "generated_documents", "booking_id", ids["bookings"])
     path("documents.booking_id→bookings", "documents", "booking_id", ids["bookings"])
-    path("notifications.user_id→users", "notifications", "user_id", ids["users"])
+    path("notifications.user_id→users / customer:<id>→customers", "notifications", "user_id",
+         lambda d, v: v[9:] in ids["customers"] if str(v).startswith("customer:") else v in ids["users"])
     path("payment_plan_assignments.payment_plan_id→payment_plans", "payment_plan_assignments", "payment_plan_id", ids["payment_plans"])
     money_paths = {k for k in out if k.split(".")[0] in ("payments", "demands", "ledger_entries", "waivers", "refunds")}
     for k, v in out.items():
@@ -457,7 +458,8 @@ def money(db) -> dict:
         if w.get("status") == "Approved":
             if not w.get("cn_number"):
                 bad("approved waiver without credit note", w["id"])
-            if sum(x.get("amount_paise") or 0 for x in w.get("entries") or []) != w.get("amount_paise"):
+            # GST credit lines (gst: true) ride on top of the waived amount (gst_note) — the waived amount is the rest
+            if sum(x.get("amount_paise") or 0 for x in w.get("entries") or [] if not x.get("gst")) != w.get("amount_paise"):
                 bad("waiver entries != amount", w["id"])
     for r in db.refunds.find({}, {"_id": 0}):
         res["refunds_checked"] += 1
@@ -544,7 +546,8 @@ def states(db) -> dict:
         if p.get("bounced_at"):
             bad("Cleared receipt carries bounced_at", p["id"])
     for k, v in res.items():
-        finding(f"STATE-{re.sub(r'[^A-Za-z]+', '-', k)[:40]}", "High", f"{v} × {k}", ex.get(k),
+        sev = "Medium" if k == "Hold without expiry" else "High"  # a stale hold blocks a sale, never misstates money
+        finding(f"STATE-{re.sub(r'[^A-Za-z]+', '-', k)[:40]}", sev, f"{v} × {k}", ex.get(k),
                 "Two records disagree on the state of the same thing", "Investigate and repair through audited path", "")
     return {"counts": dict(res), "examples": dict(ex)}
 

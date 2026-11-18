@@ -1,0 +1,7 @@
+{
+ "start errors=2": 10,
+ "scheduler lease held by one owner=True": 10,
+ "index sets unchanged=False": 1,
+ "job kinds run twice=0": 10,
+ "index sets unchanged=True": 9
+}

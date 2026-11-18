@@ -333,17 +333,34 @@ def races(label, reps):
 
 
 # ---------------------------------------------------------------- stale window (2 processes)
+VOLATILE = ("computed_at", "generated_at", "data_age", "took_ms", "ms", "server_time", "etag", "cached", "age_s", "stamp", "greeting_date",
+            "recent_audit")  # activity feed: background jobs add rows on their own
+
+
+def _clean(x):
+    if isinstance(x, dict):
+        return {k: _clean(v) for k, v in x.items() if k not in VOLATILE and not k.endswith("_ms")}
+    if isinstance(x, list):
+        return [_clean(v) for v in x]
+    return x
+
+
+def fpj(j):
+    return json.dumps(_clean(j), sort_keys=True, default=str)
+
+
 SURFACES = [
-    ("Home", "/api/home/bundle?period=fy", lambda j, ctx: json.dumps(j.get("widgets", j), sort_keys=True, default=str)[:20000]),
-    ("Home legacy", "/api/dashboard/home", lambda j, ctx: json.dumps(j, sort_keys=True, default=str)[:20000]),
-    ("Booking page", "/api/bookings/{bid}", lambda j, ctx: json.dumps(j.get("summary"), sort_keys=True)),
-    ("Customer 360", "/api/customers/{cid}", lambda j, ctx: json.dumps({k: j.get(k) for k in ("summary", "money", "totals", "bookings")}, sort_keys=True, default=str)),
-    ("Bills raised", "/api/demands/register?booking_id={bid}&page_size=50", lambda j, ctx: json.dumps(j, sort_keys=True, default=str)),
-    ("Outstanding", "/api/reports/outstanding-v2", lambda j, ctx: json.dumps(j.get("totals", j), sort_keys=True, default=str)),
-    ("Collections", "/api/reports/collections-v2?from_date={fy0}&to_date={today}", lambda j, ctx: json.dumps(j.get("totals", j), sort_keys=True, default=str)),
-    ("Customer status", "/api/reports/v3/customer-status", lambda j, ctx: json.dumps(j.get("totals", j), sort_keys=True, default=str)),
-    ("Bills vs Collection", "/api/reports/v3/bills-vs-collection", lambda j, ctx: json.dumps(j.get("totals", j), sort_keys=True, default=str)),
-    ("Payments list", "/api/payments?booking_id={bid}&page_size=50", lambda j, ctx: json.dumps([x.get("receipt_number") for x in j.get("items", [])])),
+    ("Home", "/api/home/bundle?period=fy", lambda j, ctx: fpj(j)),
+    ("Home legacy", "/api/dashboard/home", lambda j, ctx: fpj(j)),
+    ("Booking page", "/api/bookings/{bid}", lambda j, ctx: fpj(j.get("summary"))),
+    ("Customer 360", "/api/customers/{cid}", lambda j, ctx: fpj(j)),
+    ("Bills raised", "/api/demands/register?booking_id={bid}&page_size=50", lambda j, ctx: fpj(j)),
+    ("Outstanding", "/api/reports/outstanding-v2", lambda j, ctx: fpj(j.get("totals", j))),
+    ("Collections", "/api/reports/collections-v2?from_date={fy0}&to_date={today}", lambda j, ctx: fpj(j.get("totals", j))),
+    ("Customer status", "/api/reports/v3/customer-status", lambda j, ctx: fpj(j.get("totals", j))),
+    ("Bills vs Collection", "/api/reports/v3/bills-vs-collection", lambda j, ctx: fpj(j.get("totals", j))),
+    ("Payments list", "/api/payments?booking_id={bid}&page_size=50", lambda j, ctx: fpj([x.get("receipt_number") for x in j.get("items", [])])),
+    ("Dashboard", "/api/dashboard", lambda j, ctx: fpj(j)),
 ]
 
 
@@ -366,14 +383,37 @@ def stale(label, reps, redis_url=None):
         fy0 = date(t.year if t.month >= 4 else t.year - 1, 4, 1).isoformat()
         rows = []
         bks = active_bookings(reps + 2)
-        for i in range(reps):
-            bid = bks[i]
-            cid = mdb().bookings.find_one({"id": bid})["customer_id"]
+        acc = client(PORTS[0], "accounts@kkt.in")
+        db = mdb()
+        for i in range(reps * 3):
+            kind = ("receipt", "waiver approve", "stage complete")[i % 3]
+            bid = bks[i // 3]
+            if kind == "waiver approve":
+                bid = db.bookings.find({"status": "Active", "summary.account_due_paise": {"$gt": 100000}}, {"id": 1}).skip(i).limit(1)[0]["id"]
+            if kind == "stage complete":
+                blk = None
+                for b in db.blocks.find({}, {"_id": 0, "id": 1}):
+                    st = A.get(f"/api/blocks/{b['id']}/construction").json().get("stages") or []
+                    pend = [s for s in st if s["status"] != "Completed"]
+                    one = db.bookings.find_one({"block_id": b["id"], "status": "Active"}, {"id": 1})
+                    if pend and one and db.bookings.count_documents({"block_id": b["id"], "status": "Active"}) <= 60:
+                        blk, sid, bid = b["id"], pend[0]["stage_id"], one["id"]
+                        break
+                if not blk:
+                    continue
+            cid = db.bookings.find_one({"id": bid})["customer_id"]
             ctx = {"bid": bid, "cid": cid, "fy0": fy0, "today": TODAY}
             _read_all(B, ctx)  # warm B's caches with the old figures
             _read_all(B, ctx)
-            r = A.post("/api/payments", json=pay_body(bid, md, 1000 + i), headers={"Idempotency-Key": uuid.uuid4().hex})
-            assert r.status_code == 201, r.text[:200]
+            if kind == "receipt":
+                r = A.post("/api/payments", json=pay_body(bid, md, 1000 + i), headers={"Idempotency-Key": uuid.uuid4().hex})
+            elif kind == "waiver approve":
+                w = acc.post("/api/waivers", json={"booking_id": bid, "target": {"kind": "share", "share": "Account"}, "amount": 10 + i, "reason": "drill stale"})
+                _read_all(B, ctx)
+                r = A.post(f"/api/waivers/{w.json()['id']}/approve") if w.status_code == 201 else w
+            else:
+                r = A.post(f"/api/blocks/{blk}/construction/stage", json={"stage_id": sid, "completed_on": TODAY, "notes": "drill stale"})
+            assert r.status_code in (200, 201), r.text[:200]
             truth = _read_all(A, ctx)  # what A shows right after its own write
             t0 = time.monotonic()
             first = _read_all(B, ctx)
@@ -388,11 +428,29 @@ def stale(label, reps, redis_url=None):
                         pending.discard(k)
             for k in pending:
                 secs[k] = ">40"
-            rows.append(secs)
-        summary = {k: sorted({str(r[k]) for r in rows}) for k in SURFACES_NAMES()}
+                secs[k + " diff"] = _diff(json.loads(now[k]) if now[k].startswith(("{", "[")) else now[k],
+                                          json.loads(truth[k]) if truth[k].startswith(("{", "[")) else truth[k])  # fmt: skip
+            rows.append({"action": kind, **secs})
+        summary = {k: sorted({str(r[k]) for r in rows if k in r}) for k in SURFACES_NAMES()}
         save(f"stale_{label}{'_redis' if redis_url else ''}", {"reps": reps, "redis": bool(redis_url), "per_surface_seconds": summary, "rows": rows})
     finally:
         [p.kill() for p in procs]
+
+
+def _diff(a, b, p=""):
+    if isinstance(a, dict) and isinstance(b, dict):
+        for k in sorted(set(a) | set(b)):
+            d = _diff(a.get(k), b.get(k), f"{p}.{k}")
+            if d:
+                return d
+        return None
+    if isinstance(a, list) and isinstance(b, list) and len(a) == len(b):
+        for i, (x, y) in enumerate(zip(a, b)):
+            d = _diff(x, y, f"{p}[{i}]")
+            if d:
+                return d
+        return None
+    return None if a == b else f"{p}: B={str(a)[:60]} A={str(b)[:60]}"
 
 
 def SURFACES_NAMES():

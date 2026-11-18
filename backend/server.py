@@ -396,6 +396,7 @@ async def lifespan(app: FastAPI):
         _spawn(
             __import__("services.invariants", fromlist=["ensure_invariants"]).ensure_invariants()
         )  # Phase K: unique partial indexes + validators (idempotent, background)
+        _spawn(__import__("services.money_ops", fromlist=["x"]).repair_interrupted_refunds())  # 3G crash recovery
         _spawn(__import__("services.loadshed", fromlist=["lag_probe"]).lag_probe())  # Phase K.7: event-loop lag probe
         _spawn(__import__("services.alerts", fromlist=["loop"]).loop())  # Phase K.13: alert rules every minute
         _spawn(_trim_loop())

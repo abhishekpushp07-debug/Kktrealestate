@@ -75,7 +75,7 @@ async def _approve(w: dict, b: dict, user: dict, request: Request, self_approved
         "entries": entries,
         "gst_note": gst_note,
     }
-    await db.waivers.update_one(
+    res = await db.waivers.update_one(
         {"id": w["id"], "status": "Pending"},
         {
             "$set": upd,
@@ -84,6 +84,9 @@ async def _approve(w: dict, b: dict, user: dict, request: Request, self_approved
             },
         },
     )
+    if not res.modified_count:  # 3G: decided by someone else meanwhile — nothing else is written
+        cur = await db.waivers.find_one({"id": w["id"]}, {"_id": 0, "status": 1})
+        raise ApiError(409, "Already approved" if (cur or {}).get("status") == "Approved" else f"Waiver is {(cur or {}).get('status')}", "WAIVER_STATE")
     await rebuild(b["id"])
     settles = await W.settled_bills(b["id"], before) if target["kind"] == "share" else []
     w = {**w, **upd, "settles": settles}
@@ -172,7 +175,17 @@ async def list_waivers(
 
 @router.post("/{waiver_id}/approve")
 async def approve_waiver(waiver_id: str, request: Request, user: dict = Depends(require("finance.waiver.approve"))):
+    from services.booking_lock import booking_lock
+
     w = await get_or_404(db.waivers, waiver_id, "Waiver", {"company_id": user["company_id"]})
+    async with booking_lock(w["booking_id"]):  # 3G: a second approver waits, then reads "Already approved"
+        return await _approve_locked(waiver_id, request, user)
+
+
+async def _approve_locked(waiver_id: str, request: Request, user: dict):
+    w = await get_or_404(db.waivers, waiver_id, "Waiver", {"company_id": user["company_id"]})
+    if w["status"] == "Approved":
+        raise ApiError(409, "Already approved", "WAIVER_STATE")
     if w["status"] != "Pending":
         raise ApiError(409, f"Waiver is {w['status']}", "WAIVER_STATE")
     if w["requested_by"] == user["id"] and not _is_owner(user):
@@ -191,8 +204,8 @@ async def reject_waiver(
     if w["status"] != "Pending":
         raise ApiError(409, f"Waiver is {w['status']}", "WAIVER_STATE")
     ts = now_iso()
-    await db.waivers.update_one(
-        {"id": waiver_id},
+    res = await db.waivers.update_one(
+        {"id": waiver_id, "status": "Pending"},  # 3G: never overwrite an approval that landed meanwhile
         {
             "$set": {
                 "status": "Rejected",
@@ -203,6 +216,9 @@ async def reject_waiver(
             "$push": {"history": {"at": ts, "by": user["name"], "action": "rejected", "reason": body.reason}},
         },
     )
+    if not res.modified_count:
+        cur = await db.waivers.find_one({"id": waiver_id}, {"_id": 0, "status": 1})
+        raise ApiError(409, f"Waiver is {(cur or {}).get('status')}", "WAIVER_STATE")
     await write_audit(
         user,
         "waiver.reject",
@@ -235,7 +251,7 @@ async def cancel_waiver(
     if w["status"] != "Approved":
         raise ApiError(409, f"Waiver is {w['status']}", "WAIVER_STATE")
     ts = now_iso()
-    await db.waivers.update_one(
+    res = await db.waivers.update_one(
         {"id": waiver_id, "status": "Approved"},
         {
             "$set": {
@@ -247,6 +263,8 @@ async def cancel_waiver(
             "$push": {"history": {"at": ts, "by": user["name"], "action": "cancelled", "reason": body.reason}},
         },
     )
+    if not res.modified_count:
+        raise ApiError(409, "Already cancelled", "WAIVER_STATE")
     await rebuild(w["booking_id"])
     await write_audit(
         user,

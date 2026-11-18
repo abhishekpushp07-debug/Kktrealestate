@@ -5,7 +5,7 @@ Maintained by the event bus (debounced ≤2 s) + a 60 s sweep; `recompute_all()`
 import asyncio
 import hashlib
 import logging
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from core.jobs import timed_job
 from core.money import money_snapshot
@@ -59,10 +59,12 @@ async def _invalidate_read_caches():
 
 
 async def flush():
+    started = datetime.now(UTC)
     try:
         if _dirty["all"]:
             _dirty.update({"all": False, "projects": set(), "blocks": set(), "customers": set()})
             await recompute_all()
+            await _state.clear({"all": True}, started)
             return
         ps, bs, cs = _dirty["projects"], _dirty["blocks"], _dirty["customers"]
         _dirty.update({"projects": set(), "blocks": set(), "customers": set()})
@@ -77,6 +79,7 @@ async def flush():
             await refresh_customer(cid)
         if ps or bs or cs:
             await refresh_dashboards()
+            await _state.clear({"projects": ps, "blocks": bs, "customers": cs}, started)
             await _invalidate_read_caches()
         if ps or bs or cs:
             try:
@@ -118,11 +121,13 @@ async def _on_change(evt: dict):
     )
     if not doc:
         return
-    mark_dirty(
-        project_id=doc.get(pf) if pf else None,
-        block_id=doc.get(bf) if bf else None,
-        customer_id=doc.get(cf) if cf else None,
-    )
+    marks = {
+        "project_id": doc.get(pf) if pf else None,
+        "block_id": doc.get(bf) if bf else None,
+        "customer_id": doc.get(cf) if cf else None,
+    }
+    await _state.persist(**marks)  # 3G: survives a crash and tells every replica a flush is pending
+    mark_dirty(**marks)
     if evt.get("entity_type") in ("flat", "lead", "site_visit", "service_request"):
         mark_dirty(all_=False)  # counts on home come from the dashboard snapshot → flush recomputes it
 
@@ -419,6 +424,13 @@ async def compute_dashboard(company_id: str, scope: list[str] | None) -> dict:
 
 
 async def get_dashboard(company_id: str, scope: list[str] | None) -> dict:
+    if await _state.shared_pending():  # 3G: a write on any replica is not flushed yet → figures from source
+        pf = {} if not scope or "*" in scope else {"id": {"$in": scope}}
+        for bid in await _state.marked("blocks"):
+            await refresh_block(bid)  # tower progress / units feed the project summary
+        for p in await db.projects.find({"company_id": company_id, **pf}, {"_id": 0, "id": 1}).to_list(None):
+            await refresh_project(p["id"])  # project_summaries feed the dashboard: recompute them first
+        return await compute_dashboard(company_id, scope)
     snap = await db.dashboard_snapshots.find_one(
         {"company_id": company_id, "scope_hash": scope_hash(scope)}, {"_id": 0}
     )
@@ -448,6 +460,7 @@ async def sweep_loop():
         await asyncio.sleep(60)
         try:
             stale = now_iso()
+            await _state.load_shared(older_than_s=DEBOUNCE_S + 3)  # marks of a crashed process / another replica
             await timed_job("read_model_flush", flush)
             await timed_job("outbox_reconcile", reconcile_outbox)
             for p in await db.project_summaries.find(

@@ -131,6 +131,20 @@ function DiskBackups({ tick, onPruned }) {
   );
 }
 
+function UniquenessRules({ rules }) {
+  const off = (rules || []).filter((r) => r.status === "not_applied");
+  if (!off.length) return null;
+  return (
+    <div className="mt-4 rounded-[10px] border border-brick/30 bg-brick/5 p-3" data-testid="ops-uniqueness-warning">
+      {off.map((r) => (
+        <p key={r.index} className="text-sm text-brick" data-testid={`ops-uniqueness-${r.index}`}>
+          {r.message} · {r.key}
+        </p>
+      ))}
+    </div>
+  );
+}
+
 function OpsSummary({ d, groups }) {
   return (
     <>
@@ -368,6 +382,7 @@ export function SystemHealthCard() {
       {d && (
         <>
           <OpsSummary d={d} groups={groups} />
+          <UniquenessRules rules={d.uniqueness} />
           <div className="mt-5 grid gap-4 md:grid-cols-2 [&>*]:min-w-0">
             <OpsJobs d={d} jobs={jobs} />
             <div data-testid="ops-slow">

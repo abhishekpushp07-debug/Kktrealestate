@@ -18,7 +18,7 @@ async def widgets(user: dict = Depends(require("masters.project.view"))):
 
     own = user["id"] if user.get("role_name") == "Sales" else ""
     scope = ",".join(sorted(user.get("project_scope") or []))
-    ck = f"widgets:{user['company_id']}:{user.get('role_name')}:{own}:{scope}"
+    ck = f"widgets:{user['company_id']}:{user.get('role_name')}:{own}:{scope}|{await ttlcache.data_stamp()}"  # 3G: replica-safe
     hit = ttlcache.get(ck)
     if hit is not None:
         return hit

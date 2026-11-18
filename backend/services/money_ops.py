@@ -211,7 +211,36 @@ async def create_refund(
     return rf
 
 
+async def complete_refund_children(parent: dict) -> int:
+    """Per-bucket paid rows of a Mixed payout (ledger engine reads one row per bucket). Deterministic ids + upsert:
+    re-running after a crash writes only what is missing. Returns rows written."""
+    n = 0
+    base = {k: v for k, v in parent.items() if k not in ("_id", "children_pending", "amount_total_paise")}
+    for b_ in ("Account", "Other"):
+        amt = (parent.get("split") or {}).get(b_) or 0
+        if amt > 0:
+            child = {**base, "id": f"{parent['id']}-{b_.lower()}", "parent_refund_id": parent["id"], "bucket": b_,
+                     "amount_paise": amt, "split": {b_: amt}, "version": 1}  # fmt: skip
+            r = await db.refunds.update_one({"id": child["id"]}, {"$setOnInsert": child}, upsert=True)
+            n += bool(r.upserted_id)
+    await db.refunds.update_one({"id": parent["id"]}, {"$unset": {"children_pending": ""}})
+    return n
+
+
+async def repair_interrupted_refunds() -> int:
+    """Startup / sweep: finish Mixed payouts that stopped between the parent write and its children (3G crash drill)."""
+    n = 0
+    async for p in db.refunds.find({"children_pending": True}, {"_id": 0}):
+        n += await complete_refund_children(p)
+        await rebuild(p["booking_id"])
+    return n
+
+
 async def pay_refund(rf: dict, body: dict, actor: dict) -> dict:
+    if rf["status"] == "Paid" and rf.get("children_pending"):  # retry of a payout that crashed midway
+        await complete_refund_children(rf)
+        await rebuild(rf["booking_id"])
+        return await db.refunds.find_one({"id": rf["id"]}, {"_id": 0})
     if rf["status"] != "Pending":
         raise ApiError(409, f"Refund is {rf['status']}", "REFUND_NOT_PENDING")
     ts = now_iso()
@@ -252,29 +281,16 @@ async def pay_refund(rf: dict, body: dict, actor: dict) -> dict:
         "bucket": bucket,
         "updated_at": ts,
     }
+    mixed = bucket == "Mixed"
+    if mixed:  # 3G: the parent's split lands in the same atomic write as "Paid"; children are idempotent upserts
+        upd |= {"bucket": "Cash", "amount_paise": rf["split"]["Cash"], "amount_total_paise": rf["amount_paise"], "children_pending": True}
     res = await db.refunds.update_one(
         {"id": rf["id"], "status": "Pending", "version": rf["version"]}, {"$set": upd, "$inc": {"version": 1}}
     )
     if not res.matched_count:
         raise ApiError(409, "Refund changed; reload and retry", "VERSION_CONFLICT")
-    if bucket == "Mixed":  # split into per-bucket paid rows for the ledger engine
-        await db.refunds.update_one(
-            {"id": rf["id"]},
-            {"$set": {"bucket": "Cash", "amount_paise": rf["split"]["Cash"], "amount_total_paise": rf["amount_paise"]}},
-        )
-        for b_, amt in (("Account", rf["split"]["Account"]), ("Other", rf["split"]["Other"])):
-            if amt > 0:
-                child = {
-                    **{k: v for k, v in rf.items() if k != "_id"},
-                    **upd,
-                    "id": new_id(),
-                    "parent_refund_id": rf["id"],
-                    "bucket": b_,
-                    "amount_paise": amt,
-                    "split": {b_: amt},
-                }
-                await db.refunds.insert_one(child)
-        await db.refunds.delete_many({"_id": None})
+    if mixed:
+        await complete_refund_children(await db.refunds.find_one({"id": rf["id"]}, {"_id": 0}))
     await rebuild(rf["booking_id"])
     out = await db.refunds.find_one({"id": rf["id"]}, {"_id": 0})
     await write_audit(

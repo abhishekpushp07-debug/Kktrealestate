@@ -163,7 +163,7 @@ async def get(company_id: str, scope: str, sid: str | None, months: int = 12) ->
     ).to_list(None)
     from services import read_model_state
 
-    stale = read_model_state.pending()  # a write's bucket refresh is still debounced/in flight → serve from source
+    stale = await read_model_state.shared_pending()  # a bucket refresh is debounced/in flight on any replica → source
     if stale or len(rows) < len(ms) or any(k not in r for r in rows for k in KINDS):  # or missing month / old shape
         full = await refresh(company_id, scope, sid, max(months, 24))
         return {"months": ms, **{k: full[k][-len(ms) :] for k in KINDS}, "source": "monthly_buckets (refreshed)"}

@@ -124,7 +124,10 @@ async def project_summary(project_id: str, response: Response, user: dict = Depe
     from services.read_models import refresh_project
 
     ensure_project_access(user, project_id)
-    s = await db.project_summaries.find_one({"project_id": project_id}, {"_id": 0}) or await refresh_project(project_id)
+    from services.read_model_state import shared_pending
+
+    s = None if await shared_pending(f"p:{project_id}") else await db.project_summaries.find_one({"project_id": project_id}, {"_id": 0})
+    s = s or await refresh_project(project_id)
     if not s:
         from utils import ApiError
 
@@ -138,7 +141,10 @@ async def block_summary(block_id: str, response: Response, user: dict = Depends(
     from deps import ensure_project_access
     from services.read_models import refresh_block
 
-    s = await db.block_summaries.find_one({"block_id": block_id}, {"_id": 0}) or await refresh_block(block_id)
+    from services.read_model_state import shared_pending
+
+    s = None if await shared_pending(f"b:{block_id}") else await db.block_summaries.find_one({"block_id": block_id}, {"_id": 0})
+    s = s or await refresh_block(block_id)
     if not s:
         from utils import ApiError
 
@@ -152,9 +158,12 @@ async def block_summary(block_id: str, response: Response, user: dict = Depends(
 async def customer_summary(customer_id: str, response: Response, user: dict = Depends(require("sales.customer.view"))):
     from services.read_models import refresh_customer
 
-    s = await db.customer_summaries.find_one(
+    from services.read_model_state import shared_pending
+
+    s = None if await shared_pending(f"c:{customer_id}") else await db.customer_summaries.find_one(
         {"customer_id": customer_id, "company_id": user["company_id"]}, {"_id": 0}
-    ) or await refresh_customer(customer_id)
+    )
+    s = s or await refresh_customer(customer_id)
     if not s:
         from utils import ApiError
 

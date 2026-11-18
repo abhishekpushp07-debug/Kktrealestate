@@ -65,6 +65,9 @@ async def ops(window: int = 900, user: dict = Depends(require("admin.system_heal
         "alerts": alerts.LAST,
         "backup": await _backup_status(),
         "storage": await storage_usage(),
+        "uniqueness": ((await db.settings.find_one({"key": "invariants_v1"}, {"_id": 0, "value.uniqueness": 1})) or {})
+        .get("value", {})
+        .get("uniqueness", []),
         "job_runs": await job_runs.health(),
         "read_models": {"last_full_refresh": (rm or {}).get("value"), "oldest_project_summary_age_s": staleness_s},
         "cache": ttlcache.HITS,

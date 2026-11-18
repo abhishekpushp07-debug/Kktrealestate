@@ -14,13 +14,7 @@ async def dashboard(user: dict = Depends(require("masters.project.view"))):
     from services import ttlcache
 
     ck = f"dash:{user['company_id']}:{clock.today_iso()}:{int(inv.can_see_real(user))}:{','.join(sorted(user.get('project_scope') or []))}"
-    hit = ttlcache.get(ck)
-    if hit is not None:
-        return hit
-    gen = ttlcache.generation()
-    res = await _dashboard(user)
-    ttlcache.put(ck, res, 10, gen)
-    return res
+    return await ttlcache.cached(ck, 10, lambda: _dashboard(user))  # 3G: data-stamped, cross-replica safe
 
 
 async def _dashboard(user: dict):

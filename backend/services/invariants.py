@@ -18,6 +18,46 @@ from services.validators import SCHEMAS, VALIDATORS  # noqa: F401 — VALIDATORS
 
 log = logging.getLogger("invariants")
 
+# 3G (REQ-290/307): money business keys the database itself must refuse to repeat. A rule that meets existing
+# duplicates (e.g. on an old production copy) is skipped and shown on System Health; the app keeps starting.
+BUSINESS_KEYS = [
+    ("waiver number", "waivers", [("waiver_number", ASCENDING)], "uniq_waiver_number", {"waiver_number": {"$type": "string"}}),
+    ("credit-note number", "waivers", [("cn_number", ASCENDING)], "uniq_cn_number", {"cn_number": {"$type": "string"}}),
+    # a Mixed payout keeps one number across its per-bucket rows (parent = Cash, children = Account / Other)
+    ("refund number", "refunds", [("refund_number", ASCENDING), ("bucket", ASCENDING)], "uniq_refund_number_bucket", None),
+    ("ledger line (booking + sequence)", "ledger_entries", [("booking_id", ASCENDING), ("seq", ASCENDING)], "uniq_ledger_seq", None),
+]
+NOT_APPLIED = "Uniqueness rule not applied — duplicates found"
+
+
+async def _duplicates(coll: str, keys: list, pfe: dict | None) -> list:
+    group = {k.replace(".", "_"): f"${k}" for k, _ in keys}
+    pipe = [{"$match": pfe or {}}, {"$group": {"_id": group, "n": {"$sum": 1}}}, {"$match": {"n": {"$gt": 1}}}, {"$limit": 5}]
+    return [r["_id"] async for r in db[coll].aggregate(pipe, allowDiskUse=True)]
+
+
+async def _business_key(label: str, coll: str, keys: list, name: str, pfe: dict | None) -> dict:
+    row = {"key": label, "collection": coll, "index": name}
+    info = await db[coll].index_information()
+    if name in info:
+        return {**row, "status": "applied"}
+    dups = await _duplicates(coll, keys, pfe)
+    if dups:
+        log.warning("%s: %s.%s — %d+ duplicate keys, e.g. %s", NOT_APPLIED, coll, name, len(dups), dups[:2])
+        return {**row, "status": "not_applied", "message": NOT_APPLIED, "examples": [str(d) for d in dups]}
+    for old, ix in info.items():  # a plain (non-unique) index on the same keys is replaced by the unique one
+        if old != "_id_" and list(ix["key"]) == keys and not ix.get("unique"):
+            try:
+                await db[coll].drop_index(old)
+            except OperationFailure:
+                pass  # the other replica dropped it first
+    try:
+        await db[coll].create_index(keys, unique=True, name=name, **({"partialFilterExpression": pfe} if pfe else {}))
+        return {**row, "status": "applied"}
+    except OperationFailure as e:
+        log.warning("%s: %s.%s — %s", NOT_APPLIED, coll, name, str(e)[:160])
+        return {**row, "status": "not_applied", "message": NOT_APPLIED, "examples": [str(e)[:120]]}
+
 
 async def ensure_invariants() -> dict:
     out = {"indexes": [], "validators": []}
@@ -47,6 +87,7 @@ async def ensure_invariants() -> dict:
         except OperationFailure as e:  # existing duplicates → report, never crash startup
             log.warning("invariant index %s not created: %s", name, str(e)[:200])
             out["indexes"].append(f"{name}: FAILED {str(e)[:80]}")
+    out["uniqueness"] = [await _business_key(*spec) for spec in BUSINESS_KEYS]
     try:
         await db.idempotency_claims.create_index("created_at", expireAfterSeconds=24 * 3600, name="ttl_idem_claims")
     except OperationFailure:

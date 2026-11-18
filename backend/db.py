@@ -214,9 +214,7 @@ async def _indexes_list_sorts():
             [("company_id", ASCENDING), ("voided", ASCENDING), ("status", ASCENDING), ("due_date", ASCENDING)],
             "overdue",
         ),
-        ("ledger_entries", [("booking_id", ASCENDING), ("seq", ASCENDING)], "booking_seq"),
-        (
-            "audit_logs",
+        ("audit_logs",
             [("entity_type", ASCENDING), ("entity_id", ASCENDING), ("created_at", DESCENDING)],
             "entity_time",
         ),
@@ -313,7 +311,7 @@ async def _indexes_business_compound():
         name="plan_name_scope",
         partialFilterExpression={"is_active": True},
     )
-    await _ci(db.ledger_entries, [("booking_id", ASCENDING), ("seq", ASCENDING)])
+    # ledger_entries (booking_id, seq): unique, created by services.invariants (3G) — duplicates never stop startup
     await _ci(db.notifications, [("user_id", ASCENDING), ("read", ASCENDING), ("created_at", DESCENDING)])
     await _ci(db.notifications, [("audit_id", ASCENDING), ("user_id", ASCENDING)])
     await _ci(db.notifications, [("swept_v", ASCENDING), ("user_id", ASCENDING)])

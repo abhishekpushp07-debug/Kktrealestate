@@ -124,17 +124,16 @@ def _tot(rows: list[dict]) -> dict:
 async def _dead_booking_ids(company_id: str) -> list[str]:
     """Bookings that are not live (Cancelled / transferred-away): their demands never count — even Paid ones belong to the cancellation record."""
     key = f"dreg-dead:{company_id}"
-    hit = ttlcache.get(key)
-    if hit is not None:
-        return hit
-    ids = [
-        b["id"]
-        for b in await db.bookings.find(
-            {"company_id": company_id, "status": {"$nin": definitions.LIVE_BOOKING_STATUSES}}, {"_id": 0, "id": 1}
-        ).to_list(None)
-    ]
-    ttlcache.put(key, ids, 30)
-    return ids
+
+    async def compute():
+        return [
+            b["id"]
+            for b in await db.bookings.find(
+                {"company_id": company_id, "status": {"$nin": definitions.LIVE_BOOKING_STATUSES}}, {"_id": 0, "id": 1}
+            ).to_list(None)
+        ]
+
+    return await ttlcache.cached(key, 30, compute)  # 3G: data-stamped, cross-replica safe
 
 
 async def _live_only(q: dict, company_id: str) -> dict:

@@ -173,8 +173,22 @@ async def _reserve_split(booking: dict, p: dict) -> dict:
         **({"summary.cash_paid_paise": parts["Cash"]} if parts["Cash"] else {}),
         **({"summary.account_paid_paise": parts["Account"]} if parts["Account"] else {}),
     }
-    res = await db.bookings.update_one({"id": booking["id"], "status": "Active"}, {"$inc": inc})
+    res = await db.bookings.update_one(
+        {
+            "id": booking["id"],
+            "status": "Active",
+            # 3G: the cap is enforced by the write itself (a concurrent receipt can never push a bucket over agreed)
+            **({"summary.cash_paid_paise": {"$not": {"$gt": booking["cash_agreed_paise"] - parts["Cash"]}}} if parts["Cash"] else {}),
+            **({"summary.account_paid_paise": {"$not": {"$gt": booking["account_agreed_paise"] - parts["Account"]}}} if parts["Account"] else {}),
+        },
+        {"$inc": inc},
+    )
     if not res.matched_count:
+        fresh = await db.bookings.find_one({"id": booking["id"]}, {"_id": 0, "status": 1})
+        if fresh and fresh["status"] == "Active":
+            cat = "Cash" if parts["Cash"] else "Account"
+            agreed = booking["cash_agreed_paise"] if cat == "Cash" else booking["account_agreed_paise"]
+            raise _cap_error(cat, agreed, await bucket_paid(booking["id"], cat), parts[cat])
         raise ApiError(409, "Booking is not active; payments are not accepted", "BOOKING_NOT_ACTIVE")
     return {"$inc": {k: -v for k, v in inc.items()}}
 
@@ -392,8 +406,25 @@ async def post_payment(
     user: dict = Depends(require("finance.payment.create")),
     _k: None = Depends(require_idempotency_key),
 ):
+    from services.booking_lock import booking_lock
+
+    async with booking_lock(body.booking_id):  # 3G: one writer per booking across replicas (cap, cancel, ledger)
+        return await _post_payment(body, request, user)
+
+
+async def _post_payment(body: PaymentIn, request: Request, user: dict):
     booking = await get_or_404(db.bookings, body.booking_id, "Booking", {"company_id": user["company_id"]})
     ensure_project_access(user, booking["project_id"])
+    prior = await db.payments.find_one({"idempotency_key": request.headers.get("idempotency-key")}, {"_id": 0})
+    if prior and prior["booking_id"] == booking["id"]:
+        # 3G crash recovery: the first attempt stored the receipt but stopped before finishing (ledger, audit) —
+        # the retry with the same key finishes it and answers with the original receipt, never a second one
+        await rebuild(booking["id"])
+        if not await db.audit_logs.find_one({"action": "payment.post", "entity_id": prior["id"]}, {"_id": 1}):
+            await write_audit(user, "payment.post", "payment", prior["id"], after={"receipt_number": prior["receipt_number"], "amount_paise": prior["amount_paise"], "recovered": True}, ip=client_ip(request))  # fmt: skip
+        out = present_money(await db.payments.find_one({"id": prior["id"]}, {"_id": 0}))
+        out["warnings"] = []
+        return out
     if body.payment_date.isoformat() < booking["booking_date"]:
         raise ApiError(422, "payment_date cannot be before booking_date", "VALIDATION_ERROR")
     mode = await get_or_404(db.payment_modes, body.payment_mode_id, "Payment mode", {"is_active": True})

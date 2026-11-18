@@ -1009,9 +1009,40 @@ async def cancel_booking(
     booking_id: str, body: CancelIn, request: Request, user: dict = Depends(require("sales.booking.cancel"))
 ):
     """Cancellation maths comes from money_ops (deduction % of agreement/received, capped at received; only demanded penalty charges deducted)."""
+    from services.booking_lock import booking_lock
+
+    async with booking_lock(booking_id):  # 3G: a receipt on another replica can't land between preview and cancel
+        return await _cancel_booking(booking_id, body, request, user)
+
+
+async def _finish_interrupted_cancel(b: dict, user: dict, request: Request):
+    """3G crash recovery: a cancel that stopped after the status write (no refund / forfeit row yet) is completed by
+    its retry with the cancellation figures already recorded — same rows a clean run writes."""
+    from services.money_ops import create_refund
+
+    canc = b["cancellation"]
+    policy = canc.get("policy") or await _policy(user["company_id"], b.get("project_id"))
+    await rebuild(b["id"])
+    fresh = await db.bookings.find_one({"id": b["id"]}, {"_id": 0})
+    rf = await create_refund(fresh, canc["deduction_paise"], user, policy, preview=canc, pre_summary=fresh.get("summary"))
+    await auto_register(b["id"], ["cancellation"], user)
+    await write_audit(user, "booking.cancel", "booking", b["id"], before={"status": "Active", "booking_number": b["booking_number"]},
+                      after={"status": "Cancelled", "recovered": True, "booking_number": b["booking_number"]}, ip=client_ip(request))  # fmt: skip
+    out = _present(await db.bookings.find_one({"id": b["id"]}, {"_id": 0}))
+    out["refund"] = present_money(rf) if rf else None
+    return out
+
+
+async def _cancel_booking(booking_id: str, body: CancelIn, request: Request, user: dict):
     from services.money_ops import cancellation_preview, create_refund
 
     b = await _load(booking_id, user)
+    if (
+        b["status"] == "Cancelled"
+        and (b.get("cancellation") or {}).get("received_paise")
+        and not await db.refunds.find_one({"booking_id": booking_id}, {"_id": 1})
+    ):
+        return await _finish_interrupted_cancel(b, user, request)
     if b["status"] != "Active":
         raise ApiError(409, f"Booking is already {b['status']}", "BOOKING_NOT_ACTIVE")
     if await booking_rules.pending_cheques(booking_id):

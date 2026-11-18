@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+from datetime import UTC, datetime, timedelta
 
 from crypto import encrypt_field
 from db import db, ensure_indexes
@@ -565,6 +566,13 @@ async def seed():
                         "status_reason": reason,
                         "status_changed_at": now_iso(),
                         "updated_at": now_iso(),
+                        # 3G: the demo seed obeys the owner rule too — a Hold always carries an explicit expiry
+                        **(
+                            {"hold": {"note": reason, "expires_at": (datetime.now(UTC) + timedelta(days=15)).isoformat(),
+                                      "created_at": now_iso(), "created_by": None}}  # fmt: skip
+                            if status == "Hold"
+                            else {}
+                        ),
                     }
                 },
             )

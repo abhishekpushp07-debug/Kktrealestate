@@ -74,9 +74,31 @@ def scope_key(user: dict) -> str:
     return f"{user['company_id']}:{','.join(sorted(user.get('project_scope') or []))}"
 
 
+# writes that never change business figures (sign-ins, reminders, generated PDFs, messages) don't move the stamp
+import re as _re  # noqa: E402
+
+_NOISE = _re.compile(r"^(reminder\.|document\.generated|message\.|notification\.|auth\.|login|report\.|export\.|session\.)")
+
+
+async def data_stamp() -> str:
+    """3G (REQ-314): one value every replica reads from the shared database. It moves when any business write is
+    audited (every write is), when any ledger is rebuilt, and when a read-model mark is set or flushed — so a cache
+    key that carries it is never served after a write that returned on another process (with or without Redis)."""
+    from db import db
+    from services import read_model_state
+
+    a = await db.audit_logs.find_one({"action": {"$not": _NOISE}}, {"_id": 1}, sort=[("_id", -1)])
+    led = await db.ledger_entries.find_one({}, {"_id": 1}, sort=[("_id", -1)])
+    return f"{a and a['_id']}.{led and led['_id']}.{await read_model_state.version()}"
+
+
 async def cached(key: str, ttl: float, compute, stamped: bool = False):
     """stamped=True: the key already carries a data stamp read before computing, so a write during the compute
-    changes the next key — the result is still right for this key and is cached (Phase 3F reports)."""
+    changes the next key — the result is still right for this key and is cached (Phase 3F reports).
+    Otherwise (3G) the shared data stamp is appended here, so every cached read is cross-replica safe."""
+    if not stamped:
+        key = f"{key}|{await data_stamp()}"
+        stamped = True
     use_redis = os.environ.get("REDIS_URL")
     if use_redis:
         from services import cache
