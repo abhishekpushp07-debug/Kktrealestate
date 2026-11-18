@@ -501,16 +501,22 @@ async def collections(
         },
     )
     f, t = _dates(date_from or from_date, date_to or to_date)
-    q = {**_scope(user, project_id, block_id), "payment_date": {"$gte": f, "$lte": t}, "status": status or "Cleared"}
+    from services.definitions import receipt_parts_stages, receipt_split_group, received_day_expr, received_match
+
+    cleared = (status or "Cleared") == "Cleared"  # REQ-319: received = cleared, a cheque on its clearing day
+    q = {**_scope(user, project_id, block_id), "payment_date": {"$gte": f, "$lte": t}, "status": status}
+    if cleared:
+        q.pop("payment_date"), q.pop("status")
+        q |= received_match(f, t)
     if mode:
         q["payment_mode_code"] = mode
-    from services.definitions import receipt_parts_stages, receipt_split_group
+    on = received_day_expr() if cleared else "$payment_date"
 
     part_filter = [{"$match": {"_part.cat": "Other" if category == "Other charges" else category}}] if category else []
     key = {
-        "day": "$payment_date",
-        "week": {"$dateToString": {"format": "%G-W%V", "date": {"$dateFromString": {"dateString": "$payment_date"}}}},
-        "month": {"$substr": ["$payment_date", 0, 7]},
+        "day": on,
+        "week": {"$dateToString": {"format": "%G-W%V", "date": {"$dateFromString": {"dateString": on}}}},
+        "month": {"$substr": [on, 0, 7]},
     }[group_by if group_by in ("day", "week", "month") else "day"]
     rows = await db.payments.aggregate(
         maxTimeMS=REPORT_MS,
@@ -823,13 +829,31 @@ async def demand_vs_collection(
         None, description="Demand raised date ≥ (YYYY-MM-DD); same name as the Demand Register"
     ),
     date_to: str | None = Query(None, description="Demand raised date ≤ (YYYY-MM-DD)"),
+    include_cancelled: bool = False,
     format: str | None = None,
     user: dict = Depends(require("reports.demand_vs_collection.view")),
 ):
-    _strict_params(request, {"block_id", "project_id", "date_from", "date_to"})
+    _strict_params(request, {"block_id", "project_id", "date_from", "date_to", "include_cancelled"})
     q = {**_scope(user, project_id, block_id), "voided": {"$ne": True}, "status": {"$nin": ["Voided", "Cancelled"]}}
     if date_from or date_to:
         q["demand_date"] = {**({"$gte": date_from} if date_from else {}), **({"$lte": date_to} if date_to else {})}
+    # REQ-328/330: cancelled bookings are not a sale — left out by default; "Include cancelled" adds them as own rows
+    bscope = _scope(user, project_id, block_id)
+    live_bk = {
+        b["id"]: b["block_id"]
+        async for b in db.bookings.find(
+            {**bscope, "status": {"$in": ["Active", "Completed"]}}, {"_id": 0, "id": 1, "block_id": 1}
+        )
+    }
+    live = list(live_bk)
+    if not include_cancelled:
+        q["booking_id"] = {"$in": live}
+    else:  # a cancelled booking's bills stay as raised (its open bills were closed by the cancellation, not voided)
+        q.pop("status")
+        q["$or"] = [
+            {"booking_id": {"$in": live}, "status": {"$nin": ["Voided", "Cancelled"]}},
+            {"booking_id": {"$nin": live}, "status": {"$ne": "Voided"}},
+        ]
     rows = await db.demands.aggregate(
         maxTimeMS=REPORT_MS,
         pipeline=[
@@ -841,6 +865,7 @@ async def demand_vs_collection(
                         "seq": "$milestone_seq",
                         "name": "$milestone_name",
                         "pct": "$cumulative_percent",
+                        "live": {"$in": ["$booking_id", live]},
                     },
                     "cash_demand_paise": {"$sum": "$cash_demand_paise"},
                     "account_demand_paise": {"$sum": "$account_demand_paise"},
@@ -858,10 +883,42 @@ async def demand_vs_collection(
             {"company_id": user["company_id"]}, {"_id": 0, "id": 1, "name": 1, "project_code": 1}
         ).to_list(None)
     }
+    adj: dict = {}  # transfer / price-revision steps on live bookings' instalment bills (as Customer status counts them)
+    if not (date_from or date_to):
+        async for r in db.ledger_entries.aggregate(
+            [
+                {"$match": {"booking_id": {"$in": live}, "type": {"$nin": ["DEMAND", "OTHER_CHARGE_DEMAND"]}}},
+                {"$group": {"_id": "$booking_id", "t": {"$sum": "$udhar_paise"}, "c": {"$sum": "$udhar_cash_paise"}}},
+            ]
+        ):
+            if r["t"]:
+                a = adj.setdefault(live_bk[r["_id"]], {"t": 0, "c": 0, "n": 0})
+                a["t"], a["c"], a["n"] = a["t"] + r["t"], a["c"] + (r["c"] or 0), a["n"] + 1
+    rows += [
+        {
+            "_id": {
+                "block_id": bid,
+                "seq": None,
+                "name": "Transfer / price revision adjustment",
+                "pct": None,
+                "live": True,
+            },
+            "cash_demand_paise": a["c"],
+            "account_demand_paise": a["t"] - a["c"],
+            "demand_paise": a["t"],
+            "collected_paise": 0,
+            "count": a["n"],
+        }
+        for bid, a in adj.items()
+    ]
     out = [
         {
-            "block": blocks.get(r["_id"]["block_id"], "?"),
-            "milestone": f"{r['_id'].get('seq') or '·'}. {r['_id'].get('name') or 'Manual / other'}",
+            "block": blocks.get(r["_id"]["block_id"], "?") + ("" if r["_id"]["live"] else " · cancelled"),
+            "live": r["_id"]["live"],
+            "cancelled_demand_paise": 0 if r["_id"]["live"] else r["demand_paise"],
+            "milestone": r["_id"]["name"]
+            if r["_id"]["name"] == "Transfer / price revision adjustment"
+            else f"{r['_id'].get('seq') or '·'}. {r['_id'].get('name') or 'Manual / other'}",
             "percent": r["_id"].get("pct"),
             "count": r["count"],
             "cash_demand_paise": r["cash_demand_paise"],
@@ -876,41 +933,15 @@ async def demand_vs_collection(
         k: sum(r[k] for r in out)
         for k in ("count", "cash_demand_paise", "account_demand_paise", "demand_paise", "collected_paise")
     }
+    totals["cancelled_demand_paise"] = sum(r["cancelled_demand_paise"] for r in out)
     totals["pct_collected"] = (
         round(100 * totals["collected_paise"] / totals["demand_paise"], 1) if totals["demand_paise"] else 0
     )
-    bridge = None
-    if not (date_from or date_to):  # till today: reconcile instalment bills with all bills (Outstanding report)
-        bscope = _scope(user, project_id, block_id)
-        live = [
-            b["id"]
-            async for b in db.bookings.find({**bscope, "status": {"$in": ["Active", "Completed"]}}, {"_id": 0, "id": 1})
-        ]
-        not_live = await db.demands.aggregate(
-            [
-                {"$match": {**q, "booking_id": {"$nin": live}}},
-                {"$group": {"_id": None, "t": {"$sum": "$total_demand_paise"}}},
-            ]
-        ).to_list(1)
-        led = {
-            r["_id"]: r["t"]
-            async for r in db.ledger_entries.aggregate(
-                [
-                    {"$match": {"booking_id": {"$in": live}, "type": {"$ne": "DEMAND"}}},
-                    {"$group": {"_id": "$type", "t": {"$sum": "$udhar_paise"}}},
-                ]
-            )
-        }
-        other = led.pop("OTHER_CHARGE_DEMAND", 0)
-        nl = not_live[0]["t"] if not_live else 0
-        adjust = sum(led.values())
-        bridge = {
-            "instalment_paise": totals["demand_paise"],
-            "not_live_paise": nl,
-            "other_charges_paise": other,
-            "adjust_paise": adjust,
-            "all_bills_paise": totals["demand_paise"] - nl + other + adjust,
-        }
+    bridge = {  # live = Customer status bills raised; cancelled rows only when switched on
+        "live_paise": totals["demand_paise"] - totals["cancelled_demand_paise"],
+        "cancelled_paise": totals["cancelled_demand_paise"],
+        "adjust_paise": sum(a["t"] for a in adj.values()),
+    }
     cols = [
         ("block", "Block", "str", 1.3),
         ("milestone", "Milestone", "str", 1.3),
@@ -925,7 +956,7 @@ async def demand_vs_collection(
     return await respond(
         request,
         format,
-        {"bridge": bridge} if bridge else {},
+        {"bridge": bridge},
         "Bills vs Collection",
         await _company(user),
         cols,
@@ -1458,48 +1489,49 @@ async def bank_receipts(
 ):
     _strict_params(request, {"to_date", "from_date"})
     f, t = _dates(from_date, to_date)
-    rows = await db.payments.aggregate(
+    from services import definitions as D
+
+    # REQ-319/323: the rows Collections reads — each receipt on its received day, each reversal (−) on its reversal
+    # day — summed by bank / mode; cash rides along so Bank-wise + Cash = Collections
+    base = {"company_id": user["company_id"], **report_scope_filter(user)}
+    key = {
+        "bank": {"$ifNull": ["$bank_account_name", "Unassigned"]},
+        "mode": {"$ifNull": ["$payment_mode_name", "$payment_mode_code"]},
+        "cash": {"$eq": ["$payment_mode_code", "CASH"]},
+    }
+    grp = {"_id": key, "n": {"$sum": 1}, "amt": {"$sum": "$amount_paise"}}
+    got = await db.payments.aggregate(
+        [{"$match": {**base, **D.received_match(f, t, {"$in": ["Cleared", "Reversed"]})}}, {"$group": grp}],
         maxTimeMS=REPORT_MS,
-        pipeline=[
-            {
-                "$match": {
-                    "company_id": user["company_id"],
-                    **report_scope_filter(user),
-                    "payment_date": {"$gte": f, "$lte": t},
-                    "status": {"$in": ["Cleared", "Pending"]},
-                    "payment_mode_code": {"$ne": "CASH"},
-                }
-            },
-            {
-                "$group": {
-                    "_id": {"bank": {"$ifNull": ["$bank_account_name", "Unassigned"]}, "mode": "$payment_mode_name"},
-                    "count": {"$sum": 1},
-                    "cleared_paise": {"$sum": {"$cond": [{"$eq": ["$status", "Cleared"]}, "$amount_paise", 0]}},
-                    "pending_paise": {"$sum": {"$cond": [{"$eq": ["$status", "Pending"]}, "$amount_paise", 0]}},
-                }
-            },
-            {"$sort": {"_id.bank": 1}},
-        ],
     ).to_list(None)
-    out = [
-        {
-            "bank": r["_id"]["bank"],
-            "mode": r["_id"]["mode"],
-            "count": r["count"],
-            "cleared_paise": r["cleared_paise"],
-            "pending_paise": r["pending_paise"],
-            "total_paise": r["cleared_paise"] + r["pending_paise"],
-        }
-        for r in rows
-    ]
-    totals = {k: sum(r[k] for r in out) for k in ("count", "cleared_paise", "pending_paise", "total_paise")}
+    rev = await db.payments.aggregate(
+        [{"$match": {**base, "status": "Reversed", "reversal.at": clock.day_range(f, t)}}, {"$group": grp}],
+        maxTimeMS=REPORT_MS,
+    ).to_list(None)
+    g: dict = {}
+    for r, sign in [(r, 1) for r in got] + [(r, -1) for r in rev]:
+        k = (r["_id"]["bank"], r["_id"]["mode"], r["_id"]["cash"])
+        e = g.setdefault(k, {"bank": k[0], "mode": k[1], "count": 0, "cleared_paise": 0, "reversed_paise": 0})
+        if sign > 0:
+            e["count"], e["cleared_paise"] = e["count"] + r["n"], e["cleared_paise"] + r["amt"]
+        else:
+            e["reversed_paise"] -= r["amt"]
+    cash = sum(e["cleared_paise"] + e["reversed_paise"] for k, e in g.items() if k[2])
+    out = sorted(
+        ({**e, "total_paise": e["cleared_paise"] + e["reversed_paise"]} for k, e in g.items() if not k[2]),
+        key=lambda e: (e["bank"], str(e["mode"])),
+    )
+    totals = {k: sum(r[k] for r in out) for k in ("count", "cleared_paise", "reversed_paise", "total_paise")}
+    hand = await D.cheques_in_hand(base, t)
+    totals |= {"cash_mode_paise": cash, "in_hand_paise": sum(p["amount_paise"] for p in hand), "in_hand_n": len(hand)}
+    totals["collections_paise"] = totals["total_paise"] + cash
     cols = [
         ("bank", "Bank account", "str", 1.6),
         ("mode", "Mode", "str"),
         ("count", "Receipts", "num", 0.7),
         ("cleared_paise", "Cleared", "money"),
-        ("pending_paise", "Pending", "money"),
-        ("total_paise", "Total", "money"),
+        ("reversed_paise", "Reversed", "money"),
+        ("total_paise", "Received", "money"),
     ]
     return await respond(
         request,

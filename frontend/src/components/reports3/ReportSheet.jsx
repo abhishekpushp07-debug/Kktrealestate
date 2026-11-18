@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import api, { errMsg } from "@/lib/api";
-import { setParam, splitList } from "@/lib/reportsV3";
+import { setParam, splitList, todayIso } from "@/lib/reportsV3";
 import { setCrumbLabel } from "@/lib/crumbs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Skeleton } from "@/components/v2";
@@ -109,7 +109,15 @@ export function ReportSheet({ reportKey }) {
   const nav = useNavigate();
   const phone = usePhone();
   const set = (n) => setSp(n, { replace: true });
+  const future = sp.get("as_of") && sp.get("as_of") > todayIso();
+  useEffect(() => {
+    // REQ-340: a future As of in the link is refused in plain words and the report falls back to today
+    if (!future) return;
+    toast.error("As of can't be after today");
+    setSp(setParam(sp, "as_of", ""), { replace: true });
+  }, [future]); // eslint-disable-line react-hooks/exhaustive-deps
   const params = apiParams(sp);
+  if (future) params.delete("as_of");
   if (!params.get("page_size")) params.set("page_size", "500");
   const q = useQuery({
     queryKey: ["r3", reportKey, params.toString()],
@@ -176,6 +184,21 @@ export function ReportSheet({ reportKey }) {
           <p className="r3-formula" data-testid="report-formula">
             {d.formula}
           </p>
+        )}
+        {d.lines?.length > 0 && (
+          <ul className="r3-lines" data-testid="report-lines">
+            {d.lines.map((l) => (
+              <li key={l.key} className={l.tone ? `tone-${l.tone}` : ""}>
+                {l.link ? (
+                  <Link to={l.link} data-testid={`report-line-${l.key}`}>
+                    {l.text}
+                  </Link>
+                ) : (
+                  <span data-testid={`report-line-${l.key}`}>{l.text}</span>
+                )}
+              </li>
+            ))}
+          </ul>
         )}
       </header>
       <FilterBar meta={meta} options={d.options} sp={sp} set={set} defaults={d.defaults} />

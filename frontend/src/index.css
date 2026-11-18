@@ -2278,6 +2278,27 @@ a.e-tile:hover {
   color: var(--text-3);
   font-variant-numeric: tabular-nums;
 }
+.r3-lines {
+  margin-top: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-2);
+}
+.r3-lines li {
+  overflow-wrap: anywhere;
+}
+.r3-lines a {
+  color: var(--accent, inherit);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.r3-lines .tone-brick {
+  color: var(--brick, #b4442f);
+  font-weight: 600;
+}
 .r3-live {
   width: 6px;
   height: 6px;

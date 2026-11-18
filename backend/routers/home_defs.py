@@ -7,7 +7,7 @@ from datetime import date, timedelta
 from urllib.parse import quote
 
 from db import db
-from services import clock
+from services import clock, definitions
 from services.definitions import (
     BANDS,
     LIVE_BOOKING_STATUSES,
@@ -142,7 +142,7 @@ async def _count(fn, user, **kw):
 # ---------------------------------------------------------------- 1 Money today
 async def money_today(user, base, pid, today):
     d = today.isoformat()
-    split = await _split({**base, "status": "Cleared", "payment_date": d})
+    split = await _split({**base, **definitions.received_match(d, d)})
     n, amt = await _pay_totals(user, pid, "Pending")
     col = ("/reports/collections-v2", {"from_date": d, "to_date": d, "project_id": pid})
     to = f"/reports/collections-v2?from_date={d}&to_date={d}{_q(pid)}"
@@ -182,7 +182,7 @@ async def due_vs_received(user, base, pid, rng):
         ]
     ):
         due = x["s"]
-    rec = (await _split({**base, "status": "Cleared", "payment_date": {"$gte": f, "$lte": t}}))["total"]
+    rec = (await _split({**base, **definitions.received_match(f, t)}))["total"]
     return {
         "label": label,
         "due": {

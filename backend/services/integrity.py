@@ -476,7 +476,9 @@ async def _booking_ledger_findings(bk: dict, out: list) -> None:
     ):  # REQ-249: an approved waiver settles the share like a receipt (Jama credit), so the summary counts it as paid
         cash_paid += sm.get("cash_waived_paise", 0)
         acc_paid += sm.get("account_waived_paise", 0)
-    if cash_paid > bk["cash_agreed_paise"] or acc_paid > bk["account_agreed_paise"]:
+    from services.ledger import share_cap  # REQ-343: a share's cap grows by the manual bills raised on it
+
+    if cash_paid > await share_cap(bk, "Cash") or acc_paid > await share_cap(bk, "Account"):
         out.append(
             _rf(
                 "bucket_cap_exceeded",

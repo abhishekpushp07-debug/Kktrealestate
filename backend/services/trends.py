@@ -6,8 +6,10 @@ from datetime import date
 
 from db import db
 from services import clock
+from services.definitions import received_day_expr, received_match
 from utils import now_iso
 
+BASIS = "cleared"  # REQ-319: received = cleared (cheque / DD on its clearing day)
 KINDS = (
     "collections",
     "collections_cash",
@@ -42,9 +44,7 @@ async def compute(company_id: str, scope: str, sid: str | None, months: list[str
 
     split = {
         r["_id"]: r
-        for r in await receipt_split(
-            {**m, "status": "Cleared", "payment_date": {"$gte": lo, "$lte": hi}}, {"$substr": ["$payment_date", 0, 7]}
-        )
+        for r in await receipt_split({**m, **received_match(lo, hi)}, {"$substr": [received_day_expr(), 0, 7]})
     }
     col = {k: r["total_paise"] for k, r in split.items()}
     dem = {
@@ -100,8 +100,8 @@ async def compute(company_id: str, scope: str, sid: str | None, months: list[str
         r["_id"]: r["v"]
         for r in await db.payments.aggregate(
             [
-                {"$match": {**bm, "status": "Cleared", "payment_date": {"$lte": hi}}},
-                {"$group": {"_id": {"$substr": ["$payment_date", 0, 7]}, "v": {"$sum": "$amount_paise"}}},
+                {"$match": {**bm, **received_match(None, hi)}},
+                {"$group": {"_id": {"$substr": [received_day_expr(), 0, 7]}, "v": {"$sum": "$amount_paise"}}},
             ]
         ).to_list(None)
     }
@@ -143,6 +143,7 @@ async def refresh(company_id: str, scope: str, sid: str | None, months: int = 24
             "scope_id": sid or company_id,
             "month": mo,
             **{k: series[k][i] for k in KINDS},
+            "basis": BASIS,
             "updated_at": now_iso(),
         }
         for i, mo in enumerate(ms)
@@ -164,7 +165,8 @@ async def get(company_id: str, scope: str, sid: str | None, months: int = 12) ->
     from services import read_model_state
 
     stale = await read_model_state.shared_pending()  # a bucket refresh is debounced/in flight on any replica → source
-    if stale or len(rows) < len(ms) or any(k not in r for r in rows for k in KINDS):  # or missing month / old shape
+    old = any(r.get("basis") != BASIS for r in rows)  # 3H: buckets written on the receipt-date basis are rebuilt once
+    if stale or old or len(rows) < len(ms) or any(k not in r for r in rows for k in KINDS):  # or missing month / shape
         full = await refresh(company_id, scope, sid, max(months, 24))
         return {"months": ms, **{k: full[k][-len(ms) :] for k in KINDS}, "source": "monthly_buckets (refreshed)"}
     by = {r["month"]: r for r in rows}

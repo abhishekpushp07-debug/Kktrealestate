@@ -11,7 +11,7 @@ from deps import ensure_project_access, project_scope_filter, require, require_i
 from models_out import PaymentsOut, PaymentsOutPage
 from services import clock
 from services.definitions import receipt_parts
-from services.ledger import CLEAR_IMMEDIATELY, bucket_paid, line_paid, rebuild
+from services.ledger import CLEAR_IMMEDIATELY, bucket_paid, line_paid, rebuild, share_cap
 from services.money import inr, present_money, to_paise
 from services.numbering import generate_number
 from services.pdf_builders import receipt_data
@@ -91,7 +91,7 @@ async def _check_cap(booking: dict, p: dict):
         raise ApiError(409, f"Booking is {booking['status']}; payments are not accepted", "BOOKING_NOT_ACTIVE")
     if p["against"] == "FLAT_VALUE":
         cat = p["payment_category"]
-        agreed = booking["cash_agreed_paise"] if cat == "Cash" else booking["account_agreed_paise"]
+        agreed = await share_cap(booking, cat)
         paid = await bucket_paid(booking["id"], cat)
         if paid + p["amount_paise"] > agreed:
             raise _cap_error(cat, agreed, paid, p["amount_paise"])
@@ -115,7 +115,7 @@ async def reserve_cap(booking: dict, p: dict) -> dict:
     amt = p["amount_paise"]
     if p["against"] == "FLAT_VALUE":
         cat = p["payment_category"]
-        agreed = booking["cash_agreed_paise"] if cat == "Cash" else booking["account_agreed_paise"]
+        agreed = await share_cap(booking, cat)
         field = "summary.cash_paid_paise" if cat == "Cash" else "summary.account_paid_paise"
         inc = {field: amt, "summary.paid_paise": amt}
         res = await db.bookings.update_one(
@@ -159,7 +159,7 @@ async def _reserve_split(booking: dict, p: dict) -> dict:
 
     parts = bucket_parts(p["allocations"])
     for cat in ("Cash", "Account"):
-        agreed = booking["cash_agreed_paise"] if cat == "Cash" else booking["account_agreed_paise"]
+        agreed = await share_cap(booking, cat)
         if parts[cat] and await bucket_paid(booking["id"], cat) + parts[cat] > agreed:
             raise _cap_error(cat, agreed, await bucket_paid(booking["id"], cat), parts[cat])
     for lid, amt in parts["lines"].items():
@@ -195,7 +195,7 @@ async def _reserve_split(booking: dict, p: dict) -> dict:
         fresh = await db.bookings.find_one({"id": booking["id"]}, {"_id": 0, "status": 1})
         if fresh and fresh["status"] == "Active":
             cat = "Cash" if parts["Cash"] else "Account"
-            agreed = booking["cash_agreed_paise"] if cat == "Cash" else booking["account_agreed_paise"]
+            agreed = await share_cap(booking, cat)
             raise _cap_error(cat, agreed, await bucket_paid(booking["id"], cat), parts[cat])
         raise ApiError(409, "Booking is not active; payments are not accepted", "BOOKING_NOT_ACTIVE")
     return {"$inc": {k: -v for k, v in inc.items()}}
@@ -571,7 +571,7 @@ async def _headroom_warnings(booking: dict, p: dict) -> list[dict]:
     if p["against"] != "FLAT_VALUE":
         return []
     cat = p["payment_category"]
-    agreed = booking["cash_agreed_paise"] if cat == "Cash" else booking["account_agreed_paise"]
+    agreed = await share_cap(booking, cat)
     cleared = await bucket_paid(booking["id"], cat)
     pend = await db.payments.aggregate(
         [

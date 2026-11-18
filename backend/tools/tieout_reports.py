@@ -15,7 +15,7 @@ from pymongo import MongoClient
 
 load_dotenv("/app/backend/.env")
 sys.path.insert(0, "/app/backend")
-from services import clock
+from services import clock, definitions
 
 IST = timezone(timedelta(hours=5, minutes=30))
 BYPASS = {"X-Rate-Limit-Bypass": os.environ.get("LOGIN_RATE_LIMIT_BYPASS_TOKEN", "kkt-test-bypass-local")}
@@ -77,8 +77,14 @@ def main(base):
     def raw_coll(basis, f0, f1):
         tot = 0
         for p in pays:
-            d = clock.day_of(p.get("cleared_at") or p["payment_date"]) if basis == "clearance" else p["payment_date"]
-            if f0 <= d <= f1:
+            d = (
+                definitions.received_on(p)
+                if basis == "cleared"
+                else clock.day_of(p.get("cleared_at") or p["payment_date"])
+                if basis == "clearance"
+                else p["payment_date"]
+            )
+            if d and f0 <= d <= f1:
                 tot += p["amount_paise"]
             if (
                 p["status"] == "Reversed"
@@ -102,7 +108,7 @@ def main(base):
         )
     )
     tie("collections-v2", "net Jama == Σ ledger Jama rows (receipts + reversals)", col["totals"]["total_paise"], jama)
-    for basis in ("receipt", "clearance"):
+    for basis in ("cleared", "receipt", "clearance"):
         c = g("/reports/collections-v2", from_date=FY0, to_date=FY1, date_basis=basis)
         tie(
             "collections-v2",
@@ -110,11 +116,16 @@ def main(base):
             c["totals"]["total_paise"],
             raw_coll(basis, FY0, FY1),
         )
-        tie("collections-v2", f"basis label present ({basis})", c["basis_text"], f"Date basis: {basis} date")
+        tie(
+            "collections-v2",
+            f"basis label present ({basis})",
+            c["basis_text"].split(" (")[0].replace(" date", ""),
+            f"Date basis: {basis}",
+        )
     legacy = g("/reports/collections", from_date=FY0, to_date=FY1)
     tie(
         "collections-v2",
-        "receipt basis == legacy collections (payment_date, Cleared)",
+        "cleared basis == legacy collections (both: cheque on its clearing day)",
         g("/reports/collections-v2", from_date=FY0, to_date=FY1)["totals"]["total_paise"],
         legacy["totals"]["total_paise"],
     )
@@ -200,31 +211,40 @@ def main(base):
         inv("outstanding-v2", "/reports/outstanding-v2", "outstanding_paise", by)
         inv("outstanding-v2", "/reports/outstanding-v2", "net_balance_paise", by)
 
-    # 3 Demand vs collection
+    # 3 Demand vs collection (3H REQ-328/330: live bookings by default; transfer / revision steps are named rows)
     dvc = g("/reports/demand-vs-collection")
-    tie(
-        "demand-vs-collection",
-        "demanded == Σ non-void demands",
-        dvc["totals"]["demand_paise"],
-        sum(
-            d["total_demand_paise"]
-            for d in db.demands.find(
-                {"company_id": cid, "voided": {"$ne": True}, "status": {"$nin": ["Voided", "Cancelled"]}},
-                {"total_demand_paise": 1},
-            )
-        ),
+    live_ids = [b["id"] for b in live]
+    dq = {"company_id": cid, "voided": {"$ne": True}, "status": {"$nin": ["Voided", "Cancelled"]}}
+    adjust = sum(
+        e.get("udhar_paise", 0)
+        for e in db.ledger_entries.find(
+            {"booking_id": {"$in": live_ids}, "type": {"$nin": ["DEMAND", "OTHER_CHARGE_DEMAND"]}}, {"udhar_paise": 1}
+        )
     )
     tie(
         "demand-vs-collection",
-        "collected == Σ demand.paid",
+        "demanded == Σ non-void demands on live bookings + transfer / revision adjustments",
+        dvc["totals"]["demand_paise"],
+        sum(
+            d["total_demand_paise"]
+            for d in db.demands.find({**dq, "booking_id": {"$in": live_ids}}, {"total_demand_paise": 1})
+        )
+        + adjust,
+    )
+    tie(
+        "demand-vs-collection",
+        "collected == Σ demand.paid (live bookings)",
         dvc["totals"]["collected_paise"],
         sum(
-            d.get("paid_paise", 0)
-            for d in db.demands.find(
-                {"company_id": cid, "voided": {"$ne": True}, "status": {"$nin": ["Voided", "Cancelled"]}},
-                {"paid_paise": 1},
-            )
+            d.get("paid_paise", 0) for d in db.demands.find({**dq, "booking_id": {"$in": live_ids}}, {"paid_paise": 1})
         ),
+    )
+    dvc_all = g("/reports/demand-vs-collection", include_cancelled="true")
+    tie(
+        "demand-vs-collection",
+        "Include cancelled − default == bridge line Cancelled bookings",
+        dvc_all["totals"]["demand_paise"] - dvc["totals"]["demand_paise"],
+        dvc_all["totals"]["cancelled_demand_paise"],
     )
 
     # 4 Cash vs account
@@ -328,29 +348,28 @@ def main(base):
         sum(r["amount_paise"] for r in db.refunds.find({"company_id": cid, "status": "Paid"}, {"amount_paise": 1})),
     )
 
-    # 8 Bank-wise
+    # 8 Bank-wise (3H REQ-319/323: cleared on its received day, reversals netted; cheques in hand a separate line)
     bw = g("/reports/bank-receipts", from_date=F0, to_date=F1)
+    allp = list(db.payments.find({"company_id": cid}, {"_id": 0}))
+    nc = [p for p in allp if p.get("payment_mode_code") != "CASH" and p["status"] in ("Cleared", "Reversed")]
     tie(
         "bank-receipts",
-        "cleared == Σ non-cash cleared",
+        "cleared == Σ non-cash receipts received (cleared day) in range",
         bw["totals"]["cleared_paise"],
-        sum(
-            p["amount_paise"]
-            for p in db.payments.find(
-                {"company_id": cid, "status": "Cleared", "payment_mode_code": {"$ne": "CASH"}}, {"amount_paise": 1}
-            )
-        ),
+        sum(p["amount_paise"] for p in nc if F0 <= (definitions.received_on(p) or "") <= F1),
     )
     tie(
         "bank-receipts",
-        "pending == Σ non-cash pending",
-        bw["totals"]["pending_paise"],
-        sum(
-            p["amount_paise"]
-            for p in db.payments.find(
-                {"company_id": cid, "status": "Pending", "payment_mode_code": {"$ne": "CASH"}}, {"amount_paise": 1}
-            )
-        ),
+        "cheques in hand == Σ receipts in hand at range end",
+        bw["totals"]["in_hand_paise"],
+        sum(p["amount_paise"] for p in allp if definitions.in_hand_on(p, F1)),
+    )
+    cv = g("/reports/collections-v2", from_date=F0, to_date=F1)
+    tie(
+        "bank-receipts",
+        "Bank-wise + Cash == Collections (one identity, to the paisa)",
+        bw["totals"]["total_paise"] + cv["totals"]["cash_mode_paise"],
+        cv["totals"]["total_paise"],
     )
 
     # 9 Other charges
@@ -736,18 +755,25 @@ def _customer_status(g, tie, db, cid, live):
     net31 = d31["totals"]["account_dues"] + d31["totals"]["cash_dues"] - d31["totals"]["instalment_advance"]
     raw31 = 0
     for b in ids31:
-        e = db.ledger_entries.find_one({"booking_id": b, "date": {"$lte": eom}}, sort=[("seq", -1)])
-        raw31 += (e or {}).get("cash_due_paise", 0) + (e or {}).get("account_due_paise", 0)
-    tie(R, f"as of {eom}: instalment net dues == ledger rows on that day", net31, raw31)
+        prev = 0  # Σ of each row's step in Cash + Account due, rows dated on / before the day (posting order kept)
+        for e in db.ledger_entries.find(
+            {"booking_id": b}, {"date": 1, "cash_due_paise": 1, "account_due_paise": 1}
+        ).sort("seq", 1):
+            cur = (e.get("cash_due_paise") or 0) + (e.get("account_due_paise") or 0)
+            if e["date"] <= eom:
+                raw31 += cur - prev
+            prev = cur
+    tie(R, f"as of {eom}: instalment net dues == ledger rows dated on / before that day", net31, raw31)
     oc31 = 0
     for b in ids31:
-        e = db.ledger_entries.find_one({"booking_id": b, "date": {"$lte": eom}}, sort=[("seq", -1)])
-        # other-charge net billed − received on that day = running balance − instalment shares (row's other due counts unbilled)
-        oc31 += (
-            (e or {}).get("balance_paise", 0)
-            - (e or {}).get("cash_due_paise", 0)
-            - (e or {}).get("account_due_paise", 0)
-        )
+        # other-charge net billed − received = running balance − instalment shares, summed as steps of rows dated ≤ day
+        prev = 0
+        proj = {"date": 1, "balance_paise": 1, "cash_due_paise": 1, "account_due_paise": 1}
+        for e in db.ledger_entries.find({"booking_id": b}, proj).sort("seq", 1):
+            cur = (e.get("balance_paise") or 0) - (e.get("cash_due_paise") or 0) - (e.get("account_due_paise") or 0)
+            if e["date"] <= eom:
+                oc31 += cur - prev
+            prev = cur
     car = run(D.carried(ids31, f"{fy}-04-01", today.isoformat()))
     tie(
         R,
@@ -1143,25 +1169,33 @@ def _bridges_f7(g, tie):
     co = g("/reports/v3/collections", page_size=1)["totals"]
     tie(
         "bank-receipts",
-        "Collections == Bank-wise total − pending + cash receipts − reversals (this FY, to the paisa)",
+        "Collections == Bank-wise + Cash (this FY, to the paisa)",
         co["total_paise"],
-        bw["total_paise"] - bw["pending_paise"] + bw["br_cash"] + bw["br_reversal"],
+        bw["total_paise"] + bw["br_cash"],
     )
-    tie("bank-receipts", "bridge has no unexplained remainder", bw["br_rest"], 0)
+    tie("bank-receipts", "identity has no unnamed remainder", bw["br_rest"], 0)
+    tie(
+        "collections",
+        "identity: bank modes + cash mode == Collections",
+        co["bank_mode_paise"] + co["cash_mode_paise"],
+        co["total_paise"],
+    )
+    tie(
+        "collections",
+        "cheques in hand line == Bank-wise cheques in hand",
+        co.get("in_hand_paise"),
+        bw.get("in_hand_paise"),
+    )
     bv = g("/reports/v3/bills-vs-collection", page_size=1)["totals"]
     cs = g("/reports/v3/customer-status", page_size=1)["totals"]
     tie(
         "bills-vs-collection",
-        "bill raised − on cancelled/transferred ± transfer adjustments == Customer status bills raised",
-        bv["demand_paise"] - bv["br_not_live"] + bv["br_adjust"],
+        "default bill raised == Customer status bills raised",
+        bv["demand_paise"],
         cs["bills_raised"],
     )
-    tie(
-        "customer-status",
-        "Customer status bridge line == Bills vs Collection bridge",
-        (cs["br_instalment"], cs["br_not_live"], cs["br_adjust"]),
-        (bv["demand_paise"], bv["br_not_live"], bv["br_adjust"]),
-    )
+    tie("bills-vs-collection", "default view has no cancelled bookings", bv["cancelled_demand_paise"], 0)
+    tie("customer-status", "Customer status bridge line == Bills vs Collection", cs["br_bvc"], bv["demand_paise"])
 
 
 def _leads_f6(g, tie, db, cid):

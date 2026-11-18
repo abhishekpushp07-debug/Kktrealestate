@@ -214,6 +214,7 @@ ONE_TIME_STEPS = {
     "startup_phase11",
     "backfill_price_paise",
     "backfill_paid_parts",
+    "redate_receipt_rows",
 }
 DAILY_STEPS = {
     "integrity",
@@ -266,6 +267,12 @@ async def _backfill_paid_parts():
     from services.backfill import backfill_paid_parts
 
     logger.info("[startup] backfill_paid_parts %s", await backfill_paid_parts())
+
+
+async def _redate_receipt_rows():
+    from services.ledger import redate_receipt_rows
+
+    logger.info("[startup] redate_receipt_rows rebuilt %s bookings", await redate_receipt_rows())
 
 
 def _trim_memory():
@@ -340,6 +347,7 @@ async def startup_tasks():
         ("schema_validators", apply_validators),
         ("price_paise_backfill", backfill_price_paise),
         ("backfill_paid_parts", _backfill_paid_parts),
+        ("redate_receipt_rows", _redate_receipt_rows),
     ]
     if await db.settings.find_one(
         {"key": "story_mode", "value": True}

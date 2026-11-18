@@ -86,6 +86,17 @@ def register_formula(t):
     )
 
 
+def register_lines(rows, p=None):
+    """REQ-348: headline "N live · M cancelled" (live = Active + Completed); each part opens its list."""
+    live = sum(1 for r in rows if r["booking_status"] in ("Active", "Completed"))
+    gone = sum(1 for r in rows if r["booking_status"] == "Cancelled")
+    base = "/reports/v3/booking-register?booking_status="
+    return [
+        {"key": "live", "text": f"{live:,} live", "link": base + "Active,Completed", "tone": None},
+        {"key": "cancelled", "text": f"{gone:,} cancelled", "link": base + "Cancelled", "tone": None},
+    ]
+
+
 def register_illus(rows, t):
     kinds = {}
     for r in rows:

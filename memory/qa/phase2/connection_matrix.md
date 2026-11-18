@@ -1,12 +1,14 @@
 # Connection matrix (F-42, REQ-67…73)
 
-Generated 2026-11-18 14:51 UTC on the private test copy · 28 actions × 26 surfaces = 728 cells · **728 green, 0 red**
+Generated 2026-11-18 22:21 UTC on the private test copy · 30 actions × 26 surfaces = 780 cells · **780 green, 0 red**
 
 Direct reads checked immediately; read models / after-commit surfaces within 5 s. Unlisted metrics must be unchanged.
 
 | action | booking_page | customer_360 | ledger | bills_raised | received | cheque_register | roznamcha | demand_register | home_widgets | home_command | home_trends | collections | outstanding | project_statement | cancellations | hold_register | lead_funnel | status_counters | inventory_value | pdfs | documents | journey | notifications | customer_card | booking_card | project_card |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | create booking | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 |
+| manual bill raised | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 |
+| manual bill paid | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 |
 | payment Cash | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 |
 | payment Cheque | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 |
 | payment NEFT/RTGS | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 |
@@ -35,8 +37,9 @@ Direct reads checked immediately; read models / after-commit surfaces within 5 s
 | waiver rejected | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 |
 | waiver approved then cancelled | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 |
 
-Informational ("any") metrics remaining: 12
+Informational ("any") metrics remaining: 17
 
+- manual bill paid: demand_register.balance, demand_register.overdue, collections.cash, collections.account, collections.other
 - waiver approved (Account share): demand_register.balance, demand_register.overdue, journey.last, journey.last_has_values
 - waiver requested (pending): journey.entries, journey.last, journey.last_has_values
 - waiver rejected: journey.entries, journey.last, journey.last_has_values
@@ -45,7 +48,7 @@ Informational ("any") metrics remaining: 12
 ## Cells (before → after)
 
 ### create booking
-- 🟢 **booking_page** — advance null → 0; agreement null → 420000000; bill null → 55900000; flat null → "ba52343c-df19-4472-8a31-2dd516682b07"; outstanding null → 55900000; pending_cheques null → 0; plan null → "b00e6509-91aa-424f-b4f3-122560648d61"; received null → 0; status null → "Active"
+- 🟢 **booking_page** — advance null → 0; agreement null → 420000000; bill null → 55900000; flat null → "1bb8d4f2-68e6-43a6-a95f-bd88a161bf92"; outstanding null → 55900000; pending_cheques null → 0; plan null → "b00e6509-91aa-424f-b4f3-122560648d61"; received null → 0; status null → "Active"
 - 🟢 **customer_360** — bill null → 55900000; bookings 0 → 1; received null → 0; status null → "Active"
 - 🟢 **ledger** — jama null → 0; rows null → 3; udhar null → 55900000
 - 🟢 **bills_raised** — count null → 1; raised null → 42000000
@@ -53,24 +56,80 @@ Informational ("any") metrics remaining: 12
 - 🟢 **cheque_register** — unchanged
 - 🟢 **roznamcha** — unchanged
 - 🟢 **demand_register** — balance 3974318100 → 4016318100; raised_today 793734000 → 835734000; raised_today_n 14 → 15; rows 516 → 517; total 25651068400 → 25693068400
-- 🟢 **home_widgets** — agreement 50630770000 → 51050770000; available 138 → 137; bookings 80 → 81; outstanding 4497664300 → 4553564300
-- 🟢 **home_command** — l:ageing 8678454200 → 8790254200; l:inflow_30 2127035000 → 2169035000; l:pipeline 31 → 33; w:ageing 8678454200 → 8790254200; w:inflow_30 2127035000 → 2169035000; w:pipeline 31 → 33
+- 🟢 **home_widgets** — agreement 50630770000 → 51050770000; available 142 → 141; bookings 80 → 81; outstanding 4500981200 → 4556881200
+- 🟢 **home_command** — l:ageing 8685088000 → 8796888000; l:inflow_30 2127035000 → 2169035000; l:pipeline 19 → 21; w:ageing 8685088000 → 8796888000; w:inflow_30 2127035000 → 2169035000; w:pipeline 19 → 21
 - 🟢 **home_trends** — bookings 7 → 8; demands 2453885000 → 2495885000
 - 🟢 **collections** — unchanged
-- 🟢 **outstanding** — bill_raised 29169133100 → 29225033100; bookings 68 → 69; outstanding 4339227100 → 4395127100
+- 🟢 **outstanding** — bill_raised 29169133100 → 29225033100; bookings 68 → 69; outstanding 4342544000 → 4398444000
 - 🟢 **project_statement** — bill 0 → 55900000; count 0 → 1
 - 🟢 **cancellations** — unchanged
 - 🟢 **hold_register** — unchanged
-- 🟢 **lead_funnel** — Converted 56 → 57
+- 🟢 **lead_funnel** — Converted 44 → 45
 - 🟢 **status_counters** — fid_status "Available" → "Booked"; project_bookings 68 → 69; tower_bookings 0 → 1
-- 🟢 **inventory_value** — available 84 → 83; available_value 44603910000 → 44183910000; booked 68 → 69; sold_value 38288770000 → 38708770000
-- 🟢 **pdfs** — last_demand_pdf null → "DM-2627-20721:200"; statement_pdf null → true; statement_rows null → 3
+- 🟢 **inventory_value** — available 88 → 87; available_value 46283910000 → 45863910000; booked 68 → 69; sold_value 38288770000 → 38708770000
+- 🟢 **pdfs** — last_demand_pdf null → "DM-2627-21995:200"; statement_pdf null → true; statement_rows null → 3
 - 🟢 **documents** — docs null → 4
 - 🟢 **journey** — entries null → 6; last null → "booking.create"; last_has_values null → true
-- 🟢 **notifications** — newest "2026-11-18T14:47:52.539183+00:00" → "2026-11-18T14:48:19.689576+00:00"; unread 2677 → 2688
+- 🟢 **notifications** — newest "2026-11-18T22:17:09.110041+00:00" → "2026-11-18T22:17:40.925905+00:00"; unread 2322 → 2333
 - 🟢 **customer_card** — advance null → 0; billed null → 55900000; due null → 55900000; received null → 0
 - 🟢 **booking_card** — advance null → 0; billed null → 55900000; due null → 55900000; received null → 0
-- 🟢 **project_card** — outstanding 4339227100 → 4395127100
+- 🟢 **project_card** — outstanding 4342544000 → 4398444000
+
+### manual bill raised
+- 🟢 **booking_page** — bill 55900000 → 57900000; outstanding 55900000 → 57900000
+- 🟢 **customer_360** — bill 55900000 → 57900000
+- 🟢 **ledger** — rows 3 → 4; udhar 55900000 → 57900000
+- 🟢 **bills_raised** — count 1 → 2; raised 42000000 → 44000000
+- 🟢 **received** — unchanged
+- 🟢 **cheque_register** — unchanged
+- 🟢 **roznamcha** — unchanged
+- 🟢 **demand_register** — balance 4058318100 → 4060318100; raised_today 877734000 → 879734000; raised_today_n 16 → 17; rows 518 → 519; total 25735068400 → 25737068400
+- 🟢 **home_widgets** — outstanding 4612781200 → 4614781200
+- 🟢 **home_command** — l:ageing 8908688000 → 8912688000; l:due_vs_received 5223813700 → 5225813700; w:ageing 8908688000 → 8912688000; w:due_vs_received 5223813700 → 5225813700
+- 🟢 **home_trends** — demands 2537885000 → 2539885000
+- 🟢 **collections** — unchanged
+- 🟢 **outstanding** — bill_raised 29280933100 → 29282933100; outstanding 4454344000 → 4456344000
+- 🟢 **project_statement** — bill 111800000 → 113800000
+- 🟢 **cancellations** — unchanged
+- 🟢 **hold_register** — unchanged
+- 🟢 **lead_funnel** — unchanged
+- 🟢 **status_counters** — unchanged
+- 🟢 **inventory_value** — unchanged
+- 🟢 **pdfs** — last_demand_pdf "DM-2627-21996:200" → "DM-2627-21997:200"; statement_rows 3 → 4
+- 🟢 **documents** — unchanged
+- 🟢 **journey** — entries 6 → 8; last "booking.create" → "demand.create"
+- 🟢 **notifications** — newest "2026-11-18T22:17:42.686526+00:00" → "2026-11-18T22:17:48.769995+00:00"; unread 2344 → 2346
+- 🟢 **customer_card** — billed 55900000 → 57900000; due 55900000 → 57900000
+- 🟢 **booking_card** — billed 55900000 → 57900000; due 55900000 → 57900000
+- 🟢 **project_card** — outstanding 4454344000 → 4456344000
+
+### manual bill paid
+- 🟢 **booking_page** — outstanding 57900000 → 57650000; received 0 → 250000
+- 🟢 **customer_360** — received 0 → 250000
+- 🟢 **ledger** — jama 0 → 250000; rows 4 → 5
+- 🟢 **bills_raised** — unchanged
+- 🟢 **received** — cleared 0 → 250000; count 0 → 1
+- 🟢 **cheque_register** — unchanged
+- 🟢 **roznamcha** — receipts 43750400 → 44000400
+- 🟢 **demand_register** — balance 4104318100 → 4104068100
+- 🟢 **home_widgets** — outstanding 4672681200 → 4672431200; paid 37853029100 → 37853279100; today_collections 43750400 → 44000400
+- 🟢 **home_command** — l:ageing 9028488000 → 9027988000; l:attention 6 → 7; l:due_vs_received 5227813700 → 5228063700; l:inflow_30 2253035000 → 2252785000; l:money_today 82500800 → 83000800; w:ageing 9028488000 → 9027988000; w:attention 6 → 7; w:due_vs_received 5227813700 → 5228063700; w:inflow_30 2253035000 → 2252785000; w:money_today 82500800 → 83000800
+- 🟢 **home_trends** — collections 1741737700 → 1741987700
+- 🟢 **collections** — account 9187600 → 9437600; count 3 → 4; total 39250400 → 39500400
+- 🟢 **outstanding** — outstanding 4514244000 → 4513994000; received 24897086700 → 24897336700
+- 🟢 **project_statement** — received 0 → 250000
+- 🟢 **cancellations** — unchanged
+- 🟢 **hold_register** — unchanged
+- 🟢 **lead_funnel** — unchanged
+- 🟢 **status_counters** — project_paid 24897086700 → 24897336700; tower_paid 0 → 250000
+- 🟢 **inventory_value** — unchanged
+- 🟢 **pdfs** — last_receipt_pdf null → "KKT/2627/42988:200"; statement_rows 4 → 5
+- 🟢 **documents** — unchanged
+- 🟢 **journey** — entries 8 → 9; last "demand.create" → "payment.post"
+- 🟢 **notifications** — unchanged
+- 🟢 **customer_card** — due 57900000 → 57650000; received 0 → 250000
+- 🟢 **booking_card** — due 57900000 → 57650000; received 0 → 250000
+- 🟢 **project_card** — collected 24897086700 → 24897336700; outstanding 4514244000 → 4513994000
 
 ### payment Cash
 - 🟢 **booking_page** — outstanding 55900000 → 55650000; received 0 → 250000
@@ -79,26 +138,26 @@ Informational ("any") metrics remaining: 12
 - 🟢 **bills_raised** — unchanged
 - 🟢 **received** — cleared 0 → 250000; count 0 → 1
 - 🟢 **cheque_register** — unchanged
-- 🟢 **roznamcha** — closing 192785800 → 193035800; receipts 43750400 → 44000400
-- 🟢 **demand_register** — balance 4058318100 → 4058068100
-- 🟢 **home_widgets** — outstanding 4609464300 → 4609214300; paid 37856346000 → 37856596000; today_collections 43750400 → 44000400
-- 🟢 **home_command** — l:ageing 8902054200 → 8901554200; l:attention 6 → 7; l:due_vs_received 5255719200 → 5255969200; l:inflow_30 2211035000 → 2210785000; l:money_today 82500800 → 83000800; w:ageing 8902054200 → 8901554200; w:attention 6 → 7; w:due_vs_received 5255719200 → 5255969200; w:inflow_30 2211035000 → 2210785000; w:money_today 82500800 → 83000800
-- 🟢 **home_trends** — collections 1773643200 → 1773893200
-- 🟢 **collections** — cash 27562800 → 27812800; count 3 → 4; total 39250400 → 39500400
-- 🟢 **outstanding** — outstanding 4451027100 → 4450777100; received 24900403600 → 24900653600
-- 🟢 **project_statement** — received 0 → 250000
+- 🟢 **roznamcha** — closing 192785800 → 193035800; receipts 44000400 → 44250400
+- 🟢 **demand_register** — balance 4146068100 → 4145818100
+- 🟢 **home_widgets** — outstanding 4728331200 → 4728081200; paid 37853279100 → 37853529100; today_collections 44000400 → 44250400
+- 🟢 **home_command** — l:ageing 9139788000 → 9139288000; l:attention 7 → 8; l:due_vs_received 5228063700 → 5228313700; l:inflow_30 2294785000 → 2294535000; l:money_today 83000800 → 83500800; w:ageing 9139788000 → 9139288000; w:attention 7 → 8; w:due_vs_received 5228063700 → 5228313700; w:inflow_30 2294785000 → 2294535000; w:money_today 83000800 → 83500800
+- 🟢 **home_trends** — collections 1741987700 → 1742237700
+- 🟢 **collections** — cash 27562800 → 27812800; count 4 → 5; total 39500400 → 39750400
+- 🟢 **outstanding** — outstanding 4569894000 → 4569644000; received 24897336700 → 24897586700
+- 🟢 **project_statement** — received 250000 → 500000
 - 🟢 **cancellations** — unchanged
 - 🟢 **hold_register** — unchanged
 - 🟢 **lead_funnel** — unchanged
-- 🟢 **status_counters** — project_paid 24900403600 → 24900653600; tower_paid 0 → 250000
+- 🟢 **status_counters** — project_paid 24897336700 → 24897586700; tower_paid 250000 → 500000
 - 🟢 **inventory_value** — unchanged
-- 🟢 **pdfs** — last_receipt_pdf null → "KKT/2627/39788:200"; statement_rows 3 → 4
+- 🟢 **pdfs** — last_receipt_pdf null → "KKT/2627/42989:200"; statement_rows 3 → 4
 - 🟢 **documents** — unchanged
 - 🟢 **journey** — entries 6 → 7; last "booking.create" → "payment.post"
 - 🟢 **notifications** — unchanged
 - 🟢 **customer_card** — due 55900000 → 55650000; received 0 → 250000
 - 🟢 **booking_card** — due 55900000 → 55650000; received 0 → 250000
-- 🟢 **project_card** — collected 24900403600 → 24900653600; outstanding 4451027100 → 4450777100
+- 🟢 **project_card** — collected 24897336700 → 24897586700; outstanding 4569894000 → 4569644000
 
 ### payment Cheque
 - 🟢 **booking_page** — pending_cheques 0 → 250000
@@ -110,9 +169,9 @@ Informational ("any") metrics remaining: 12
 - 🟢 **roznamcha** — pending 0 → 250000
 - 🟢 **demand_register** — unchanged
 - 🟢 **home_widgets** — pending_cheques 4000000 → 4250000
-- 🟢 **home_command** — l:inflow_30 2252785000 → 2253035000; l:money_today 83000800 → 83250800; w:inflow_30 2252785000 → 2253035000; w:money_today 83000800 → 83250800
+- 🟢 **home_command** — l:inflow_30 2336535000 → 2336785000; l:money_today 83500800 → 83750800; w:inflow_30 2336535000 → 2336785000; w:money_today 83500800 → 83750800
 - 🟢 **home_trends** — unchanged
-- 🟢 **collections** — pending 4000000 → 4250000
+- 🟢 **collections** — in_hand 4000000 → 4250000; pending 4000000 → 4250000
 - 🟢 **outstanding** — unchanged
 - 🟢 **project_statement** — unchanged
 - 🟢 **cancellations** — unchanged
@@ -120,7 +179,7 @@ Informational ("any") metrics remaining: 12
 - 🟢 **lead_funnel** — unchanged
 - 🟢 **status_counters** — unchanged
 - 🟢 **inventory_value** — unchanged
-- 🟢 **pdfs** — last_receipt_pdf null → "KKT/2627/39789:200"
+- 🟢 **pdfs** — last_receipt_pdf null → "KKT/2627/42990:200"
 - 🟢 **documents** — unchanged
 - 🟢 **journey** — entries 6 → 7; last "booking.create" → "payment.post"
 - 🟢 **notifications** — unchanged
@@ -135,26 +194,26 @@ Informational ("any") metrics remaining: 12
 - 🟢 **bills_raised** — unchanged
 - 🟢 **received** — cleared 0 → 250000; count 0 → 1
 - 🟢 **cheque_register** — unchanged
-- 🟢 **roznamcha** — receipts 44000400 → 44250400
-- 🟢 **demand_register** — balance 4142068100 → 4141818100
-- 🟢 **home_widgets** — outstanding 4721014300 → 4720764300; paid 37856596000 → 37856846000; today_collections 44000400 → 44250400
-- 🟢 **home_command** — l:ageing 9125154200 → 9124654200; l:attention 7 → 8; l:due_vs_received 5255969200 → 5256219200; l:inflow_30 2295035000 → 2294785000; l:money_today 83250800 → 83750800; w:ageing 9125154200 → 9124654200; w:attention 7 → 8; w:due_vs_received 5255969200 → 5256219200; w:inflow_30 2295035000 → 2294785000; w:money_today 83250800 → 83750800
-- 🟢 **home_trends** — collections 1773893200 → 1774143200
-- 🟢 **collections** — account 9187600 → 9437600; count 4 → 5; total 39500400 → 39750400
-- 🟢 **outstanding** — outstanding 4562577100 → 4562327100; received 24900653600 → 24900903600
-- 🟢 **project_statement** — received 250000 → 500000
+- 🟢 **roznamcha** — receipts 44250400 → 44500400
+- 🟢 **demand_register** — balance 4229818100 → 4229568100
+- 🟢 **home_widgets** — outstanding 4839881200 → 4839631200; paid 37853529100 → 37853779100; today_collections 44250400 → 44500400
+- 🟢 **home_command** — l:ageing 9362888000 → 9362388000; l:attention 8 → 9; l:due_vs_received 5228313700 → 5228563700; l:inflow_30 2378785000 → 2378535000; l:money_today 83750800 → 84250800; w:ageing 9362888000 → 9362388000; w:attention 8 → 9; w:due_vs_received 5228313700 → 5228563700; w:inflow_30 2378785000 → 2378535000; w:money_today 83750800 → 84250800
+- 🟢 **home_trends** — collections 1742237700 → 1742487700
+- 🟢 **collections** — account 9437600 → 9687600; count 5 → 6; total 39750400 → 40000400
+- 🟢 **outstanding** — outstanding 4681444000 → 4681194000; received 24897586700 → 24897836700
+- 🟢 **project_statement** — received 500000 → 750000
 - 🟢 **cancellations** — unchanged
 - 🟢 **hold_register** — unchanged
 - 🟢 **lead_funnel** — unchanged
-- 🟢 **status_counters** — project_paid 24900653600 → 24900903600; tower_paid 250000 → 500000
+- 🟢 **status_counters** — project_paid 24897586700 → 24897836700; tower_paid 500000 → 750000
 - 🟢 **inventory_value** — unchanged
-- 🟢 **pdfs** — last_receipt_pdf null → "KKT/2627/39790:200"; statement_rows 3 → 4
+- 🟢 **pdfs** — last_receipt_pdf null → "KKT/2627/42991:200"; statement_rows 3 → 4
 - 🟢 **documents** — unchanged
 - 🟢 **journey** — entries 6 → 7; last "booking.create" → "payment.post"
 - 🟢 **notifications** — unchanged
 - 🟢 **customer_card** — due 55900000 → 55650000; received 0 → 250000
 - 🟢 **booking_card** — due 55900000 → 55650000; received 0 → 250000
-- 🟢 **project_card** — collected 24900653600 → 24900903600; outstanding 4562577100 → 4562327100
+- 🟢 **project_card** — collected 24897586700 → 24897836700; outstanding 4681444000 → 4681194000
 
 ### payment UPI
 - 🟢 **booking_page** — outstanding 55900000 → 55650000; received 0 → 250000
@@ -163,26 +222,26 @@ Informational ("any") metrics remaining: 12
 - 🟢 **bills_raised** — unchanged
 - 🟢 **received** — cleared 0 → 250000; count 0 → 1
 - 🟢 **cheque_register** — unchanged
-- 🟢 **roznamcha** — receipts 44250400 → 44500400
-- 🟢 **demand_register** — balance 4183818100 → 4183568100
-- 🟢 **home_widgets** — outstanding 4776664300 → 4776414300; paid 37856846000 → 37857096000; today_collections 44250400 → 44500400
-- 🟢 **home_command** — l:ageing 9236454200 → 9235954200; l:attention 8 → 9; l:due_vs_received 5256219200 → 5256469200; l:inflow_30 2336785000 → 2336535000; l:money_today 83750800 → 84250800; w:ageing 9236454200 → 9235954200; w:attention 8 → 9; w:due_vs_received 5256219200 → 5256469200; w:inflow_30 2336785000 → 2336535000; w:money_today 83750800 → 84250800
-- 🟢 **home_trends** — collections 1774143200 → 1774393200
-- 🟢 **collections** — account 9437600 → 9687600; count 5 → 6; total 39750400 → 40000400
-- 🟢 **outstanding** — outstanding 4618227100 → 4617977100; received 24900903600 → 24901153600
-- 🟢 **project_statement** — received 500000 → 750000
+- 🟢 **roznamcha** — receipts 44500400 → 44750400
+- 🟢 **demand_register** — balance 4271568100 → 4271318100
+- 🟢 **home_widgets** — outstanding 4895531200 → 4895281200; paid 37853779100 → 37854029100; today_collections 44500400 → 44750400
+- 🟢 **home_command** — l:ageing 9474188000 → 9473688000; l:attention 9 → 10; l:due_vs_received 5228563700 → 5228813700; l:inflow_30 2420535000 → 2420285000; l:money_today 84250800 → 84750800; w:ageing 9474188000 → 9473688000; w:attention 9 → 10; w:due_vs_received 5228563700 → 5228813700; w:inflow_30 2420535000 → 2420285000; w:money_today 84250800 → 84750800
+- 🟢 **home_trends** — collections 1742487700 → 1742737700
+- 🟢 **collections** — account 9687600 → 9937600; count 6 → 7; total 40000400 → 40250400
+- 🟢 **outstanding** — outstanding 4737094000 → 4736844000; received 24897836700 → 24898086700
+- 🟢 **project_statement** — received 750000 → 1000000
 - 🟢 **cancellations** — unchanged
 - 🟢 **hold_register** — unchanged
 - 🟢 **lead_funnel** — unchanged
-- 🟢 **status_counters** — project_paid 24900903600 → 24901153600; tower_paid 500000 → 750000
+- 🟢 **status_counters** — project_paid 24897836700 → 24898086700; tower_paid 750000 → 1000000
 - 🟢 **inventory_value** — unchanged
-- 🟢 **pdfs** — last_receipt_pdf null → "KKT/2627/39791:200"; statement_rows 3 → 4
+- 🟢 **pdfs** — last_receipt_pdf null → "KKT/2627/42992:200"; statement_rows 3 → 4
 - 🟢 **documents** — unchanged
 - 🟢 **journey** — entries 6 → 7; last "booking.create" → "payment.post"
 - 🟢 **notifications** — unchanged
 - 🟢 **customer_card** — due 55900000 → 55650000; received 0 → 250000
 - 🟢 **booking_card** — due 55900000 → 55650000; received 0 → 250000
-- 🟢 **project_card** — collected 24900903600 → 24901153600; outstanding 4618227100 → 4617977100
+- 🟢 **project_card** — collected 24897836700 → 24898086700; outstanding 4737094000 → 4736844000
 
 ### cheque clear
 - 🟢 **booking_page** — outstanding 55900000 → 55650000; pending_cheques 250000 → 0; received 0 → 250000
@@ -191,18 +250,18 @@ Informational ("any") metrics remaining: 12
 - 🟢 **bills_raised** — unchanged
 - 🟢 **received** — cleared 0 → 250000; pending 250000 → 0
 - 🟢 **cheque_register** — amount 4500000 → 4250000; count 3 → 2
-- 🟢 **roznamcha** — pending 500000 → 250000; receipts 44500400 → 44750400
-- 🟢 **demand_register** — balance 4225568100 → 4225318100
-- 🟢 **home_widgets** — outstanding 4832314300 → 4832064300; paid 37857096000 → 37857346000; pending_cheques 4500000 → 4250000; today_collections 44500400 → 44750400
-- 🟢 **home_command** — l:ageing 9347754200 → 9347254200; l:attention 9 → 10; l:due_vs_received 5256469200 → 5256719200; l:inflow_30 2378785000 → 2378285000; l:money_today 84500800 → 84750800; w:ageing 9347754200 → 9347254200; w:attention 9 → 10; w:due_vs_received 5256469200 → 5256719200; w:inflow_30 2378785000 → 2378285000; w:money_today 84500800 → 84750800
-- 🟢 **home_trends** — collections 1774393200 → 1774643200
-- 🟢 **collections** — account 9687600 → 9937600; count 6 → 7; pending 4500000 → 4250000; total 40000400 → 40250400
-- 🟢 **outstanding** — outstanding 4673877100 → 4673627100; received 24901153600 → 24901403600
-- 🟢 **project_statement** — received 750000 → 1000000
+- 🟢 **roznamcha** — pending 500000 → 250000; receipts 44750400 → 45000400
+- 🟢 **demand_register** — balance 4313318100 → 4313068100
+- 🟢 **home_widgets** — outstanding 4951181200 → 4950931200; paid 37854029100 → 37854279100; pending_cheques 4500000 → 4250000; today_collections 44750400 → 45000400
+- 🟢 **home_command** — l:ageing 9585488000 → 9584988000; l:attention 10 → 11; l:due_vs_received 5228813700 → 5229063700; l:inflow_30 2462535000 → 2462035000; l:money_today 85000800 → 85250800; w:ageing 9585488000 → 9584988000; w:attention 10 → 11; w:due_vs_received 5228813700 → 5229063700; w:inflow_30 2462535000 → 2462035000; w:money_today 85000800 → 85250800
+- 🟢 **home_trends** — collections 1742737700 → 1742987700
+- 🟢 **collections** — account 9937600 → 10187600; count 7 → 8; in_hand 4500000 → 4250000; pending 4500000 → 4250000; total 40250400 → 40500400
+- 🟢 **outstanding** — outstanding 4792744000 → 4792494000; received 24898086700 → 24898336700
+- 🟢 **project_statement** — received 1000000 → 1250000
 - 🟢 **cancellations** — unchanged
 - 🟢 **hold_register** — unchanged
 - 🟢 **lead_funnel** — unchanged
-- 🟢 **status_counters** — project_paid 24901153600 → 24901403600; tower_paid 750000 → 1000000
+- 🟢 **status_counters** — project_paid 24898086700 → 24898336700; tower_paid 1000000 → 1250000
 - 🟢 **inventory_value** — unchanged
 - 🟢 **pdfs** — statement_rows 3 → 4
 - 🟢 **documents** — unchanged
@@ -210,7 +269,7 @@ Informational ("any") metrics remaining: 12
 - 🟢 **notifications** — unchanged
 - 🟢 **customer_card** — due 55900000 → 55650000; received 0 → 250000
 - 🟢 **booking_card** — due 55900000 → 55650000; received 0 → 250000
-- 🟢 **project_card** — collected 24901153600 → 24901403600; outstanding 4673877100 → 4673627100
+- 🟢 **project_card** — collected 24898086700 → 24898336700; outstanding 4792744000 → 4792494000
 
 ### cheque bounce
 - 🟢 **booking_page** — bill 55900000 → 55950000; outstanding 55900000 → 55950000; pending_cheques 250000 → 0
@@ -221,12 +280,12 @@ Informational ("any") metrics remaining: 12
 - 🟢 **cheque_register** — amount 4500000 → 4250000; count 3 → 2
 - 🟢 **roznamcha** — pending 500000 → 250000
 - 🟢 **demand_register** — unchanged
-- 🟢 **home_widgets** — outstanding 4887964300 → 4888014300; pending_cheques 4500000 → 4250000
-- 🟢 **home_command** — l:ageing 9459054200 → 9459154200; l:attention 10 → 11; l:inflow_30 2420535000 → 2420285000; l:money_today 85000800 → 84750800; w:ageing 9459054200 → 9459154200; w:attention 10 → 11; w:inflow_30 2420535000 → 2420285000; w:money_today 85000800 → 84750800
+- 🟢 **home_widgets** — outstanding 5006831200 → 5006881200; pending_cheques 4500000 → 4250000
+- 🟢 **home_command** — l:ageing 9696788000 → 9696888000; l:attention 11 → 12; l:inflow_30 2504285000 → 2504035000; l:money_today 85500800 → 85250800; w:ageing 9696788000 → 9696888000; w:attention 11 → 12; w:inflow_30 2504285000 → 2504035000; w:money_today 85500800 → 85250800
 - 🟢 **home_trends** — unchanged
-- 🟢 **collections** — pending 4500000 → 4250000
-- 🟢 **outstanding** — bill_raised 29560433100 → 29560483100; outstanding 4729527100 → 4729577100
-- 🟢 **project_statement** — bill 391300000 → 391350000
+- 🟢 **collections** — in_hand 4500000 → 4250000; pending 4500000 → 4250000
+- 🟢 **outstanding** — bill_raised 29676233100 → 29676283100; outstanding 4848394000 → 4848444000
+- 🟢 **project_statement** — bill 507100000 → 507150000
 - 🟢 **cancellations** — unchanged
 - 🟢 **hold_register** — unchanged
 - 🟢 **lead_funnel** — unchanged
@@ -235,10 +294,10 @@ Informational ("any") metrics remaining: 12
 - 🟢 **pdfs** — statement_rows 3 → 4
 - 🟢 **documents** — unchanged
 - 🟢 **journey** — entries 7 → 9; last "payment.post" → "payment.bounce"
-- 🟢 **notifications** — newest "2026-11-18T14:48:59.206501+00:00" → "2026-11-18T14:49:05.038582+00:00"; unread 2754 → 2756
+- 🟢 **notifications** — newest "2026-11-18T22:18:41.220613+00:00" → "2026-11-18T22:18:47.422040+00:00"; unread 2425 → 2427
 - 🟢 **customer_card** — billed 55900000 → 55950000; due 55900000 → 55950000
 - 🟢 **booking_card** — billed 55900000 → 55950000; due 55900000 → 55950000
-- 🟢 **project_card** — outstanding 4729527100 → 4729577100
+- 🟢 **project_card** — outstanding 4848394000 → 4848444000
 
 ### receipt reversal
 - 🟢 **booking_page** — outstanding 55650000 → 55900000; received 250000 → 0
@@ -247,26 +306,26 @@ Informational ("any") metrics remaining: 12
 - 🟢 **bills_raised** — unchanged
 - 🟢 **received** — cleared 250000 → 0; reversed 0 → 1
 - 🟢 **cheque_register** — unchanged
-- 🟢 **roznamcha** — cash_out 726200000 → 726450000; closing 193285800 → 193035800; receipts 45000400 → 44750400
-- 🟢 **demand_register** — balance 4309068100 → 4309318100
-- 🟢 **home_widgets** — outstanding 4943664300 → 4943914300; paid 37857596000 → 37857346000; today_collections 45000400 → 44750400
-- 🟢 **home_command** — l:ageing 9570454200 → 9570954200; l:attention 12 → 11; l:due_vs_received 5256969200 → 5256719200; l:inflow_30 2462035000 → 2462285000; l:money_today 85250800 → 84750800; w:ageing 9570454200 → 9570954200; w:attention 12 → 11; w:due_vs_received 5256969200 → 5256719200; w:inflow_30 2462035000 → 2462285000; w:money_today 85250800 → 84750800
-- 🟢 **home_trends** — collections 1774893200 → 1774643200
-- 🟢 **collections** — cash 28062800 → 27812800; count 8 → 9; total 40500400 → 40250400
-- 🟢 **outstanding** — outstanding 4785227100 → 4785477100; received 24901653600 → 24901403600
-- 🟢 **project_statement** — received 1250000 → 1000000
+- 🟢 **roznamcha** — cash_out 726200000 → 726450000; closing 193285800 → 193035800; receipts 45250400 → 45000400
+- 🟢 **demand_register** — balance 4396818100 → 4397068100
+- 🟢 **home_widgets** — outstanding 5062531200 → 5062781200; paid 37854529100 → 37854279100; today_collections 45250400 → 45000400
+- 🟢 **home_command** — l:ageing 9808188000 → 9808688000; l:attention 13 → 12; l:due_vs_received 5229313700 → 5229063700; l:inflow_30 2545785000 → 2546035000; l:money_today 85750800 → 85250800; w:ageing 9808188000 → 9808688000; w:attention 13 → 12; w:due_vs_received 5229313700 → 5229063700; w:inflow_30 2545785000 → 2546035000; w:money_today 85750800 → 85250800
+- 🟢 **home_trends** — collections 1743237700 → 1742987700
+- 🟢 **collections** — cash 28062800 → 27812800; count 9 → 10; total 40750400 → 40500400
+- 🟢 **outstanding** — outstanding 4904094000 → 4904344000; received 24898586700 → 24898336700
+- 🟢 **project_statement** — received 1500000 → 1250000
 - 🟢 **cancellations** — unchanged
 - 🟢 **hold_register** — unchanged
 - 🟢 **lead_funnel** — unchanged
-- 🟢 **status_counters** — project_paid 24901653600 → 24901403600; tower_paid 1250000 → 1000000
+- 🟢 **status_counters** — project_paid 24898586700 → 24898336700; tower_paid 1500000 → 1250000
 - 🟢 **inventory_value** — unchanged
 - 🟢 **pdfs** — statement_rows 4 → 5
 - 🟢 **documents** — unchanged
 - 🟢 **journey** — entries 7 → 8; last "payment.post" → "payment.reverse"
-- 🟢 **notifications** — newest "2026-11-18T14:49:06.873364+00:00" → "2026-11-18T14:49:12.740664+00:00"; unread 2767 → 2768
+- 🟢 **notifications** — newest "2026-11-18T22:18:49.807142+00:00" → "2026-11-18T22:18:55.994705+00:00"; unread 2438 → 2439
 - 🟢 **customer_card** — due 55650000 → 55900000; received 250000 → 0
 - 🟢 **booking_card** — due 55650000 → 55900000; received 250000 → 0
-- 🟢 **project_card** — collected 24901653600 → 24901403600; outstanding 4785227100 → 4785477100
+- 🟢 **project_card** — collected 24898586700 → 24898336700; outstanding 4904094000 → 4904344000
 
 ### stage complete → bills
 - 🟢 **booking_page** — bill 55900000 → 77950000; outstanding 55900000 → 77950000
@@ -276,25 +335,25 @@ Informational ("any") metrics remaining: 12
 - 🟢 **received** — unchanged
 - 🟢 **cheque_register** — unchanged
 - 🟢 **roznamcha** — unchanged
-- 🟢 **demand_register** — balance 4351318100 → 4540318100; raised_today 1171734000 → 1360734000; raised_today_n 23 → 32; rows 525 → 534; total 26029068400 → 26218068400
-- 🟢 **home_widgets** — outstanding 4999814300 → 5198264300
-- 🟢 **home_command** — l:ageing 9682754200 → 10079654200; l:inflow_30 2504285000 → 2693285000; l:next_milestone 4528912400 → 4727362400; w:ageing 9682754200 → 10079654200; w:inflow_30 2504285000 → 2693285000; w:next_milestone 4528912400 → 4727362400
-- 🟢 **home_trends** — demands 2831885000 → 3020885000
+- 🟢 **demand_register** — balance 4439068100 → 4670068100; raised_today 1259734000 → 1490734000; raised_today_n 27 → 38; rows 529 → 540; total 26117068400 → 26348068400
+- 🟢 **home_widgets** — outstanding 5118681200 → 5361231200
+- 🟢 **home_command** — l:ageing 9920488000 → 10405588000; l:inflow_30 2588035000 → 2819035000; l:next_milestone 4573012400 → 4815562400; w:ageing 9920488000 → 10405588000; w:inflow_30 2588035000 → 2819035000; w:next_milestone 4573012400 → 4815562400
+- 🟢 **home_trends** — demands 2919885000 → 3150885000
 - 🟢 **collections** — unchanged
-- 🟢 **outstanding** — bill_raised 29672283100 → 29870733100; outstanding 4841377100 → 5039827100
-- 🟢 **project_statement** — bill 503150000 → 701600000
+- 🟢 **outstanding** — bill_raised 29788083100 → 30030633100; outstanding 4960244000 → 5202794000
+- 🟢 **project_statement** — bill 618950000 → 861500000
 - 🟢 **cancellations** — unchanged
 - 🟢 **hold_register** — unchanged
 - 🟢 **lead_funnel** — unchanged
 - 🟢 **status_counters** — unchanged
 - 🟢 **inventory_value** — unchanged
-- 🟢 **pdfs** — last_demand_pdf "DM-2627-20729:200" → "DM-2627-20738:200"; statement_rows 3 → 5
+- 🟢 **pdfs** — last_demand_pdf "DM-2627-22007:200" → "DM-2627-22018:200"; statement_rows 3 → 5
 - 🟢 **documents** — docs 4 → 5
 - 🟢 **journey** — entries 6 → 8; last "booking.create" → "demand.create"
-- 🟢 **notifications** — newest "2026-11-18T14:49:14.618006+00:00" → "2026-11-18T14:49:21.885498+00:00"; unread 2779 → 2800
+- 🟢 **notifications** — newest "2026-11-18T22:18:58.183291+00:00" → "2026-11-18T22:19:05.412454+00:00"; unread 2450 → 2470
 - 🟢 **customer_card** — billed 55900000 → 77950000; due 55900000 → 77950000
 - 🟢 **booking_card** — billed 55900000 → 77950000; due 55900000 → 77950000
-- 🟢 **project_card** — outstanding 4841377100 → 5039827100
+- 🟢 **project_card** — outstanding 4960244000 → 5202794000
 
 ### stage undo
 - 🟢 **booking_page** — bill 122050000 → 77950000; outstanding 122050000 → 77950000
@@ -304,25 +363,25 @@ Informational ("any") metrics remaining: 12
 - 🟢 **received** — unchanged
 - 🟢 **cheque_register** — unchanged
 - 🟢 **roznamcha** — unchanged
-- 🟢 **demand_register** — balance 5023318100 → 4603318100; raised_today 1843734000 → 1423734000; raised_today_n 44 → 34; rows 546 → 536; total 26701068400 → 26281068400
-- 🟢 **home_widgets** — outstanding 5717214300 → 5276214300
-- 🟢 **home_command** — l:ageing 11117554200 → 10235554200; l:inflow_30 3176285000 → 2756285000; l:next_milestone 4550962400 → 4771462400; w:ageing 11117554200 → 10235554200; w:inflow_30 3176285000 → 2756285000; w:next_milestone 4550962400 → 4771462400
-- 🟢 **home_trends** — demands 3503885000 → 3083885000
+- 🟢 **demand_register** — balance 5237068100 → 4733068100; raised_today 2057734000 → 1553734000; raised_today_n 52 → 40; rows 554 → 542; total 26915068400 → 26411068400
+- 🟢 **home_widgets** — outstanding 5968381200 → 5439181200
+- 🟢 **home_command** — l:ageing 11619888000 → 10561488000; l:inflow_30 3386035000 → 2882035000; l:next_milestone 4595062400 → 4859662400; w:ageing 11619888000 → 10561488000; w:inflow_30 3386035000 → 2882035000; w:next_milestone 4595062400 → 4859662400
+- 🟢 **home_trends** — demands 3717885000 → 3213885000
 - 🟢 **collections** — unchanged
-- 🟢 **outstanding** — bill_raised 30389683100 → 29948683100; outstanding 5558777100 → 5117777100
-- 🟢 **project_statement** — bill 1220550000 → 779550000
+- 🟢 **outstanding** — bill_raised 30637783100 → 30108583100; outstanding 5809944000 → 5280744000
+- 🟢 **project_statement** — bill 1468650000 → 939450000
 - 🟢 **cancellations** — unchanged
 - 🟢 **hold_register** — unchanged
 - 🟢 **lead_funnel** — unchanged
 - 🟢 **status_counters** — unchanged
 - 🟢 **inventory_value** — unchanged
-- 🟢 **pdfs** — last_demand_pdf "DM-2627-20750:200" → "DM-2627-20740:200"; statement_rows 7 → 5
+- 🟢 **pdfs** — last_demand_pdf "DM-2627-22032:200" → "DM-2627-22020:200"; statement_rows 7 → 5
 - 🟢 **documents** — unchanged
 - 🟢 **journey** — unchanged
-- 🟢 **notifications** — unread 2848 → 2838
+- 🟢 **notifications** — unread 2531 → 2519
 - 🟢 **customer_card** — billed 122050000 → 77950000; due 122050000 → 77950000
 - 🟢 **booking_card** — billed 122050000 → 77950000; due 122050000 → 77950000
-- 🟢 **project_card** — outstanding 5558777100 → 5117777100
+- 🟢 **project_card** — outstanding 5809944000 → 5280744000
 
 ### cancel → refund
 - 🟢 **booking_page** — bill 77950000 → 250000; outstanding 77700000 → 0; status "Active" → "Cancelled"
@@ -332,25 +391,25 @@ Informational ("any") metrics remaining: 12
 - 🟢 **received** — unchanged
 - 🟢 **cheque_register** — unchanged
 - 🟢 **roznamcha** — unchanged
-- 🟢 **demand_register** — balance 4666068100 → 4603318100; raised_today 1486734000 → 1423734000; raised_today_n 36 → 34; rows 538 → 536; total 26344068400 → 26281068400
-- 🟢 **home_widgets** — agreement 55250770000 → 54830770000; available 127 → 128; bookings 91 → 90; outstanding 5353914300 → 5276214300; paid 37857596000 → 37857346000
-- 🟢 **home_command** — l:ageing 10390954200 → 10235554200; l:attention 12 → 11; l:inflow_30 2819035000 → 2756285000; l:next_milestone 4815562400 → 4771462400; w:ageing 10390954200 → 10235554200; w:attention 12 → 11; w:inflow_30 2819035000 → 2756285000; w:next_milestone 4815562400 → 4771462400
-- 🟢 **home_trends** — demands 3146885000 → 3083885000
+- 🟢 **demand_register** — balance 4795818100 → 4733068100; raised_today 1616734000 → 1553734000; raised_today_n 42 → 40; rows 544 → 542; total 26474068400 → 26411068400
+- 🟢 **home_widgets** — agreement 56090770000 → 55670770000; available 129 → 130; bookings 93 → 92; outstanding 5516881200 → 5439181200; paid 37854529100 → 37854279100
+- 🟢 **home_command** — l:ageing 10716888000 → 10561488000; l:attention 13 → 12; l:inflow_30 2944785000 → 2882035000; l:next_milestone 4903762400 → 4859662400; w:ageing 10716888000 → 10561488000; w:attention 13 → 12; w:inflow_30 2944785000 → 2882035000; w:next_milestone 4903762400 → 4859662400
+- 🟢 **home_trends** — demands 3276885000 → 3213885000
 - 🟢 **collections** — unchanged
-- 🟢 **outstanding** — bill_raised 30026633100 → 29948683100; bookings 79 → 78; outstanding 5195477100 → 5117777100; received 24901653600 → 24901403600
-- 🟢 **project_statement** — bill 857500000 → 779550000; count 11 → 10; received 1250000 → 1000000
-- 🟢 **cancellations** — refund 43889200 → 44139200; rows 7 → 8
+- 🟢 **outstanding** — bill_raised 30186533100 → 30108583100; bookings 81 → 80; outstanding 5358444000 → 5280744000; received 24898586700 → 24898336700
+- 🟢 **project_statement** — bill 1017400000 → 939450000; count 13 → 12; received 1500000 → 1250000
+- 🟢 **cancellations** — bvc_cancelled_line 432840000 → 495840000; refund 43889200 → 44139200; rows 7 → 8
 - 🟢 **hold_register** — unchanged
-- 🟢 **lead_funnel** — Converted 67 → 66; Lost 14 → 15
-- 🟢 **status_counters** — fid_status "Booked" → "Available"; project_bookings 79 → 78; project_paid 24901653600 → 24901403600; tower_bookings 11 → 10; tower_paid 1250000 → 1000000
-- 🟢 **inventory_value** — available 73 → 74; available_value 39983910000 → 40403910000; booked 79 → 78; sold_value 42908770000 → 42488770000
-- 🟢 **pdfs** — last_demand_pdf "DM-2627-20752:200" → null; statement_rows 6 → 7
+- 🟢 **lead_funnel** — Converted 57 → 56; Lost 14 → 15
+- 🟢 **status_counters** — fid_status "Booked" → "Available"; project_bookings 81 → 80; project_paid 24898586700 → 24898336700; tower_bookings 13 → 12; tower_paid 1500000 → 1250000
+- 🟢 **inventory_value** — available 75 → 76; available_value 40823910000 → 41243910000; booked 81 → 80; sold_value 43748770000 → 43328770000
+- 🟢 **pdfs** — last_demand_pdf "DM-2627-22034:200" → null; statement_rows 6 → 7
 - 🟢 **documents** — docs 4 → 5
 - 🟢 **journey** — entries 8 → 10; last "payment.post" → "booking.cancel"
-- 🟢 **notifications** — newest "2026-11-18T14:49:34.107990+00:00" → "2026-11-18T14:49:40.145094+00:00"; unread 2850 → 2854
+- 🟢 **notifications** — newest "2026-11-18T22:19:19.949426+00:00" → "2026-11-18T22:19:26.276005+00:00"; unread 2531 → 2535
 - 🟢 **customer_card** — advance 0 → null; billed 77950000 → null; due 77700000 → null; received 250000 → null
 - 🟢 **booking_card** — billed 77950000 → 250000; due 77700000 → 0
-- 🟢 **project_card** — collected 24901653600 → 24901403600; outstanding 5195477100 → 5117777100
+- 🟢 **project_card** — collected 24898586700 → 24898336700; outstanding 5358444000 → 5280744000
 
 ### cancel → forfeit
 - 🟢 **booking_page** — bill 77950000 → 250000; outstanding 77700000 → 0; status "Active" → "Cancelled"
@@ -360,25 +419,25 @@ Informational ("any") metrics remaining: 12
 - 🟢 **received** — unchanged
 - 🟢 **cheque_register** — unchanged
 - 🟢 **roznamcha** — unchanged
-- 🟢 **demand_register** — balance 4666068100 → 4603318100; raised_today 1486734000 → 1423734000; raised_today_n 36 → 34; rows 538 → 536; total 26344068400 → 26281068400
-- 🟢 **home_widgets** — agreement 55250770000 → 54830770000; available 127 → 128; bookings 91 → 90; outstanding 5353914300 → 5276214300; paid 37857596000 → 37857346000
-- 🟢 **home_command** — l:ageing 10390954200 → 10235554200; l:attention 12 → 11; l:inflow_30 2819035000 → 2756285000; l:next_milestone 4815562400 → 4771462400; w:ageing 10390954200 → 10235554200; w:attention 12 → 11; w:inflow_30 2819035000 → 2756285000; w:next_milestone 4815562400 → 4771462400
-- 🟢 **home_trends** — demands 3146885000 → 3083885000
+- 🟢 **demand_register** — balance 4795818100 → 4733068100; raised_today 1616734000 → 1553734000; raised_today_n 42 → 40; rows 544 → 542; total 26474068400 → 26411068400
+- 🟢 **home_widgets** — agreement 56090770000 → 55670770000; available 129 → 130; bookings 93 → 92; outstanding 5516881200 → 5439181200; paid 37854529100 → 37854279100
+- 🟢 **home_command** — l:ageing 10716888000 → 10561488000; l:attention 13 → 12; l:inflow_30 2944785000 → 2882035000; l:next_milestone 4903762400 → 4859662400; w:ageing 10716888000 → 10561488000; w:attention 13 → 12; w:inflow_30 2944785000 → 2882035000; w:next_milestone 4903762400 → 4859662400
+- 🟢 **home_trends** — demands 3276885000 → 3213885000
 - 🟢 **collections** — unchanged
-- 🟢 **outstanding** — bill_raised 30026633100 → 29948683100; bookings 79 → 78; outstanding 5195477100 → 5117777100; received 24901653600 → 24901403600
-- 🟢 **project_statement** — bill 857500000 → 779550000; count 11 → 10; received 1250000 → 1000000
-- 🟢 **cancellations** — forfeit 53786800 → 54036800; rows 8 → 9
+- 🟢 **outstanding** — bill_raised 30186533100 → 30108583100; bookings 81 → 80; outstanding 5358444000 → 5280744000; received 24898586700 → 24898336700
+- 🟢 **project_statement** — bill 1017400000 → 939450000; count 13 → 12; received 1500000 → 1250000
+- 🟢 **cancellations** — bvc_cancelled_line 495840000 → 558840000; forfeit 53786800 → 54036800; rows 8 → 9
 - 🟢 **hold_register** — unchanged
-- 🟢 **lead_funnel** — Converted 67 → 66; Lost 15 → 16
-- 🟢 **status_counters** — fid_status "Booked" → "Available"; project_bookings 79 → 78; project_paid 24901653600 → 24901403600; tower_bookings 11 → 10; tower_paid 1250000 → 1000000
-- 🟢 **inventory_value** — available 73 → 74; available_value 39983910000 → 40403910000; booked 79 → 78; sold_value 42908770000 → 42488770000
-- 🟢 **pdfs** — last_demand_pdf "DM-2627-20754:200" → null; statement_rows 6 → 7
+- 🟢 **lead_funnel** — Converted 57 → 56; Lost 15 → 16
+- 🟢 **status_counters** — fid_status "Booked" → "Available"; project_bookings 81 → 80; project_paid 24898586700 → 24898336700; tower_bookings 13 → 12; tower_paid 1500000 → 1250000
+- 🟢 **inventory_value** — available 75 → 76; available_value 40823910000 → 41243910000; booked 81 → 80; sold_value 43748770000 → 43328770000
+- 🟢 **pdfs** — last_demand_pdf "DM-2627-22036:200" → null; statement_rows 6 → 7
 - 🟢 **documents** — docs 4 → 5
 - 🟢 **journey** — entries 8 → 10; last "payment.post" → "booking.cancel"
-- 🟢 **notifications** — newest "2026-11-18T14:49:42.090955+00:00" → "2026-11-18T14:49:48.095626+00:00"; unread 2866 → 2870
+- 🟢 **notifications** — newest "2026-11-18T22:19:28.560474+00:00" → "2026-11-18T22:19:34.924474+00:00"; unread 2547 → 2551
 - 🟢 **customer_card** — advance 0 → null; billed 77950000 → null; due 77700000 → null; received 250000 → null
 - 🟢 **booking_card** — billed 77950000 → 250000; due 77700000 → 0
-- 🟢 **project_card** — collected 24901653600 → 24901403600; outstanding 5195477100 → 5117777100
+- 🟢 **project_card** — collected 24898586700 → 24898336700; outstanding 5358444000 → 5280744000
 
 ### refund paid (cash)
 - 🟢 **booking_page** — bill 15000000 → 0; received 15000000 → 0
@@ -392,7 +451,7 @@ Informational ("any") metrics remaining: 12
 - 🟢 **home_widgets** — refunds_paid 44339200 → 59339200
 - 🟢 **home_command** — unchanged
 - 🟢 **home_trends** — unchanged
-- 🟢 **collections** — unchanged
+- 🟢 **collections** — refunds_paid 0 → 15000000
 - 🟢 **outstanding** — unchanged
 - 🟢 **project_statement** — unchanged
 - 🟢 **cancellations** — unchanged
@@ -403,7 +462,7 @@ Informational ("any") metrics remaining: 12
 - 🟢 **pdfs** — statement_rows 7 → 8
 - 🟢 **documents** — unchanged
 - 🟢 **journey** — unchanged
-- 🟢 **notifications** — newest "2026-11-18T14:49:50.079699+00:00" → "2026-11-18T14:49:56.160848+00:00"; unread 2886 → 2887
+- 🟢 **notifications** — newest "2026-11-18T22:19:37.228324+00:00" → "2026-11-18T22:19:43.518472+00:00"; unread 2567 → 2568
 - 🟢 **customer_card** — unchanged
 - 🟢 **booking_card** — billed 15000000 → 0; received 15000000 → 0
 - 🟢 **project_card** — unchanged
@@ -420,7 +479,7 @@ Informational ("any") metrics remaining: 12
 - 🟢 **home_widgets** — refunds_paid 59339200 → 71139200
 - 🟢 **home_command** — unchanged
 - 🟢 **home_trends** — unchanged
-- 🟢 **collections** — unchanged
+- 🟢 **collections** — refunds_paid 15000000 → 26800000
 - 🟢 **outstanding** — unchanged
 - 🟢 **project_statement** — unchanged
 - 🟢 **cancellations** — unchanged
@@ -431,13 +490,13 @@ Informational ("any") metrics remaining: 12
 - 🟢 **pdfs** — statement_rows 7 → 9
 - 🟢 **documents** — unchanged
 - 🟢 **journey** — unchanged
-- 🟢 **notifications** — newest "2026-11-18T14:49:58.128517+00:00" → "2026-11-18T14:50:04.194084+00:00"; unread 2903 → 2904
+- 🟢 **notifications** — newest "2026-11-18T22:19:45.807977+00:00" → "2026-11-18T22:19:52.097076+00:00"; unread 2584 → 2585
 - 🟢 **customer_card** — unchanged
 - 🟢 **booking_card** — billed 11800000 → 0; received 11800000 → 0
 - 🟢 **project_card** — unchanged
 
 ### transfer
-- 🟢 **booking_page** — flat "9dd91b3c-3e7d-46c0-8671-6d942bebde59" → "e64a40c1-b4ab-4f69-ba3a-772192040f9e"
+- 🟢 **booking_page** — flat "392bfe49-b3c7-4cee-862c-3e6210f6a69e" → "17b26ab0-c715-4332-b6d3-78a213e19d7d"
 - 🟢 **customer_360** — unchanged
 - 🟢 **ledger** — rows 6 → 7
 - 🟢 **bills_raised** — unchanged
@@ -459,7 +518,7 @@ Informational ("any") metrics remaining: 12
 - 🟢 **pdfs** — statement_rows 6 → 7
 - 🟢 **documents** — unchanged
 - 🟢 **journey** — entries 8 → 10; last "payment.post" → "booking.transfer"
-- 🟢 **notifications** — newest "2026-11-18T14:50:06.143865+00:00" → "2026-11-18T14:50:12.187056+00:00"; unread 2916 → 2917
+- 🟢 **notifications** — newest "2026-11-18T22:19:54.336074+00:00" → "2026-11-18T22:20:00.635785+00:00"; unread 2597 → 2598
 - 🟢 **customer_card** — unchanged
 - 🟢 **booking_card** — unchanged
 - 🟢 **project_card** — unchanged
@@ -472,13 +531,13 @@ Informational ("any") metrics remaining: 12
 - 🟢 **received** — unchanged
 - 🟢 **cheque_register** — unchanged
 - 🟢 **roznamcha** — unchanged
-- 🟢 **demand_register** — balance 4728818100 → 4728968100; raised_today 1549734000 → 1549884000; total 26407068400 → 26407218400
-- 🟢 **home_widgets** — agreement 55670770000 → 55671770000; outstanding 5431614300 → 5431764300
-- 🟢 **home_command** — l:ageing 10546354200 → 10546654200; l:inflow_30 2881785000 → 2881935000; l:next_milestone 4859662400 → 4859774900; w:ageing 10546354200 → 10546654200; w:inflow_30 2881785000 → 2881935000; w:next_milestone 4859662400 → 4859774900
-- 🟢 **home_trends** — demands 3209885000 → 3210035000
+- 🟢 **demand_register** — balance 4858568100 → 4858718100; raised_today 1679734000 → 1679884000; total 26537068400 → 26537218400
+- 🟢 **home_widgets** — agreement 56510770000 → 56511770000; outstanding 5594581200 → 5594731200
+- 🟢 **home_command** — l:ageing 10872288000 → 10872588000; l:inflow_30 3007535000 → 3007685000; l:next_milestone 4947862400 → 4947974900; w:ageing 10872288000 → 10872588000; w:inflow_30 3007535000 → 3007685000; w:next_milestone 4947862400 → 4947974900
+- 🟢 **home_trends** — demands 3339885000 → 3340035000
 - 🟢 **collections** — unchanged
-- 🟢 **outstanding** — bill_raised 30104583100 → 30104733100; outstanding 5273177100 → 5273327100
-- 🟢 **project_statement** — bill 935450000 → 935600000
+- 🟢 **outstanding** — bill_raised 30264483100 → 30264633100; outstanding 5436144000 → 5436294000
+- 🟢 **project_statement** — bill 1095350000 → 1095500000
 - 🟢 **cancellations** — unchanged
 - 🟢 **hold_register** — unchanged
 - 🟢 **lead_funnel** — unchanged
@@ -487,10 +546,10 @@ Informational ("any") metrics remaining: 12
 - 🟢 **pdfs** — statement_rows 6 → 7
 - 🟢 **documents** — unchanged
 - 🟢 **journey** — entries 8 → 10; last "payment.post" → "booking.agreement_revision"
-- 🟢 **notifications** — newest "2026-11-18T14:50:14.200235+00:00" → "2026-11-18T14:50:20.280852+00:00"; unread 2929 → 2930
+- 🟢 **notifications** — newest "2026-11-18T22:20:02.971733+00:00" → "2026-11-18T22:20:09.165234+00:00"; unread 2610 → 2611
 - 🟢 **customer_card** — billed 77950000 → 78100000; due 77700000 → 77850000
 - 🟢 **booking_card** — billed 77950000 → 78100000; due 77700000 → 77850000
-- 🟢 **project_card** — outstanding 5273177100 → 5273327100
+- 🟢 **project_card** — outstanding 5436144000 → 5436294000
 
 ### change plan
 - 🟢 **booking_page** — bill 77950000 → 452800000; outstanding 77950000 → 452800000; plan "b00e6509-91aa-424f-b4f3-122560648d61" → "deb91882-b1bc-4e2e-8601-f9dec4e2d3d9"
@@ -500,25 +559,25 @@ Informational ("any") metrics remaining: 12
 - 🟢 **received** — unchanged
 - 🟢 **cheque_register** — unchanged
 - 🟢 **roznamcha** — unchanged
-- 🟢 **demand_register** — balance 4791968100 → 5148968100; raised_today 1612884000 → 1969884000; raised_today_n 40 → 39; rows 542 → 541; total 26470218400 → 26827218400
-- 🟢 **home_widgets** — outstanding 5509714300 → 5884564300
-- 🟢 **home_command** — l:ageing 10702554200 → 11452254200; l:due_vs_received 5284519200 → 5704519200; l:inflow_30 2944935000 → 3301935000; l:next_milestone 4903874900 → 4859774900; w:ageing 10702554200 → 11452254200; w:due_vs_received 5284519200 → 5704519200; w:inflow_30 2944935000 → 3301935000; w:next_milestone 4903874900 → 4859774900
-- 🟢 **home_trends** — demands 3273035000 → 3630035000
+- 🟢 **demand_register** — balance 4921718100 → 5278718100; raised_today 1742884000 → 2099884000; raised_today_n 46 → 45; rows 548 → 547; total 26600218400 → 26957218400
+- 🟢 **home_widgets** — outstanding 5672681200 → 6047531200
+- 🟢 **home_command** — l:ageing 11028488000 → 11778188000; l:due_vs_received 5256863700 → 5676863700; l:inflow_30 3070685000 → 3427685000; l:next_milestone 4992074900 → 4947974900; w:ageing 11028488000 → 11778188000; w:due_vs_received 5256863700 → 5676863700; w:inflow_30 3070685000 → 3427685000; w:next_milestone 4992074900 → 4947974900
+- 🟢 **home_trends** — demands 3403035000 → 3760035000
 - 🟢 **collections** — unchanged
-- 🟢 **outstanding** — bill_raised 30182683100 → 30557533100; outstanding 5351277100 → 5726127100
-- 🟢 **project_statement** — bill 1013550000 → 1388400000
+- 🟢 **outstanding** — bill_raised 30342583100 → 30717433100; outstanding 5514244000 → 5889094000
+- 🟢 **project_statement** — bill 1173450000 → 1548300000
 - 🟢 **cancellations** — unchanged
 - 🟢 **hold_register** — unchanged
 - 🟢 **lead_funnel** — unchanged
 - 🟢 **status_counters** — unchanged
 - 🟢 **inventory_value** — unchanged
-- 🟢 **pdfs** — last_demand_pdf "DM-2627-20764:200" → "DM-2627-20765:200"
+- 🟢 **pdfs** — last_demand_pdf "DM-2627-22046:200" → "DM-2627-22047:200"
 - 🟢 **documents** — docs 4 → 5
 - 🟢 **journey** — entries 7 → 10; last "booking.create" → "booking.plan_change"
-- 🟢 **notifications** — newest "2026-11-18T14:50:22.234456+00:00" → "2026-11-18T14:50:28.416953+00:00"; unread 2942 → 2946
+- 🟢 **notifications** — newest "2026-11-18T22:20:11.552672+00:00" → "2026-11-18T22:20:18.026391+00:00"; unread 2623 → 2627
 - 🟢 **customer_card** — billed 77950000 → 452800000; due 77950000 → 452800000
 - 🟢 **booking_card** — billed 77950000 → 452800000; due 77950000 → 452800000
-- 🟢 **project_card** — outstanding 5351277100 → 5726127100
+- 🟢 **project_card** — outstanding 5514244000 → 5889094000
 
 ### hold
 - 🟢 **booking_page** — unchanged
@@ -529,17 +588,17 @@ Informational ("any") metrics remaining: 12
 - 🟢 **cheque_register** — unchanged
 - 🟢 **roznamcha** — unchanged
 - 🟢 **demand_register** — unchanged
-- 🟢 **home_widgets** — available 125 → 124
-- 🟢 **home_command** — l:attention 13 → 14; w:attention 13 → 14
+- 🟢 **home_widgets** — available 127 → 126
+- 🟢 **home_command** — l:attention 14 → 15; w:attention 14 → 15
 - 🟢 **home_trends** — unchanged
 - 🟢 **collections** — unchanged
 - 🟢 **outstanding** — unchanged
 - 🟢 **project_statement** — unchanged
 - 🟢 **cancellations** — unchanged
-- 🟢 **hold_register** — active 3 → 4; held_total 119 → 120; on_hold 3 → 4
+- 🟢 **hold_register** — active 3 → 4; held_total 131 → 132; on_hold 3 → 4
 - 🟢 **lead_funnel** — unchanged
 - 🟢 **status_counters** — fid_status "Available" → "Hold"
-- 🟢 **inventory_value** — available 71 → 70; available_value 39143910000 → 38723910000; hold 3 → 4
+- 🟢 **inventory_value** — available 73 → 72; available_value 39983910000 → 39563910000; hold 3 → 4
 - 🟢 **pdfs** — unchanged
 - 🟢 **documents** — unchanged
 - 🟢 **journey** — unchanged
@@ -557,17 +616,17 @@ Informational ("any") metrics remaining: 12
 - 🟢 **cheque_register** — unchanged
 - 🟢 **roznamcha** — unchanged
 - 🟢 **demand_register** — unchanged
-- 🟢 **home_widgets** — available 123 → 124
-- 🟢 **home_command** — l:attention 15 → 14; w:attention 15 → 14
+- 🟢 **home_widgets** — available 125 → 126
+- 🟢 **home_command** — l:attention 16 → 15; w:attention 16 → 15
 - 🟢 **home_trends** — unchanged
 - 🟢 **collections** — unchanged
 - 🟢 **outstanding** — unchanged
 - 🟢 **project_statement** — unchanged
 - 🟢 **cancellations** — unchanged
-- 🟢 **hold_register** — active 5 → 4; on_hold 5 → 4; released 29 → 30
+- 🟢 **hold_register** — active 5 → 4; on_hold 5 → 4; released 32 → 33
 - 🟢 **lead_funnel** — unchanged
 - 🟢 **status_counters** — fid_status "Hold" → "Available"
-- 🟢 **inventory_value** — available 69 → 70; available_value 38303910000 → 38723910000; hold 5 → 4
+- 🟢 **inventory_value** — available 71 → 72; available_value 39143910000 → 39563910000; hold 5 → 4
 - 🟢 **pdfs** — unchanged
 - 🟢 **documents** — unchanged
 - 🟢 **journey** — unchanged
@@ -585,8 +644,8 @@ Informational ("any") metrics remaining: 12
 - 🟢 **cheque_register** — unchanged
 - 🟢 **roznamcha** — unchanged
 - 🟢 **demand_register** — unchanged
-- 🟢 **home_widgets** — available 123 → 124
-- 🟢 **home_command** — l:attention 15 → 14; w:attention 15 → 14
+- 🟢 **home_widgets** — available 125 → 126
+- 🟢 **home_command** — l:attention 16 → 15; w:attention 16 → 15
 - 🟢 **home_trends** — unchanged
 - 🟢 **collections** — unchanged
 - 🟢 **outstanding** — unchanged
@@ -595,11 +654,11 @@ Informational ("any") metrics remaining: 12
 - 🟢 **hold_register** — active 5 → 4; expired 3 → 4; on_hold 5 → 4
 - 🟢 **lead_funnel** — unchanged
 - 🟢 **status_counters** — fid_status "Hold" → "Available"
-- 🟢 **inventory_value** — available 69 → 70; available_value 38303910000 → 38723910000; hold 5 → 4
+- 🟢 **inventory_value** — available 71 → 72; available_value 39143910000 → 39563910000; hold 5 → 4
 - 🟢 **pdfs** — unchanged
 - 🟢 **documents** — unchanged
 - 🟢 **journey** — unchanged
-- 🟢 **notifications** — newest "2026-11-18T14:50:28.416953+00:00" → "2026-11-18T14:50:53.080335+00:00"; unread 2946 → 2948
+- 🟢 **notifications** — newest "2026-11-18T22:20:18.026391+00:00" → "2026-11-18T22:20:43.658727+00:00"; unread 2627 → 2629
 - 🟢 **customer_card** — unchanged
 - 🟢 **booking_card** — unchanged
 - 🟢 **project_card** — unchanged
@@ -623,7 +682,7 @@ Informational ("any") metrics remaining: 12
 - 🟢 **hold_register** — unchanged
 - 🟢 **lead_funnel** — unchanged
 - 🟢 **status_counters** — fid_price 4200000.0 → 4300000.0
-- 🟢 **inventory_value** — available_value 38723910000 → 38733910000
+- 🟢 **inventory_value** — available_value 39563910000 → 39573910000
 - 🟢 **pdfs** — unchanged
 - 🟢 **documents** — unchanged
 - 🟢 **journey** — unchanged
@@ -633,32 +692,32 @@ Informational ("any") metrics remaining: 12
 - 🟢 **project_card** — unchanged
 
 ### lead → visit → booking
-- 🟢 **booking_page** — advance null → 0; agreement null → 420000000; bill null → 77950000; flat null → "8d70eaa6-0c1d-40e5-a826-3daff34f34b1"; outstanding null → 77950000; pending_cheques null → 0; plan null → "b00e6509-91aa-424f-b4f3-122560648d61"; received null → 0; status null → "Active"
+- 🟢 **booking_page** — advance null → 0; agreement null → 420000000; bill null → 77950000; flat null → "130158a0-e4e0-4e47-8841-c669fa4cc87c"; outstanding null → 77950000; pending_cheques null → 0; plan null → "b00e6509-91aa-424f-b4f3-122560648d61"; received null → 0; status null → "Active"
 - 🟢 **customer_360** — bill null → 77950000; bookings null → 1; received null → 0; status null → "Active"
 - 🟢 **ledger** — jama null → 0; rows null → 5; udhar null → 77950000
 - 🟢 **bills_raised** — count null → 2; raised null → 63000000
 - 🟢 **received** — bounced null → 0; cleared null → 0; count null → 0; pending null → 0; reversed null → 0
 - 🟢 **cheque_register** — unchanged
 - 🟢 **roznamcha** — unchanged
-- 🟢 **demand_register** — balance 5148968100 → 5211968100; raised_today 1969884000 → 2032884000; raised_today_n 39 → 41; rows 541 → 543; total 26827218400 → 26890218400
-- 🟢 **home_widgets** — agreement 56091770000 → 56511770000; available 124 → 123; bookings 93 → 94; leads_open 37 → 36; outstanding 5884564300 → 5962514300
-- 🟢 **home_command** — l:ageing 11452254200 → 11608154200; l:inflow_30 3301935000 → 3364935000; l:next_milestone 4859774900 → 4903874900; l:pipeline 66 → 67; w:ageing 11452254200 → 11608154200; w:inflow_30 3301935000 → 3364935000; w:next_milestone 4859774900 → 4903874900; w:pipeline 66 → 67
-- 🟢 **home_trends** — bookings 24 → 25; demands 3630035000 → 3693035000
+- 🟢 **demand_register** — balance 5278718100 → 5341718100; raised_today 2099884000 → 2162884000; raised_today_n 45 → 47; rows 547 → 549; total 26957218400 → 27020218400
+- 🟢 **home_widgets** — agreement 56931770000 → 57351770000; available 126 → 125; bookings 95 → 96; leads_open 37 → 36; outstanding 6047531200 → 6125481200
+- 🟢 **home_command** — l:ageing 11778188000 → 11934088000; l:inflow_30 3427685000 → 3490685000; l:next_milestone 4947974900 → 4992074900; l:pipeline 58 → 59; w:ageing 11778188000 → 11934088000; w:inflow_30 3427685000 → 3490685000; w:next_milestone 4947974900 → 4992074900; w:pipeline 58 → 59
+- 🟢 **home_trends** — bookings 26 → 27; demands 3760035000 → 3823035000
 - 🟢 **collections** — unchanged
-- 🟢 **outstanding** — bill_raised 30557533100 → 30635483100; bookings 81 → 82; outstanding 5726127100 → 5804077100
-- 🟢 **project_statement** — bill 1388400000 → 1466350000; count 13 → 14
+- 🟢 **outstanding** — bill_raised 30717433100 → 30795383100; bookings 83 → 84; outstanding 5889094000 → 5967044000
+- 🟢 **project_statement** — bill 1548300000 → 1626250000; count 15 → 16
 - 🟢 **cancellations** — unchanged
 - 🟢 **hold_register** — unchanged
-- 🟢 **lead_funnel** — Converted 69 → 70; New 11 → 10
-- 🟢 **status_counters** — fid_status "Available" → "Booked"; project_bookings 81 → 82; tower_bookings 13 → 14
-- 🟢 **inventory_value** — available 70 → 69; available_value 38733910000 → 38313910000; booked 81 → 82; sold_value 43748770000 → 44168770000
-- 🟢 **pdfs** — last_demand_pdf null → "DM-2627-20767:200"; statement_pdf null → true; statement_rows null → 5
+- 🟢 **lead_funnel** — Converted 59 → 60; New 11 → 10
+- 🟢 **status_counters** — fid_status "Available" → "Booked"; project_bookings 83 → 84; tower_bookings 15 → 16
+- 🟢 **inventory_value** — available 72 → 71; available_value 39573910000 → 39153910000; booked 83 → 84; sold_value 44588770000 → 45008770000
+- 🟢 **pdfs** — last_demand_pdf null → "DM-2627-22049:200"; statement_pdf null → true; statement_rows null → 5
 - 🟢 **documents** — docs null → 4
 - 🟢 **journey** — entries null → 7; last null → "booking.create"; last_has_values null → true
-- 🟢 **notifications** — newest "2026-11-18T14:51:00.661978+00:00" → "2026-11-18T14:51:07.046396+00:00"; unread 2949 → 2960
+- 🟢 **notifications** — newest "2026-11-18T22:20:52.039376+00:00" → "2026-11-18T22:20:58.857057+00:00"; unread 2630 → 2641
 - 🟢 **customer_card** — advance null → 0; billed null → 77950000; due null → 77950000; received null → 0
 - 🟢 **booking_card** — advance null → 0; billed null → 77950000; due null → 77950000; received null → 0
-- 🟢 **project_card** — outstanding 5726127100 → 5804077100
+- 🟢 **project_card** — outstanding 5889094000 → 5967044000
 
 ### master change (charge head GST %)
 - 🟢 **booking_page** — unchanged
@@ -689,32 +748,32 @@ Informational ("any") metrics remaining: 12
 - 🟢 **project_card** — unchanged
 
 ### booking with discount
-- 🟢 **booking_page** — advance null → 0; agreement null → 415000000; bill null → 77162500; flat null → "034e3170-29fc-4fe2-9c3c-8e4879206101"; outstanding null → 77162500; pending_cheques null → 0; plan null → "b00e6509-91aa-424f-b4f3-122560648d61"; received null → 0; status null → "Active"
+- 🟢 **booking_page** — advance null → 0; agreement null → 415000000; bill null → 77162500; flat null → "4532213e-24aa-4167-af43-ae9c23865ff2"; outstanding null → 77162500; pending_cheques null → 0; plan null → "b00e6509-91aa-424f-b4f3-122560648d61"; received null → 0; status null → "Active"
 - 🟢 **customer_360** — bill null → 77162500; bookings 0 → 1; received null → 0; status null → "Active"
 - 🟢 **ledger** — jama null → 0; rows null → 5; udhar null → 77162500
 - 🟢 **bills_raised** — count null → 2; raised null → 62250000
 - 🟢 **received** — bounced null → 0; cleared null → 0; count null → 0; pending null → 0; reversed null → 0
 - 🟢 **cheque_register** — unchanged
 - 🟢 **roznamcha** — unchanged
-- 🟢 **demand_register** — balance 5274718100 → 5336968100; raised_today 2095884000 → 2158134000; raised_today_n 43 → 45; rows 545 → 547; total 26953218400 → 27015468400
-- 🟢 **home_widgets** — agreement 56931770000 → 57346770000; available 122 → 121; bookings 95 → 96; outstanding 6040214300 → 6117376800
-- 🟢 **home_command** — l:ageing 11763554200 → 11917879200; l:inflow_30 3427685000 → 3489935000; l:next_milestone 4947974900 → 4991549900; l:pipeline 69 → 71; w:ageing 11763554200 → 11917879200; w:inflow_30 3427685000 → 3489935000; w:next_milestone 4947974900 → 4991549900; w:pipeline 69 → 71
-- 🟢 **home_trends** — bookings 26 → 27; demands 3756035000 → 3818285000
+- 🟢 **demand_register** — balance 5404468100 → 5466718100; raised_today 2225884000 → 2288134000; raised_today_n 49 → 51; rows 551 → 553; total 27083218400 → 27145468400
+- 🟢 **home_widgets** — agreement 57771770000 → 58186770000; available 124 → 123; bookings 97 → 98; outstanding 6203181200 → 6280343700
+- 🟢 **home_command** — l:ageing 12089488000 → 12243813000; l:inflow_30 3553435000 → 3615685000; l:next_milestone 5036174900 → 5079749900; l:pipeline 61 → 63; w:ageing 12089488000 → 12243813000; w:inflow_30 3553435000 → 3615685000; w:next_milestone 5036174900 → 5079749900; w:pipeline 61 → 63
+- 🟢 **home_trends** — bookings 28 → 29; demands 3886035000 → 3948285000
 - 🟢 **collections** — unchanged
-- 🟢 **outstanding** — bill_raised 30713433100 → 30790595600; bookings 83 → 84; outstanding 5881777100 → 5958939600
-- 🟢 **project_statement** — bill 1544300000 → 1621462500; count 15 → 16
+- 🟢 **outstanding** — bill_raised 30873333100 → 30950495600; bookings 85 → 86; outstanding 6044744000 → 6121906500
+- 🟢 **project_statement** — bill 1704200000 → 1781362500; count 17 → 18
 - 🟢 **cancellations** — unchanged
 - 🟢 **hold_register** — unchanged
-- 🟢 **lead_funnel** — Converted 71 → 72
-- 🟢 **status_counters** — fid_status "Available" → "Booked"; project_bookings 83 → 84; tower_bookings 15 → 16
-- 🟢 **inventory_value** — available 68 → 67; available_value 37893910000 → 37473910000; booked 83 → 84; sold_value 44588770000 → 45008770000
-- 🟢 **pdfs** — last_demand_pdf null → "DM-2627-20771:200"; statement_pdf null → true; statement_rows null → 5
+- 🟢 **lead_funnel** — Converted 61 → 62
+- 🟢 **status_counters** — fid_status "Available" → "Booked"; project_bookings 85 → 86; tower_bookings 17 → 18
+- 🟢 **inventory_value** — available 70 → 69; available_value 38733910000 → 38313910000; booked 85 → 86; sold_value 45428770000 → 45848770000
+- 🟢 **pdfs** — last_demand_pdf null → "DM-2627-22053:200"; statement_pdf null → true; statement_rows null → 5
 - 🟢 **documents** — docs null → 4
 - 🟢 **journey** — entries null → 7; last null → "booking.create"; last_has_values null → true
-- 🟢 **notifications** — newest "2026-11-18T14:51:08.689847+00:00" → "2026-11-18T14:51:22.618828+00:00"; unread 2973 → 2984
+- 🟢 **notifications** — newest "2026-11-18T22:21:00.800844+00:00" → "2026-11-18T22:21:15.795323+00:00"; unread 2654 → 2666
 - 🟢 **customer_card** — advance null → 0; billed null → 77162500; due null → 77162500; received null → 0
 - 🟢 **booking_card** — advance null → 0; billed null → 77162500; due null → 77162500; received null → 0
-- 🟢 **project_card** — outstanding 5881777100 → 5958939600
+- 🟢 **project_card** — outstanding 6044744000 → 6121906500
 
 ### waiver approved (Account share)
 - 🟢 **booking_page** — outstanding 79950000 → 78900000
@@ -724,12 +783,12 @@ Informational ("any") metrics remaining: 12
 - 🟢 **received** — unchanged
 - 🟢 **cheque_register** — unchanged
 - 🟢 **roznamcha** — unchanged
-- 🟢 **demand_register** — balance 5401968100 → 5400968100
-- 🟢 **home_widgets** — outstanding 6197326800 → 6196276800
-- 🟢 **home_command** — l:ageing 12077779200 → 12075679200; l:attention 15 → 16; l:inflow_30 3552935000 → 3551935000; w:ageing 12077779200 → 12075679200; w:attention 15 → 16; w:inflow_30 3552935000 → 3551935000
+- 🟢 **demand_register** — balance 5531718100 → 5530718100
+- 🟢 **home_widgets** — outstanding 6360293700 → 6359243700
+- 🟢 **home_command** — l:ageing 12403713000 → 12401613000; l:attention 16 → 17; l:inflow_30 3678685000 → 3677685000; w:ageing 12403713000 → 12401613000; w:attention 16 → 17; w:inflow_30 3678685000 → 3677685000
 - 🟢 **home_trends** — unchanged
 - 🟢 **collections** — unchanged
-- 🟢 **outstanding** — outstanding 6038889600 → 6037839600
+- 🟢 **outstanding** — outstanding 6201856500 → 6200806500
 - 🟢 **project_statement** — unchanged
 - 🟢 **cancellations** — unchanged
 - 🟢 **hold_register** — unchanged
@@ -742,7 +801,7 @@ Informational ("any") metrics remaining: 12
 - 🟢 **notifications** — unchanged
 - 🟢 **customer_card** — due 79950000 → 78900000
 - 🟢 **booking_card** — due 79950000 → 78900000
-- 🟢 **project_card** — outstanding 6038889600 → 6037839600
+- 🟢 **project_card** — outstanding 6201856500 → 6200806500
 
 ### waiver requested (pending)
 - 🟢 **booking_page** — unchanged
@@ -767,7 +826,7 @@ Informational ("any") metrics remaining: 12
 - 🟢 **pdfs** — unchanged
 - 🟢 **documents** — unchanged
 - 🟢 **journey** — entries 9 → 10; last "demand.create" → "waiver.request"
-- 🟢 **notifications** — newest "2026-11-18T14:51:32.232612+00:00" → "2026-11-18T14:51:38.446402+00:00"; unread 3013 → 3014
+- 🟢 **notifications** — newest "2026-11-18T22:21:26.300547+00:00" → "2026-11-18T22:21:32.717331+00:00"; unread 2694 → 2695
 - 🟢 **customer_card** — unchanged
 - 🟢 **booking_card** — unchanged
 - 🟢 **project_card** — unchanged
@@ -795,7 +854,7 @@ Informational ("any") metrics remaining: 12
 - 🟢 **pdfs** — unchanged
 - 🟢 **documents** — unchanged
 - 🟢 **journey** — entries 9 → 11; last "demand.create" → "waiver.reject"
-- 🟢 **notifications** — newest "2026-11-18T14:51:40.395897+00:00" → "2026-11-18T14:51:46.272412+00:00"; unread 3028 → 3029
+- 🟢 **notifications** — newest "2026-11-18T22:21:34.992526+00:00" → "2026-11-18T22:21:41.235686+00:00"; unread 2709 → 2710
 - 🟢 **customer_card** — unchanged
 - 🟢 **booking_card** — unchanged
 - 🟢 **project_card** — unchanged

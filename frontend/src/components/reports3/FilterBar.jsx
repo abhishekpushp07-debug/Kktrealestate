@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { toast } from "sonner";
 import { RotateCcw, SlidersHorizontal } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { fmtDate } from "@/lib/format";
@@ -219,9 +220,11 @@ export function FilterBar({ meta, options, sp, set, defaults }) {
               value={sp.get("as_of") || todayIso()}
               max={todayIso()}
               required
-              onChange={(e) =>
-                set(setParam(sp, "as_of", e.target.value === todayIso() ? "" : e.target.value))
-              }
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v && v > todayIso()) return toast.error("As of can't be after today");
+                set(setParam(sp, "as_of", v === todayIso() ? "" : v));
+              }}
               className="w-40"
               data-testid="rf-as-of"
             />
@@ -274,6 +277,19 @@ export function FilterBar({ meta, options, sp, set, defaults }) {
                   testId={`rf-${f.key}`}
                 />
               </div>
+            );
+          if (f.kind === "in_hand_on")
+            return (
+              <label key={f.key} className="flex items-center gap-1.5">
+                <span className="r3-flab">{f.label}</span>
+                <DateInput
+                  className="h-8 w-40"
+                  max={todayIso()}
+                  value={sp.get(f.key) || ""}
+                  onChange={(e) => set(setParam(sp, f.key, e.target.value))}
+                  data-testid={`rf-${f.key}`}
+                />
+              </label>
             );
           if (f.kind === "bool" || f.kind === "only")
             return (

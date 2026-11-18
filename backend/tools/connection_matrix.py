@@ -249,7 +249,13 @@ def s_trends(api, c):
 
 def s_collections(api, c):
     t = api.get("/reports/collections-v2", from_date=c["today"], to_date=c["today"], project_id=c["pid"])["totals"]
-    return {k: t.get(f"{k}_paise", t.get(k)) for k in ("count", "cash", "account", "other", "total", "pending")}
+    out = {k: t.get(f"{k}_paise", t.get(k)) for k in ("count", "cash", "account", "other", "total", "pending")}
+    # 3H REQ-320/323/327: cheques in hand and refunds paid out are named lines beside Received; Bank + Cash = total
+    return out | {
+        "in_hand": t["in_hand_paise"],
+        "refunds_paid": t["refunds_paid_paise"],
+        "identity_gap": t["total_paise"] - t["bank_mode_paise"] - t["cash_mode_paise"],
+    }
 
 
 def s_outstanding(api, c):
@@ -268,7 +274,15 @@ def s_pstatement(api, c):
 def s_cancellations(api, c):
     r = api.get("/reports/cancellations", project_id=c["pid"])
     t = r["totals"]
-    return {"rows": r["total_rows"], "forfeit": t.get("forfeiture_paise"), "refund": t.get("refund_paise")}
+    bv = api.get("/reports/demand-vs-collection", project_id=c["pid"], include_cancelled="true")["totals"]
+    bv0 = api.get("/reports/demand-vs-collection", project_id=c["pid"])["totals"]
+    return {
+        "rows": r["total_rows"],
+        "forfeit": t.get("forfeiture_paise"),
+        "refund": t.get("refund_paise"),
+        "bvc_cancelled_line": bv["cancelled_demand_paise"],  # REQ-328: the "Cancelled bookings ₹X" bridge line
+        "bvc_gap": bv["demand_paise"] - bv0["demand_paise"] - bv["cancelled_demand_paise"],
+    }
 
 
 def s_holds(api, c):
@@ -454,7 +468,7 @@ class World:
         from tests.flat_claims import own_flats
 
         self.api = api
-        self.flats = own_flats(api.base, api.h, 30, rate=4200)
+        self.flats = own_flats(api.base, api.h, 34, rate=4200)
         self.used = 0
         self.today = _today(api)
         self.modes = {m["code"]: m for m in api.get("/master/payment-modes")["items"]}
@@ -580,7 +594,7 @@ CHEQUE_POSTED = {
     "cheque_register": {"count": d(1), "amount": d(lambda c: c["A"])},
     "roznamcha": {"pending": d(lambda c: c["A"])},
     "home_widgets": {"pending_cheques": d(lambda c: c["A"])},
-    "collections": {"pending": d(lambda c: c["A"])},
+    "collections": {"pending": d(lambda c: c["A"]), "in_hand": d(lambda c: c["A"])},
     "pdfs": {"statement_rows": ANY, "last_receipt_pdf": ANY},
     "journey": {"entries": GROWS, "last": to("payment.post"), "last_has_values": to(True)},
     "notifications": {"unread": ANY},
@@ -628,6 +642,7 @@ CLEARED = {
         "total": d(lambda c: c["A"]),
         "account": d(lambda c: c["A"]),
         "pending": d(lambda c: -c["A"]),
+        "in_hand": d(lambda c: -c["A"]),
     },
     "ledger": {"rows": ANY, "jama": d(lambda c: c["A"])},
     "pdfs": {"statement_rows": ANY},
@@ -644,7 +659,7 @@ BOUNCED = {
     "demand_register": ANY,
     "home_widgets": {"pending_cheques": d(lambda c: -c["A"]), "outstanding": ANY},
     "home_trends": {"demands": ANY},
-    "collections": {"pending": d(lambda c: -c["A"])},
+    "collections": {"pending": d(lambda c: -c["A"]), "in_hand": d(lambda c: -c["A"])},
     "outstanding": {"outstanding": ANY, "bill_raised": ANY},
     "project_statement": {"bill": ANY},
     "pdfs": ANY,
@@ -779,6 +794,7 @@ def _cancel(deduction_rupees):
             for d in st
             if d.get("status") != "Cancelled"
         )
+        c["bills0"] = sum(d.get("total_demand_paise") or 0 for d in st if not d.get("voided"))
         w.api.post(
             f"/bookings/{c['bid']}/cancel",
             {"reason": "matrix cancel", "deduction": deduction_rupees, "version": w.version(c)},
@@ -830,6 +846,7 @@ def _refund_other_setup(w):
 
 
 REFUND_PAID = {
+    "collections": {"refunds_paid": d(lambda c: c["R"])},  # REQ-327: its own line, Received untouched
     "roznamcha": {
         "refunds": d(lambda c: c["R"]),
         "cash_out": d(lambda c: c["R"]),
@@ -866,7 +883,15 @@ def _cancelled():
         "collections": ANY,
         "outstanding": ANY,
         "project_statement": ANY,
-        "cancellations": {"rows": d(1), "forfeit": d(lambda c: c["forfeit"]), "refund": d(lambda c: c["refund"])},
+        "cancellations": {
+            "rows": d(1),
+            "forfeit": d(lambda c: c["forfeit"]),
+            "refund": d(lambda c: c["refund"]),
+            "bvc_cancelled_line": (
+                "+ the booking's bills (left the default view, shown on the Cancelled line)",
+                lambda b, a, c: (a or 0) - (b or 0) == c["bills0"],
+            ),
+        },
         "lead_funnel": {"Converted": d(-1), "Lost": d(1)},  # owner rule: the booking's lead is marked Lost
         "status_counters": {"fid_status": to("Available"), "tower_bookings": d(-1), "project_bookings": d(-1)}
         | {"tower_paid": ANY, "project_paid": ANY},
@@ -1267,8 +1292,49 @@ WAIVED = {  # REQ-253: a waiver is Jama credit, never money received — no rece
 }
 
 
+def _manual_bill(w, c):  # REQ-343: a bill raised by hand, due today
+    w.api.post(
+        "/demands/manual",
+        {"booking_id": c["bid"], "name": "Matrix manual bill", "account_amount": 20000, "due_date": w.today},
+    )
+    c["M"] = 2000000
+
+
+def _manual_setup(w):
+    c = w.book()
+    c |= w.ctx(**c)
+    _manual_bill(w, c)
+    return c
+
+
+MANUAL_RAISED = {  # owed money is owed: in Outstanding and ageing by its own due date
+    "booking_page": {"bill": d(lambda c: c["M"]), "outstanding": d(lambda c: c["M"])},
+    "customer_360": {"bill": d(lambda c: c["M"])},
+    "ledger": {"rows": d(1), "udhar": d(lambda c: c["M"])},
+    "bills_raised": {"count": d(1), "raised": d(lambda c: c["M"])},
+    "demand_register": {"balance": d(lambda c: c["M"])},
+    "home_widgets": {"outstanding": d(lambda c: c["M"])},
+    "home_command": ANY,
+    "home_trends": {"demands": d(lambda c: c["M"])},
+    "outstanding": {"outstanding": d(lambda c: c["M"]), "bill_raised": d(lambda c: c["M"])},
+    "project_statement": {"bill": d(lambda c: c["M"])},
+    "status_counters": ANY,
+    "pdfs": {
+        "statement_rows": d(1),
+        "last_demand_pdf": ("the new bill's PDF opens (200)", lambda b, a, c: a != b and str(a).endswith(":200")),
+    },
+    "documents": ANY,
+    "journey": {"entries": GROWS, "last": to("demand.create")},
+    "notifications": {"unread": ANY},
+    "customer_card": ANY,
+    "booking_card": ANY,
+    "project_card": ANY,
+}
+
 ACTIONS = {
     "create booking": (_create_setup, _create, BOOKED),
+    "manual bill raised": (lambda w: (lambda c: c | w.ctx(**c))(w.book()), _manual_bill, MANUAL_RAISED),
+    "manual bill paid": (_manual_setup, _pay_action("NEFT_RTGS", "Account", _upi_extra)[1], MONEY_IN),
     "payment Cash": (*_pay_action("CASH", "Cash"), MONEY_IN),
     "payment Cheque": (*_pay_action("CHEQUE", "Account", _cheque_extra), CHEQUE_POSTED),
     "payment NEFT/RTGS": (*_pay_action("NEFT_RTGS", "Account", _upi_extra), MONEY_IN),

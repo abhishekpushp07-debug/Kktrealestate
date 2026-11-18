@@ -192,8 +192,16 @@ def test_demand_register_grouping_ties_out_to_ledger_udhar(admin_headers):
 
 
 def test_manual_demand_ledger_effect_journey_and_void_is_final(admin_headers):
-    b = _active_booking(admin_headers)
-    before = requests.get(f"{BASE}/api/bookings/{b['id']}/ledger", headers=admin_headers).json()["booking"]["summary"]
+    # 3H: an advance held is applied to a new manual bill (oldest-bill-first), so use a booking with no advance
+    items = requests.get(f"{BASE}/api/bookings", params={"status": "Active", "page_size": 50}, headers=admin_headers)
+    for b in items.json()["items"]:
+        before = requests.get(f"{BASE}/api/bookings/{b['id']}/ledger", headers=admin_headers).json()["booking"][
+            "summary"
+        ]
+        if not before["advance_paise"]:
+            break
+    else:
+        pytest.skip("no active booking without an advance")
     due = (date.today() + timedelta(days=10)).isoformat()
     pv = requests.post(
         f"{BASE}/api/demands/manual",

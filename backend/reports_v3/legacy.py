@@ -2,12 +2,21 @@
 (same code, same numbers — nothing re-derived) at its finest grouping, then adds the booking's location / customer /
 sales dimensions so the engine can filter, group and link rows."""
 
+from contextvars import ContextVar
+
 import httpx
 
 from db import db
 from deps import create_access_token, report_scope_filter
 
 _TYPE = {"str": "text", "money": "money", "num": "num", "pct": "pct", "date": "date"}
+
+
+LAST: ContextVar[dict | None] = ContextVar("legacy_totals", default=None)  # this request's legacy totals, by path
+
+
+def last(path: str) -> dict | None:
+    return (LAST.get() or {}).get(path)
 
 
 async def call(user: dict, path: str, params: dict) -> dict:
@@ -69,6 +78,7 @@ def provider(path: str, fixed: dict | None = None, period: bool = False, push: t
             v = ctx["params"].get(ours) or p.get(theirs)
             p[theirs] = v[0] if isinstance(v, list) else v
         data = await call(user, path, p)
+        LAST.set({**(LAST.get() or {}), path: data.get("totals") or {}})
         by_no, by_id = await _booking_dims(user)
         out = []
         for r in data["rows"]:

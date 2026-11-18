@@ -8,7 +8,7 @@ import pytest
 import requests
 from pymongo import MongoClient
 
-from services.definitions import SPLIT_KEYS, receipt_parts
+from services.definitions import SPLIT_KEYS, receipt_parts, received_on
 from tests.conftest import PURGE_SCAN_FILE
 
 
@@ -34,7 +34,9 @@ def test_home_month_split_equals_sum_of_allocation_parts(base_url, admin_headers
     cid = db.companies.find_one({})["id"]
     m0 = date.today().replace(day=1).isoformat()
     raw = dict.fromkeys(SPLIT_KEYS, 0)
-    for p in db.payments.find({"company_id": cid, "status": "Cleared", "payment_date": {"$gte": m0}}):
+    for p in db.payments.find({"company_id": cid, "status": "Cleared"}):
+        if (received_on(p) or "") < m0:  # 3H REQ-319: received = cleared (cheque on its clearing day)
+            continue
         for k, v in receipt_parts(p).items():
             raw[k] += v
     month = requests.get(f"{base_url}/api/dashboard", headers=admin_headers, timeout=60).json()["collections"]["month"]

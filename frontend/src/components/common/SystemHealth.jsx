@@ -133,7 +133,13 @@ function DiskBackups({ tick, onPruned }) {
 
 function UniquenessRules({ rules }) {
   const off = (rules || []).filter((r) => r.status === "not_applied");
-  if (!off.length) return null;
+  if (!rules?.length) return null;
+  if (!off.length)
+    return (
+      <p className="mt-4 text-sm text-txt-muted" data-testid="ops-uniqueness-ok">
+        All {rules.length} uniqueness rules applied
+      </p>
+    );
   return (
     <div
       className="mt-4 rounded-[10px] border border-brick/30 bg-brick/5 p-3"

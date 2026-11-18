@@ -749,6 +749,71 @@ def _f(text):
     return lambda t: re.sub(r"\{(\w+)\}", lambda m: money(t.get(m.group(1))), text)
 
 
+def _m(v):
+    from services.pdf import inr
+
+    v = round(v or 0)
+    return f"−{inr(-v)}" if v < 0 else inr(v)
+
+
+def _line(key, text, link=None, tone=None):
+    return {"key": key, "text": text, "link": link, "tone": tone}
+
+
+def _identity(a, b, c, rest=None):
+    """REQ-323/324: the one-line identity; a remainder is always named (and fails the tie-out)."""
+    rest = c - a - b if rest is None else rest
+    out = [_line("identity", f"Bank-wise {_m(a)} + Cash {_m(b)} = Collections {_m(c)}")]
+    return out + ([_line("remainder", f"Unexplained remainder {_m(rest)}", tone="brick")] if rest else [])
+
+
+def _hand_day(t, p):
+    p = p or {}
+    return (t.get("in_hand_day") or p.get("period_to") or str(p.get("as_of") or "")) or __import__(
+        "services.clock", fromlist=["x"]
+    ).today().isoformat()
+
+
+def _period(p):
+    p = p or {}
+    q = [f"period_from={p['period_from']}"] if p.get("period_from") else []
+    q += [f"period_to={p['period_to']}"] if p.get("period_to") else []
+    return "&".join(q)
+
+
+def _received_lines(t, rows=None, p=None):
+    """REQ-320/327: cheques in hand (tap → the list) and refunds paid out, beside Received and never inside it."""
+    out = []
+    if "in_hand_n" in t:
+        n = t["in_hand_n"]
+        out.append(
+            _line(
+                "in-hand",
+                f"Cheques in hand {_m(t['in_hand_paise'])} ({n} cheque{'' if n == 1 else 's'})",
+                "/reports/v3/cheques?in_hand_on=" + _hand_day(t, p),
+            )
+        )
+    if t.get("refunds_paid_n"):
+        out.append(
+            _line(
+                "refunds",
+                f"Refunds paid out {_m(-t['refunds_paid_paise'])}",
+                "/reports/v3/cancellations?" + (_period(p) or "period_from=2000-01-01"),
+            )
+        )
+    if t.get("reversal_paise"):
+        out.append(_line("reversed", f"Reversed in period (incl. bounced after clearing) {_m(t['reversal_paise'])}"))
+    return out
+
+
+_DRILL = [  # REQ-345: Project → Tower → Floor → Flat → Booking
+    {"key": "project", "label": "Project", "field": "project"},
+    {"key": "tower", "label": "Tower", "field": "tower"},
+    {"key": "floor", "label": "Floor", "field": "floor_label"},
+    {"key": "flat", "label": "Flat", "field": "flat_code"},
+    {"key": "booking", "label": "Booking", "field": "booking_number"},
+]
+
 REGISTRY |= {
     "collections": _legacy(
         "Collections",
@@ -766,7 +831,16 @@ REGISTRY |= {
             ("reversal_paise", "Reversed", "money"),
             ("total_paise", "Total", "money"),
         ],
-        ["count", "cash_paise", "account_paise", "other_paise", "reversal_paise", "total_paise"],
+        [
+            "count",
+            "cash_paise",
+            "account_paise",
+            "other_paise",
+            "reversal_paise",
+            "total_paise",
+            "cash_mode_paise",
+            "bank_mode_paise",
+        ],
         perm="reports.collections.view",
         fixed={"group_by": "receipt"},
         period=True,
@@ -778,7 +852,11 @@ REGISTRY |= {
                 "label": "Date basis",
                 "kind": "choice",
                 "pushdown": True,
-                "options": [["receipt", "Receipt date"], ["clearance", "Clearance date"]],
+                "options": [
+                    ["cleared", "Cleared (cheque on clearing day)"],
+                    ["receipt", "Receipt date"],
+                    ["clearance", "Clearance date"],
+                ],
             },
             _multi("mode", "Mode", "mode"),
             _multi("bank", "Bank", "bank"),
@@ -787,13 +865,23 @@ REGISTRY |= {
             {"key": "no_reversals", "label": "Exclude reversals", "kind": "only", "field": "is_regular"},
             *_LF,
         ],
-        groups=_LG
-        + [{"key": "mode", "label": "Mode", "field": "mode"}, {"key": "bank", "label": "Bank", "field": "bank"}],
+        groups=_DRILL
+        + [
+            _G["customer"],
+            _G["sales"],
+            {"key": "mode", "label": "Mode", "field": "mode"},
+            {"key": "bank", "label": "Bank", "field": "bank"},
+        ],
         unit=("receipt", "receipts"),
         default_sort=("date", True, "group"),
         headline="total_paise",
         formula=_f(
             "Cash {cash_paise} + Account {account_paise} + Other {other_paise} = collected {total_paise} (already net of reversals {reversal_paise})"
+        ),
+        bridge=BR.collections,
+        lines=lambda t, rows=None, p=None: (
+            _identity(t.get("bank_mode_paise", 0), t.get("cash_mode_paise", 0), t.get("total_paise", 0))
+            + _received_lines(t, rows, p)
         ),
         illus=_money_split(
             "What came in",
@@ -853,17 +941,17 @@ REGISTRY |= {
     ),
     "bank-receipts": _legacy(
         "Bank-wise receipts",
-        "Receipts per bank and mode, cleared vs pending.",
+        "Money received per bank and mode — a cheque on its clearing day; cheques in hand shown apart.",
         "bank-receipts",
         [
             ("bank", "Bank", "str", 18),
             ("mode", "Mode", "str", 10),
             ("count", "Receipts", "num", 8),
             ("cleared_paise", "Cleared", "money"),
-            ("pending_paise", "Pending", "money"),
-            ("total_paise", "Total", "money"),
+            ("reversed_paise", "Reversed", "money"),
+            ("total_paise", "Received", "money"),
         ],
-        ["count", "cleared_paise", "pending_paise", "total_paise"],
+        ["count", "cleared_paise", "reversed_paise", "total_paise"],
         perm="reports.bank_wise.view",
         period=True,
         filters=[_multi("bank", "Bank", "bank"), _multi("mode", "Mode", "mode"), _rng("total", "Total", "total_paise")],
@@ -871,25 +959,18 @@ REGISTRY |= {
         link=None,
         unit=("bank · mode", "bank · modes"),
         headline="total_paise",
-        formula=lambda t: (
-            _f("Cleared {cleared_paise} + pending {pending_paise} = {total_paise}")(t)
-            + (
-                (
-                    f" · total {_f('{total_paise}')(t)} − pending (not cleared yet) {_f('{pending_paise}')(t)} + cash receipts "
-                    f"{_f('{br_cash}')(t)} ({t['br_cash_n']:,})"
-                )
-                + (f" − reversals {_f('{x}')({'x': -t['br_reversal']})}" if t["br_reversal"] else "")
-                + (f" ± other {_f('{br_rest}')(t)}" if t["br_rest"] else "")
-                + f" = Collections {_f('{br_collections}')(t)} ({t['br_collections_n']:,} receipts)"
-                if "br_collections" in t
-                else ""
-            )
+        formula=_f(
+            "Cleared {cleared_paise} + reversed {reversed_paise} = received {total_paise} (a cheque counts on its clearing day)"
+        ),
+        lines=lambda t, rows=None, p=None: (
+            (_identity(t["total_paise"], t["br_cash"], t["br_collections"], t["br_rest"]) if "br_cash" in t else [])
+            + _received_lines(t, rows, p)
         ),
         bridge=BR.bank,
         illus=_money_split(
-            "Cleared vs pending", [("cleared_paise", "Cleared", "sapphire"), ("pending_paise", "Pending", "steel")]
+            "Received by bank", [("cleared_paise", "Cleared", "sapphire"), ("reversed_paise", "Reversed", "coral")]
         ),
-        tieout="Σ = Collections non-cash receipts for the period",
+        tieout="Bank-wise + Cash = Collections for the period, to the paisa",
     ),
     "cheques": _legacy(
         "Cheque register",
@@ -925,6 +1006,7 @@ REGISTRY |= {
                 "sentence": "in hand {v}+ days",
             },
             _rng("amount", "Amount", "amount_paise"),
+            {"key": "in_hand_on", "label": "In hand on", "kind": "in_hand_on", "field": "_pay"},
             *_LF,
         ],
         groups=_LG
@@ -951,12 +1033,21 @@ REGISTRY |= {
             ("collected_paise", "Received", "money"),
             ("pct_collected", "Recovery %", "pct", 8),
         ],
-        ["count", "cash_demand_paise", "account_demand_paise", "demand_paise", "collected_paise"],
+        [
+            "count",
+            "cash_demand_paise",
+            "account_demand_paise",
+            "demand_paise",
+            "collected_paise",
+            "cancelled_demand_paise",
+        ],
         perm="reports.demand_vs_collection.view",
+        fixed={"include_cancelled": "true"},
         filters=[
             _multi("block", "Tower", "block"),
             _multi("stage", "Stage", "milestone"),
             _rng("billed", "Bill raised", "demand_paise"),
+            {"key": "include_cancelled", "label": "Include cancelled", "kind": "bool", "field": "live"},
         ],
         groups=[
             {"key": "block", "label": "Tower", "field": "block"},
@@ -966,21 +1057,18 @@ REGISTRY |= {
         unit=("stage", "stages"),
         derived=_pct(("pct_collected", "collected_paise"), "demand_paise"),
         headline="demand_paise",
-        formula=lambda t: (
-            _f(
-                "Bill raised {demand_paise} (Cash {cash_demand_paise} + Account {account_demand_paise}) · received {collected_paise}"
-            )(t)
-            + (
-                (
-                    f" · bill raised {_f('{br_instalment}')(t)} − on cancelled / transferred bookings {_f('{br_not_live}')(t)} "
-                    f"{'−' if t['br_adjust'] < 0 else '+'} transfer adjustments {_f('{x}')({'x': abs(t['br_adjust'])})} = live "
-                    f"bookings {_f('{br_live}')(t)}, as in Customer status"
-                )
-                if "br_live" in t
-                else ""
-            )
+        formula=_f(
+            "Bill raised {demand_paise} (Cash {cash_demand_paise} + Account {account_demand_paise}) · received {collected_paise}"
         ),
-        bridge=BR.bills,
+        lines=lambda t, rows=None, p=None: (
+            [_line("cancelled", f"Cancelled bookings {_m(t['cancelled_demand_paise'])} (included by the switch)")]
+            if t.get("cancelled_demand_paise")
+            else [
+                _line(
+                    "live", f"Live bookings only — bill raised {_m(t['demand_paise'])} = Customer status bills raised"
+                )
+            ]
+        ),
         illus=_money_split(
             "Received against bills",
             [("collected_paise", "Received", "sapphire"), ("demand_paise", "Bill raised", "graphite")],
@@ -1007,6 +1095,7 @@ REGISTRY |= {
             ("overdue_paise", "Overdue", "money"),
             ("promise", "Promise", "str", 12),
             ("net_balance_paise", "Net balance", "money"),
+            ("in_hand_paise", "Cheques in hand", "money"),
         ],
         [
             "udhar_paise",
@@ -1021,6 +1110,8 @@ REGISTRY |= {
             "band_90+",
             "overdue_paise",
             "net_balance_paise",
+            "in_hand_paise",
+            "in_hand_n",
         ],
         perm="reports.outstanding.view",
         fixed={"group_by": "booking"},
@@ -1050,10 +1141,13 @@ REGISTRY |= {
             _rng("outstanding", "Outstanding", "outstanding_paise"),
             {"key": "only_overdue", "label": "Only overdue", "kind": "only", "field": "is_overdue"},
         ],
-        hide=("band_Not due", "promise", "net_balance_paise", "advance_paise"),
+        hide=("band_Not due", "promise", "net_balance_paise", "advance_paise", "in_hand_paise"),
+        groups=_DRILL + [_G["customer"], _G["sales"]],
         link="/bookings/{booking_id}",
         unit=("booking", "bookings"),
         headline="outstanding_paise",
+        lines=_received_lines,
+        pdf_landscape=True,
         formula=_f(
             "Bill raised {udhar_paise} − received {jama_paise} − waived {waived_paise} + advance {advance_paise} = outstanding {outstanding_paise}"
         ),
@@ -1136,6 +1230,18 @@ REGISTRY |= {
                 ("account_balance_paise", "Account balance", "coral"),
                 ("cash_balance_paise", "Cash balance", "coral-soft"),
             ],
+        ),
+        bridge=BR.forfeits,
+        lines=lambda t, rows=None, p=None: (
+            [
+                _line(
+                    "other-income",
+                    f"Cancellation deductions kept — other income, not sales {_m(t['br_forfeit'])}",
+                    "/reports/v3/cancellations?period_from=2000-01-01",
+                )
+            ]
+            if t.get("br_forfeit")
+            else []
         ),
         tieout="Cash + Account received = Customer status received columns",
     ),
@@ -1337,6 +1443,8 @@ REGISTRY |= {
         _BG + [{"key": "booking_status", "label": "Status", "field": "booking_status"}],
         default_sort=("booking_date", True, "booking_number"),
         headline="agreement_value",
+        lines=lambda t, rows=None, p=None: BK.register_lines(rows or [], p),
+        lines_public=True,
         tieout="Σ agreement value (Active + Completed) = bookings collection",
     ),
     "sales-summary": _bk(
@@ -1498,7 +1606,7 @@ REGISTRY |= {
             ("customer_name", "Customer name", "str", 18),
             ("unit", "Flat", "str", 14),
             ("paid_paise", "Received", "money"),
-            ("forfeiture_paise", "Deduction kept", "money"),
+            ("forfeiture_paise", "Deduction kept (other income)", "money"),
             ("refund_paise", "Refund payable", "money"),
             ("refund_paid_paise", "Refund paid", "money"),
             ("refund_status", "Refund", "status", 9),
@@ -1521,7 +1629,8 @@ REGISTRY |= {
         default_sort=("cancelled_on", True),
         headline="refund_paise",
         formula=_f(
-            "Received {paid_paise} − deduction kept {forfeiture_paise} = refund payable {refund_paise} · refund paid {refund_paid_paise}"
+            "Received {paid_paise} − deduction kept {forfeiture_paise} = refund payable {refund_paise} · refund paid "
+            "{refund_paid_paise} · the deduction kept is other income, never sales or instalment collection"
         ),
         illus=_money_split(
             "Where the money received went",
@@ -1813,6 +1922,7 @@ REGISTRY |= {
         unit=("flat", "flats"),
         default_sort=("flat_code", False),
         headline="flats",
+        no_customer_ids=True,
         **_SALES_OK,
         tieout="cells = flats in Inventory status (same viewer)",
     ),

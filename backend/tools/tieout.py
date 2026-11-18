@@ -23,6 +23,12 @@ BYPASS = {"X-Rate-Limit-Bypass": os.environ.get("LOGIN_RATE_LIMIT_BYPASS_TOKEN",
 OUT = "/app/memory/qa/journey/tieout_raw.md"
 
 
+def dvc_live_ids(db, cid):
+    return [
+        b["id"] for b in db.bookings.find({"company_id": cid, "status": {"$in": ["Active", "Completed"]}}, {"id": 1})
+    ]
+
+
 def main(base):
     A = base.rstrip("/") + "/api"
     tok = requests.post(
@@ -42,8 +48,14 @@ def main(base):
         rows.append((name, report_val, raw_val, "PASS" if ok else "FAIL", note))
 
     FY0, FY1 = "2025-04-01", "2026-12-31"
-    cleared = {"company_id": cid, "status": "Cleared", "payment_date": {"$gte": FY0, "$lte": FY1}}
-    raw_cleared = sum(p["amount_paise"] for p in db.payments.find(cleared, {"amount_paise": 1}))
+    sys.path.insert(0, "/app/backend")
+    from services.definitions import received_on as _ron  # 3H REQ-319: received = cleared, read independently
+
+    raw_cleared = sum(
+        p["amount_paise"]
+        for p in db.payments.find({"company_id": cid, "status": "Cleared"})
+        if FY0 <= (_ron(p) or "") <= FY1
+    )
     col = g("/reports/collections", from_date=FY0, to_date=FY1)
     tie("collections FY total == Σ cleared receipts", (col.get("totals") or {}).get("total_paise"), raw_cleared)
 
@@ -304,15 +316,32 @@ def main(base):
             {"total_demand_paise": 1},
         )
     )
-    tie("demand-vs-collection demanded == Σ non-void demands", dvc["totals"]["demand_paise"], raw_demanded)
+    tie(
+        "demand-vs-collection (default: live bookings) + Cancelled bookings line == Σ non-void demands",
+        dvc["totals"]["demand_paise"]
+        - dvc["bridge"]["adjust_paise"]
+        + g("/reports/demand-vs-collection", include_cancelled="true")["totals"]["cancelled_demand_paise"],
+        raw_demanded
+        + sum(  # a cancelled booking's bills closed by its cancellation are still bills it was raised
+            d["total_demand_paise"]
+            for d in db.demands.find(
+                {
+                    "company_id": cid,
+                    "status": "Cancelled",
+                    "voided": {"$ne": True},
+                    "booking_id": {"$nin": dvc_live_ids(db, cid)},
+                },
+                {"total_demand_paise": 1},
+            )
+        ),
+    )
 
     month = datetime.now(IST).date().isoformat()[:7]
     legacy = g("/dashboard")
     raw_month = sum(
         p["amount_paise"]
-        for p in db.payments.find(
-            {"company_id": cid, "status": "Cleared", "payment_date": {"$regex": f"^{month}"}}, {"amount_paise": 1}
-        )
+        for p in db.payments.find({"company_id": cid, "status": "Cleared"})
+        if (__import__("services.definitions", fromlist=["x"]).received_on(p) or "").startswith(month)
     )
     tie(
         "legacy dashboard collections.month == Σ cleared this month",
@@ -476,16 +505,19 @@ def main(base):
         tie(f"{path} segment counts sum == list total", r.get("total"), sum((r.get("status_counts") or {}).values()))
 
     # Phase 1 F-3 (Q-1): Home / trends / reports Cash · Account · Other == Σ allocation parts per category, to the paise
-    def raw_split(match):
+    def raw_split(lo, hi):  # 3H REQ-319: received = cleared (cheque / DD on its clearing day), read independently
+        from services.definitions import received_on
+
         out = dict.fromkeys(SPLIT_KEYS, 0)
-        for p in db.payments.find({"company_id": cid, "status": "Cleared", **match}):
-            for k, v in receipt_parts(p).items():
-                out[k] += v
+        for p in db.payments.find({"company_id": cid, "status": "Cleared"}):
+            if lo <= (received_on(p) or "") <= hi:
+                for k, v in receipt_parts(p).items():
+                    out[k] += v
         return out
 
     t0 = datetime.now(IST).date()  # the app's business day is IST (clock.today)
     m0 = t0.replace(day=1).isoformat()
-    month_raw = raw_split({"payment_date": {"$gte": m0, "$lte": t0.isoformat()}})
+    month_raw = raw_split(m0, t0.isoformat())
     hc = g("/dashboard").get("collections", {}).get("month") or {}
     tie("Home month Cash·Account·Other == Σ allocation parts", {k: hc.get(f"{k}_paise") for k in SPLIT_KEYS}, month_raw)
     tie("Home month total == Cash + Account + Other", hc.get("total_paise"), sum(month_raw.values()))
@@ -501,7 +533,7 @@ def main(base):
         "Other": rows_cv.get("Other charges", 0),
     }
     tie("collections-v2 (this month, by bucket) == Σ allocation parts", cv_split, month_raw)
-    fy_raw = raw_split({"payment_date": {"$gte": FY0, "$lte": FY1}})
+    fy_raw = raw_split(FY0, FY1)
     tot = col.get("totals") or {}
     tie(
         "collections FY cash/account/other == Σ allocation parts",
@@ -525,7 +557,9 @@ def main(base):
     tie(  # iteration 12: exact bridge, receipt date → clearance (ledger) basis, instead of assuming they are equal
         "bridge: received by payment date == Collections net received (receipt basis)",
         brg.get("by_receipt_date_paise"),
-        cvf["totals"]["total_paise"],
+        g("/reports/collections-v2", from_date=fy0, to_date=t0.isoformat(), date_basis="receipt")["totals"][
+            "total_paise"
+        ],
     )
     tie(
         "bridge: by payment date − not live − dated in, cleared after + dated before, cleared in + refunds == carried received",
@@ -560,10 +594,16 @@ def main(base):
         dvc["totals"]["cash_demand_paise"] + dvc["totals"]["account_demand_paise"],
         dvc["totals"]["demand_paise"],
     )
-    br = dvc.get("bridge") or {}
+    other_live = sum(
+        e.get("udhar_paise", 0)
+        for e in db.ledger_entries.find(
+            {"type": "OTHER_CHARGE_DEMAND", "booking_id": {"$in": dvc_live_ids(db, cid)}},
+            {"udhar_paise": 1},
+        )
+    )
     tie(
-        "bridge: Bills vs Collection instalment bills → all bills == Outstanding bill raised",
-        br.get("all_bills_paise"),
+        "bridge: Bills vs Collection (live) + other charges billed == Outstanding bill raised",
+        dvc["totals"]["demand_paise"] + other_live,
         g("/reports/outstanding-v2")["totals"]["bill_raised_paise"],
     )
     tie(
@@ -587,9 +627,14 @@ def main(base):
         bnk["totals"]["total_paise"],
     )
     tie(
-        "formula: Bank-wise cleared + pending == total",
-        bnk["totals"]["cleared_paise"] + bnk["totals"]["pending_paise"],
+        "formula: Bank-wise cleared + reversed == received",
+        bnk["totals"]["cleared_paise"] + bnk["totals"]["reversed_paise"],
         bnk["totals"]["total_paise"],
+    )
+    tie(  # 3H REQ-323/324: one identity; an unnamed remainder fails here
+        "identity: Bank-wise + Cash == Collections (this FY)",
+        bnk["totals"]["total_paise"] + bnk["totals"]["cash_mode_paise"],
+        g("/reports/collections-v2", from_date=fy0, to_date=t0.isoformat())["totals"]["total_paise"],
     )
 
     # E1: ONE outstanding number — Home "Due ageing" == Outstanding & ageing report, band by band, to the paisa
@@ -634,7 +679,7 @@ def main(base):
     tie(
         "Home Money today == Σ today's allocation parts",
         hb["widgets"]["money_today"]["data"]["total"]["amount_paise"],
-        sum(raw_split({"payment_date": hb["business_day"]}).values()),
+        sum(raw_split(hb["business_day"], hb["business_day"]).values()),
     )
 
     # Phase I: every report has its own tie-out set (tools/tieout_reports.py) — folded in so this stays the one scoreboard

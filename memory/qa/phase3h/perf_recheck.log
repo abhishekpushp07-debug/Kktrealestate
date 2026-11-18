@@ -1,0 +1,14 @@
+customer-statement       first p95    30.2  cached p95   11.0
+outstanding              first p95   475.4  cached p95   27.1
+other-charges            first p95   351.2  cached p95   26.0
+plan-position            first p95   384.6  cached p95   22.7
+transfers                first p95   473.4  cached p95    3.8
+sales-team               first p95   433.2  cached p95    3.6
+booking-health           first p95   467.7  cached p95   22.6
+stacking-plan            first p95   420.5  cached p95   27.7
+landowner                first p95   144.7  cached p95    3.4
+sales-velocity           first p95   401.7  cached p95    4.1
+follow-ups               first p95    66.6  cached p95    3.9
+team-pipeline            first p95   375.2  cached p95    3.8
+3/12 within budget ['outstanding', 'other-charges', 'plan-position', 'transfers', 'sales-team', 'booking-health', 'stacking-plan', 'sales-velocity', 'team-pipeline']
+exit 1

@@ -5,6 +5,7 @@ import re
 from datetime import date
 
 from services import clock
+from services import definitions as D
 from services.pdf import fmt_date, inr
 
 MAX_GROUP_LEVELS = 5
@@ -116,6 +117,8 @@ def apply_filters(spec: dict, rows: list[dict], p: dict) -> list[dict]:
                 out = [r for r in out if val(r) <= hi]
         elif f["kind"] == "min" and p.get(k) not in (None, ""):
             out = [r for r in out if (r.get(field) or 0) >= float(p[k])]
+        elif f["kind"] == "in_hand_on" and p.get(k):  # REQ-321: the cheques that were in hand on that day
+            out = [r for r in out if D.in_hand_on(r["_pay"], p[k])]
         elif f["kind"] == "bool" and not p.get(k):
             out = [r for r in out if r.get(field)]
         elif f["kind"] == "only" and p.get(k):
@@ -176,6 +179,8 @@ def sentence(spec: dict, p: dict, opts: dict, n: int, as_of: date | None) -> str
             bits.append(f"{f['label'].lower()} {fm(lo) if lo else '0'} – {fm(hi) if hi else 'any'}")
         elif f["kind"] == "min" and p.get(k):
             bits.append(f.get("sentence", f"{f['label'].lower()} {{v}}").format(v=p[k]))
+        elif f["kind"] == "in_hand_on" and p.get(k):
+            bits.append(f"in hand on {date.fromisoformat(p[k]).strftime('%d %b %Y')}")
         elif f["kind"] in ("bool", "only") and p.get(k):
             bits.append(f["label"].lower())
         elif f["kind"] == "choice" and p.get(k):
@@ -264,7 +269,7 @@ async def to_pdf(spec: dict, cols: list[dict], lines: list, tot: dict, head: lis
     """REQ-267: letterhead, landscape when > 7 columns, columns sized by their declared widths."""
     from services import pdf as _pdf
 
-    d = _pdf.BrandedDoc(spec["title"], company, landscape_mode=len(cols) > 7)
+    d = _pdf.BrandedDoc(spec["title"], company, landscape_mode=len(cols) > 7 or bool(spec.get("pdf_landscape")))
     for h in head[1:]:
         d.small(h)
     d.spacer(2)
@@ -278,26 +283,83 @@ async def to_pdf(spec: dict, cols: list[dict], lines: list, tot: dict, head: lis
             )
         else:
             rows.append([_cell(c, x.get(c["key"])) for c in cols])
-    import re
-
     tot_cells = ["TOTAL"] + [_cell(c, tot[c["key"]]) if c["key"] in tot else "" for c in cols[1:]]
-
-    def need(i, c):  # widest unbreakable value in the column (money/codes never wrap) vs the header's longest word
-        vals = [re.sub(r"<[^>]+>", "", str(r[i])) for r in rows[:400]] + [tot_cells[i]]
-        parts = [p for v in vals for p in (v.split(" · ") if c["type"] == "code" else [v])]
-        longest = max((len(v) for v in parts), default=4) if c["type"] in ("money", "date", "code") else 0
-        words = max(len(w) for w in c["label"].split())
-        floor = {"text": c.get("width", 12) * 0.6, "status": 11}.get(c["type"], 6)
-        return max(longest * 1.15 + 1, words + 1, floor)
-
+    avail = d.pagesize[0] - 28 * _mm()
+    widths = fit_widths(cols, rows, tot_cells, avail)
+    fs = None
+    if sum(widths) > avail:  # too wide even on landscape: shrink the type, never wrap a figure
+        pad = _PAD * len(widths)
+        k = (avail - pad) / (sum(widths) - pad)
+        fs, widths = 8 * k, [(w - _PAD) * k + _PAD for w in widths]
+    k = (fs or 8) / 8
+    rows = [[v if _whole(cols[i]) else _clip(v, _PAD + (widths[i] - _PAD) / k) for i, v in enumerate(r)] for r in rows]
     d.table(
         [c["label"] for c in cols],
         rows,
-        widths=[need(i, c) for i, c in enumerate(cols)],
+        widths=widths,
         align_right=[i for i, c in enumerate(cols) if c["type"] == "money"],
         totals=tot_cells,
+        font_size=fs,
     )
     return d.build()
+
+
+_NOWRAP = ("money", "date", "code", "num", "pct")
+_KEEP = ("flat_code", "flat", "unit", "booking_number", "receipt_number")  # identifiers are never shortened (REQ-346)
+
+
+def _whole(c: dict) -> bool:
+    return c["type"] in _NOWRAP or c["key"] in _KEEP
+
+
+_PAD = 14  # cell padding left + right (pt) + a hair
+
+
+def _mm():
+    from reportlab.lib.units import mm
+
+    return mm
+
+
+def _w(text: str, bold: bool = False) -> float:
+    from reportlab.pdfbase.pdfmetrics import stringWidth
+
+    from services.pdf import CELL
+
+    plain = re.sub(r"<[^>]+>", "", str(text))
+    return stringWidth(plain, "Helvetica-Bold" if bold or "<b>" in str(text) else CELL.fontName, CELL.fontSize)
+
+
+def fit_widths(cols: list[dict], rows: list[list], tot: list, avail: float) -> list[float]:
+    """REQ-346: money, dates, codes and numbers get the width of their widest value (never wrap); the header may break
+    between words; text columns share what is left and are shortened with "…" (_clip)."""
+    out, text = [], []
+    for i, c in enumerate(cols):
+        head = max(_w(wd, True) for wd in c["label"].split()) + _PAD  # headers are bold; break between words only
+        if _whole(c):
+            vals = [r[i] for r in rows[:2000]] + [tot[i]]
+            out.append(max(head, max((_w(v, True) for v in vals), default=0) + _PAD))  # totals print bold
+        else:  # a text column keeps room for a readable name (up to 80 pt), the rest is shared below
+            longest = max((_w(r[i]) for r in rows[:2000]), default=0) + _PAD
+            out.append(max(head, min(longest, 80)))
+            text.append(i)
+    room = avail - sum(out)
+    if text and room > 0:
+        share = {i: max(cols[i].get("width", 12), 6) for i in text}
+        for i in text:
+            out[i] += room * share[i] / sum(share.values())
+    return out
+
+
+def _clip(v, width: float) -> str:
+    s = str(v)
+    plain = re.sub(r"<[^>]+>", "", s)
+    if _w(s) + _PAD <= width:
+        return s
+    while plain and _w(("<b>" if "<b>" in s else "") + plain + "…") + _PAD > width:
+        plain = plain[:-1]
+    out = plain.rstrip() + "…"
+    return f"<b>{out}</b>" if "<b>" in s else out
 
 
 def parse_date(s: str | None) -> date:

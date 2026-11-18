@@ -71,7 +71,7 @@ def _params(spec: dict, request: Request) -> dict:
         fy = date(t.year if t.month >= 4 else t.year - 1, 4, 1)
         p |= {"period_from": fy.isoformat(), "period_to": t.isoformat(), "_default_period": "this_fy"}
     if p["as_of"] > clock.today():
-        raise ApiError(422, "As-of can't be after today", "VALIDATION_ERROR")
+        raise ApiError(422, "As of can't be after today", "VALIDATION_ERROR")
     nums = ["page", "page_size"] + [f["key"] for f in spec["filters"] if f["kind"] == "min"]
     nums += [f"{f['key']}_{e}" for f in spec["filters"] if f["kind"] == "range" for e in ("min", "max")]
     for k in nums:
@@ -161,6 +161,7 @@ async def _compute(spec: dict, user: dict, p: dict) -> dict:
         "options": opts,
         "sentence": E.sentence(spec, p, opts, len(got), p["as_of"] if spec.get("date_mode") == "as_of" else None),
         "formula": spec["formula"](tot) if money or spec.get("public_money") else None,
+        "lines": spec["lines"](tot, got, p) if spec.get("lines") and (money or spec.get("lines_public")) else [],
         "illustration": spec["illustration"](got, tot)
         if money or spec.get("public_money") or spec.get("illus_always")
         else None,
@@ -186,19 +187,21 @@ def _meta(spec: dict, user: dict) -> dict:
     }
 
 
-def _strip(r: dict, cols: list[dict]) -> dict:
-    keep = {c["key"] for c in cols} | {"booking_id", "customer_id", "status_kind", "_legacy_link"}
+def _strip(r: dict, cols: list[dict], ids: bool = True) -> dict:
+    keep = (
+        {c["key"] for c in cols} | {"booking_id", "status_kind", "_legacy_link"} | ({"customer_id"} if ids else set())
+    )
     return {k: v for k, v in r.items() if k in keep}
 
 
-def _strip_tree(tree: list[dict], cols) -> list[dict]:
+def _strip_tree(tree: list[dict], cols, ids: bool = True) -> list[dict]:
     out = []
     for g in tree:
         n = {k: v for k, v in g.items() if k not in ("children", "rows")}
         n |= (
-            {"children": _strip_tree(g["children"], cols)}
+            {"children": _strip_tree(g["children"], cols, ids)}
             if "children" in g
-            else {"rows": [_strip(r, cols) for r in g["rows"]]}
+            else {"rows": [_strip(r, cols, ids) for r in g["rows"]]}
         )
         out.append(n)
     return out
@@ -314,9 +317,10 @@ async def report(key: str, request: Request, user: dict = Depends(get_current_us
         **out,
     }
     if p["group"]:
-        body["groups"] = _strip_tree(E.group_tree(spec, rows, p["group"]), cols)
+        body["groups"] = _strip_tree(E.group_tree(spec, rows, p["group"]), cols, not spec.get("no_customer_ids"))
     else:
-        body["rows"] = [_strip(r, cols) for r in rows[(page - 1) * size : page * size]]
+        ids = not spec.get("no_customer_ids")  # REQ-347: the stacking plan never carries customer references
+        body["rows"] = [_strip(r, cols, ids) for r in rows[(page - 1) * size : page * size]]
     return Response(
         json.dumps(body, default=str), media_type="application/json", headers={"Cache-Control": "private, no-cache"}
     )
@@ -338,6 +342,7 @@ async def _export(key: str, request: Request, user: dict, fmt: str) -> Response:
     rows, cols = out["rows_all"], out["cols"]
     lines = list(E._flat(E.group_tree(spec, rows, p["group"]), cols)) if p["group"] else [("row", r) for r in rows]
     head = [spec["title"], out["sentence"]] + ([out["formula"]] if out["formula"] else [])
+    head += [ln["text"] for ln in out.get("lines") or []]  # REQ-320/323: the named lines print with the report
     name = f"{spec['key']}-{p['as_of']}"
     if fmt == "xlsx":
         data = E.to_xlsx(spec, cols, lines, out["totals"], head)

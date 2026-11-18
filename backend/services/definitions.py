@@ -10,6 +10,94 @@ from services import clock
 LIVE_BOOKING_STATUSES = ["Active", "Completed"]
 OPEN_DEMAND_STATUSES = ["Open", "Partially Paid"]
 CLEARED = "Cleared"
+INSTRUMENT_MODES = ("CHEQUE", "DD")  # money is received on the bank-clearing day (owner decision 1, 3H)
+
+
+def received_on(p: dict) -> str | None:
+    """REQ-319: the India day a receipt's money counts as received — a cheque / DD on its clearing day, everything else
+    on its receipt day (the same day its ledger Jama row carries). None = not cleared (in hand / bounced)."""
+    if p.get("payment_mode_code") in INSTRUMENT_MODES:
+        return clock.day_of(p.get("cleared_at")) if p.get("cleared_at") else None
+    return p["payment_date"]
+
+
+def _valid_day(d: str) -> str:
+    """'2026-11-31' (a month-end bound written as day 31) → the month's last real day."""
+    y, m, dd = map(int, d.split("-"))
+    while True:
+        try:
+            return date(y, m, dd).isoformat()
+        except ValueError:
+            dd -= 1
+
+
+def received_match(f: str | None = None, t: str | None = None, status=CLEARED) -> dict:
+    """Mongo twin of received_on(): cleared receipts whose money was received on India days f…t (cheque / DD by
+    their clearing time, everything else by receipt day)."""
+    days = {**({"$gte": f} if f else {}), **({"$lte": t} if t else {})}
+    clear = {
+        **({"$gte": clock.day_start_utc(_valid_day(f))} if f else {}),
+        **({"$lte": clock.day_end_utc(_valid_day(t))} if t else {}),
+    } or {"$exists": True}
+    return {
+        "status": status,
+        "$or": [
+            {"payment_mode_code": {"$nin": list(INSTRUMENT_MODES)}, **({"payment_date": days} if days else {})},
+            {"payment_mode_code": {"$in": list(INSTRUMENT_MODES)}, "cleared_at": clear},
+        ],
+    }
+
+
+def received_day_expr() -> dict:
+    """Aggregation expression of received_on() (India day string)."""
+    tz = str(clock.business_tz())
+    cleared = {
+        "$dateToString": {
+            "date": {
+                "$dateFromString": {
+                    "dateString": {"$substrCP": ["$cleared_at", 0, 19]},
+                    "timezone": "UTC",
+                    "onError": None,
+                }
+            },
+            "timezone": tz,
+            "format": "%Y-%m-%d",
+        }
+    }
+    return {"$cond": [{"$in": ["$payment_mode_code", list(INSTRUMENT_MODES)]}, cleared, "$payment_date"]}
+
+
+def in_hand_on(p: dict, day: str) -> bool:
+    """REQ-320/334: a receipt is a cheque in hand on `day` when it was dated on or before the day, had not cleared by it
+    and had not bounced by it."""
+    if p["payment_date"] > day:
+        return False
+    if p.get("status") == "Pending":
+        return True
+    if p.get("status") == "Bounced":
+        return (clock.day_of(p.get("bounced_at")) or "9999") > day
+    got = received_on(p)
+    return bool(got) and got > day
+
+
+async def cheques_in_hand(match: dict, day: str) -> list[dict]:
+    """Receipts in hand at the end of `day` (India): dated ≤ day, not cleared / bounced by then."""
+    from db import db
+
+    after = {"$gt": clock.day_end_utc(_valid_day(day))}  # cleared / bounced only after the day ends
+    instr = {"$in": list(INSTRUMENT_MODES)}
+    q = {
+        **match,
+        "payment_date": {"$lte": day},
+        "$or": [
+            {"status": "Pending"},
+            {"status": {"$in": ["Cleared", "Reversed"]}, "payment_mode_code": instr, "cleared_at": after},
+            {"status": "Bounced", "bounced_at": after},
+        ],
+    }
+    proj = {"_id": 0, "id": 1, "booking_id": 1, "receipt_number": 1, "amount_paise": 1, "payment_date": 1, "status": 1}
+    proj |= {"payment_mode_code": 1, "cleared_at": 1, "bounced_at": 1, "instrument": 1, "bank_account_name": 1}
+    return [p async for p in db.payments.find(q, proj) if in_hand_on(p, day)]
 
 
 def live_bookings_match(extra: dict | None = None) -> dict:
@@ -463,28 +551,55 @@ def final_status(
 SHARE_KEYS = ("cash_due_paise", "account_due_paise", "other_charges_due_paise", "outstanding_paise", "advance_paise")
 
 
+_LINEAR = ("cash_due_paise", "account_due_paise", "other_charges_due_paise")
+_OC_ROWS = ("OTHER_CHARGE_DEMAND", "OTHER_CHARGE_PAYMENT")
+_LINEAR += ("cash_order_raised_paise", "account_order_raised_paise", "cash_paid_cum_paise", "account_paid_cum_paise")
+
+
 async def shares_as_of(booking_ids: list[str], as_of: date) -> dict:
-    """REQ-278: each booking's share state on India day `as_of` = its last ledger row on or before that day (every row
-    carries the running raised / paid-to-date / due / advance), plus waived-to-date per share from the waiver rows'
-    paid-to-date steps. Received = paid-to-date − waived-to-date. Today this equals the booking summary."""
+    """REQ-278/335/336: each booking's share state on India day `as_of` = the sum of the steps of every ledger row
+    dated on or before that day (a row's step = its running raised / paid-to-date / due minus the row posted before
+    it). A row posted earlier but dated after the day (a back-dated bill, a later price revision or waiver) never
+    leaks in. Waived-to-date per share from the waiver rows' paid-to-date steps. Received = paid − waived."""
     from db import db
 
     out, prev = {}, {}
-    proj = {"_id": 0, "booking_id": 1, "type": 1, "cash_paid_cum_paise": 1, "account_paid_cum_paise": 1}
-    proj |= {"cash_order_raised_paise": 1, "account_order_raised_paise": 1, **{k: 1 for k in SHARE_KEYS}}
-    cur = db.ledger_entries.find({"booking_id": {"$in": booking_ids}, "date": {"$lte": as_of.isoformat()}}, proj)
+    day = as_of.isoformat()
+    proj = {
+        "_id": 0,
+        "booking_id": 1,
+        "type": 1,
+        "date": 1,
+        "udhar_paise": 1,
+        "jama_paise": 1,
+        **{k: 1 for k in _LINEAR},
+    }
+    cur = db.ledger_entries.find({"booking_id": {"$in": booking_ids}}, proj)
     async for e in cur.sort([("booking_id", 1), ("seq", 1)]).batch_size(2000):
         b = e["booking_id"]
-        s = out.setdefault(b, {"cash_waived_paise": 0, "account_waived_paise": 0})
         p = prev.get(b) or {}
+        prev[b] = e
+        if (e.get("date") or "") > day:
+            continue
+        s = out.setdefault(b, {"cash_waived_paise": 0, "account_waived_paise": 0, **dict.fromkeys(_LINEAR, 0)})
+        step = {k: (e.get(k) or 0) - (p.get(k) or 0) for k in _LINEAR}
+        # the running other_charges_due on a row counts every other-charge line agreed (billed or not); as of a past
+        # day only other-charge bills raised by then count (Udhar − Jama of the other-charge rows) — REQ-338
+        if e.get("type") in _OC_ROWS:
+            step["other_charges_due_paise"] = (e.get("udhar_paise") or 0) - (e.get("jama_paise") or 0)
+        elif e.get("type") not in ("WAIVER", "WAIVER_REVERSAL"):  # a waiver on an other charge steps it down
+            step["other_charges_due_paise"] = 0
+        for k, v in step.items():
+            s[k] += v
         if e.get("type") in ("WAIVER", "WAIVER_REVERSAL"):
             for k in ("cash", "account"):
-                s[f"{k}_waived_paise"] += (e.get(f"{k}_paid_cum_paise") or 0) - (p.get(f"{k}_paid_cum_paise") or 0)
-        prev[b] = e
-        s |= {k: e.get(k) or 0 for k in SHARE_KEYS}
+                s[f"{k}_waived_paise"] += step[f"{k}_paid_cum_paise"]
+    for s in out.values():
         for k in ("cash", "account"):
-            s[f"{k}_order_raised_paise"] = e.get(f"{k}_order_raised_paise") or 0
-            s[f"{k}_paid_paise"] = e.get(f"{k}_paid_cum_paise") or 0
+            s[f"{k}_paid_paise"] = s[f"{k}_paid_cum_paise"]
+        dues = [s[k] for k in ("cash_due_paise", "account_due_paise", "other_charges_due_paise")]
+        s["outstanding_paise"] = sum(max(v, 0) for v in dues)
+        s["advance_paise"] = sum(max(-v, 0) for v in dues)
     return out
 
 

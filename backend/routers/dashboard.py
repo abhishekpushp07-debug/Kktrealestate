@@ -5,6 +5,7 @@ from deps import report_scope_filter, require
 from routers.projects import STATUSES, status_counts
 from services import clock
 from services import inventory as inv
+from services.definitions import received_match as _received
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
@@ -156,8 +157,8 @@ async def collections_widget(user: dict) -> dict:
     ).to_list(1)
     return present_money(
         {
-            "today": await grouped({**base, "payment_date": today.isoformat()}),
-            "month": await grouped({**base, "payment_date": {"$gte": month_start}}),
+            "today": await grouped({**base, **_received(today.isoformat(), today.isoformat())}),
+            "month": await grouped({**base, **_received(month_start, today.isoformat())}),
             "pending_cheques": {
                 "count": pending[0]["n"] if pending else 0,
                 "amount_paise": pending[0]["s"] if pending else 0,

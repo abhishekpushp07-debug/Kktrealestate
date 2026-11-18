@@ -47637,7 +47637,7 @@
       "name": "date_basis",
       "required": false,
       "schema": {
-       "default": "receipt",
+       "default": "cleared",
        "title": "Date Basis",
        "type": "string"
       }
@@ -47968,6 +47968,16 @@
      },
      {
       "in": "query",
+      "name": "include_cancelled",
+      "required": false,
+      "schema": {
+       "default": false,
+       "title": "Include Cancelled",
+       "type": "boolean"
+      }
+     },
+     {
+      "in": "query",
       "name": "format",
       "required": false,
       "schema": {
@@ -48084,6 +48094,16 @@
        ],
        "description": "Demand raised date \u2264 (YYYY-MM-DD)",
        "title": "Date To"
+      }
+     },
+     {
+      "in": "query",
+      "name": "include_cancelled",
+      "required": false,
+      "schema": {
+       "default": false,
+       "title": "Include Cancelled",
+       "type": "boolean"
       }
      },
      {

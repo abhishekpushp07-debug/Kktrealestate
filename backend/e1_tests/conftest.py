@@ -22,10 +22,14 @@ def block_id(home, project_code, name):
 # ---- Phase 3E helpers (QA-prefixed fixtures) ----
 import random as _r, datetime as _dt
 SGH = "8e4ef80c-0ce8-4fe6-8c46-7b552afe0d8a"
-def login(email):
+_LOGIN_CACHE = {}
+def login(email, fresh=False):
+    if email in _LOGIN_CACHE and not fresh: return _LOGIN_CACHE[email]
     r = httpx.post(f"{BASE}/auth/login", json={"email":email,"password":_pw()}, timeout=30)
     assert r.status_code == 200, r.text
-    return httpx.Client(base_url=BASE, headers={"Authorization":"Bearer "+r.json()["access_token"]}, timeout=60)
+    c = httpx.Client(base_url=BASE, headers={"Authorization":"Bearer "+r.json()["access_token"]}, timeout=60)
+    if not fresh: _LOGIN_CACHE[email] = c
+    return c
 def qa_customer(c, tag, **kw):
     body = {"full_name": f"QA tscheck {tag} {_r.randint(1000,9999)}", "phone": "9"+str(_r.randint(100000000,999999999))}
     body.update(kw)
@@ -46,3 +50,31 @@ CREATED = []
 def pytest_sessionfinish(session, exitstatus):
     if CREATED:
         open("/tmp/tscheck_3e_created.txt","a").write("\n".join(map(str,CREATED))+"\n")
+
+# ---- Phase 3G concurrency helpers ----
+import threading as _th, uuid as _uuid
+CASH_MODE = "b6a7dde1-e9f2-4826-983f-1c38b7f4279a"
+VILLA_P = "0d220380-bdd3-4202-9769-7a5db753b75a"
+ORION = "8c8d8d49-1575-45d7-86b0-70f09cc71917"
+def parallel(*fns):
+    out=[None]*len(fns); bar=_th.Barrier(len(fns))
+    def run(i,f):
+        bar.wait()
+        try: out[i]=f()
+        except Exception as e: out[i]=e
+    ts=[_th.Thread(target=run,args=(i,f)) for i,f in enumerate(fns)]
+    [t.start() for t in ts]; [t.join() for t in ts]
+    return out
+def booking_on_flat(c, tag, flat, cust=None):
+    cust = cust or qa_customer(c, tag)
+    av = flat["price"]
+    return {"flat_id":flat["id"],"customer_id":cust["id"],"booking_date":_dt.date.today().isoformat(),
+            "agreement_value":av,"cash_agreed":round(av*0.2),"account_agreed":av-round(av*0.2)}
+def avail_flats(c, block_id):
+    return [f for f in c.get("/flats", params={"block_id":block_id,"status":"Available","limit":100}).json()["items"] if f.get("bookable")]
+def ledger_len(c, bid):
+    j = c.get(f"/bookings/{bid}/ledger").json()
+    items = j if isinstance(j, list) else (j.get("items") or j.get("entries") or j.get("rows") or [])
+    return len(items)
+def summary(c, bid):
+    return c.get(f"/bookings/{bid}").json()["summary"]

@@ -209,7 +209,8 @@ def test_f3_equals_existing_report(admin, key):
     old = requests.get(f"{BASE}/api/reports/{F3[key]}", headers=admin, params=q, timeout=60).json()
     assert new["meta"]["segment"] == "Finance"
     same = [k for k in new["totals"] if k.endswith("_paise") and k in (old.get("totals") or {})]
-    assert same and all(round(new["totals"][k]) == round(old["totals"][k]) for k in same)
+    diff = {k: (new["totals"][k], old["totals"][k]) for k in same if round(new["totals"][k]) != round(old["totals"][k])}
+    assert same and not diff, diff
     assert requests.get(f"{BASE}/api/reports/v3/{F3[key]}", headers=admin, timeout=60).json()["meta"]["key"] == key
 
 

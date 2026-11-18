@@ -424,7 +424,9 @@ class Story:
         )
         await self.api.post(
             f"/api/site-visits/{v['id']}/{outcome}",
-            {"note": "Could not make it" if outcome != "complete" else "Liked the sample flat"},
+            {"note": "Could not make it"}
+            if outcome != "complete"
+            else {"note": "Liked the sample flat", "outcome": "Interested"},  # REQ-223: a completed visit needs one
             as_of=when,
         )
         return v

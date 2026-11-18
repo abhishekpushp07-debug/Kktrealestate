@@ -182,7 +182,7 @@ def test_collections_date_basis_and_csv_shape():
         params={"from_date": "2025-04-01", "to_date": "2026-03-31", "date_basis": "clearance"},
         timeout=60,
     ).json()
-    assert a["date_basis"] == "receipt" and b["date_basis"] == "clearance" and a["basis_text"] != b["basis_text"]
+    assert a["date_basis"] == "cleared" and b["date_basis"] == "clearance" and a["basis_text"] != b["basis_text"]
     assert a["kpis"][0]["label"] == "Net received" and a["purpose"]
     assert (
         requests.get(f"{API}/reports/collections-v2", headers=h, params={"date_basis": "x"}, timeout=30).status_code
@@ -194,7 +194,7 @@ def test_collections_date_basis_and_csv_shape():
         params={"from_date": "2025-04-01", "to_date": "2026-03-31", "format": "csv"},
         timeout=60,
     ).text.splitlines()
-    assert csv[0].startswith("# Collections (Received)") and "Date basis: receipt date" in csv[0]
+    assert csv[0].startswith("# Collections (Received)") and "Date basis: cleared" in csv[0]
     assert "Cash received ₹" in csv[1] and "Net received ₹" in csv[1]
     assert csv[-1].startswith("TOTAL")
 

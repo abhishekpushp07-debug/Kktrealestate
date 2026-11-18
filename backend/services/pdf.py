@@ -478,21 +478,23 @@ class BrandedDoc:
         align_right: list[int] | None = None,
         totals: list | None = None,
         zebra=True,
+        font_size: float | None = None,
     ):
         avail = self.pagesize[0] - 28 * mm
+        cell = CELL if not font_size else ParagraphStyle("cs", parent=CELL, fontSize=font_size, leading=font_size + 2)
         if widths:
             s = sum(widths)
             cw = [avail * w / s for w in widths]
         else:
             cw = [avail / len(headers)] * len(headers)
-        data = [[Paragraph(f"<b>{h}</b>", ParagraphStyle("hc", parent=CELL, textColor=colors.white)) for h in headers]]
+        data = [[Paragraph(f"<b>{h}</b>", ParagraphStyle("hc", parent=cell, textColor=colors.white)) for h in headers]]
         for r in rows:
             data.append(
                 [
                     Paragraph(
                         str(c if c is not None else ""),
                         ParagraphStyle(
-                            "c", parent=CELL, alignment=TA_RIGHT if (align_right and i in align_right) else 0
+                            "c", parent=cell, alignment=TA_RIGHT if (align_right and i in align_right) else 0
                         ),
                     )
                     for i, c in enumerate(r)
@@ -504,7 +506,7 @@ class BrandedDoc:
                     Paragraph(
                         f"<b>{c if c is not None else ''}</b>",
                         ParagraphStyle(
-                            "t", parent=CELL, alignment=TA_RIGHT if (align_right and i in align_right) else 0
+                            "t", parent=cell, alignment=TA_RIGHT if (align_right and i in align_right) else 0
                         ),
                     )
                     for i, c in enumerate(totals)

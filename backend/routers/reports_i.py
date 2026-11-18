@@ -121,50 +121,10 @@ _COLL_FIELDS = (  # every receipt field Collections reads (rows, buckets, bridge
 )
 
 
-async def _received_bridge(pays: list[dict], live_ids: list[str], f: str, t: str) -> dict:
-    """Collections (receipt date) → carried "received in period" (ledger / clearance date), term by term."""
-    # the ledger dates a receipt row on its posting day (ledger._collect_events: posted_at), so no ledger read is needed
-    day = {
-        p["receipt_number"]: clock.day_of(p["posted_at"])
-        for p in pays
-        if p.get("receipt_number") and p.get("posted_at")
-    }
-    ref_rows = await db.ledger_entries.aggregate(
-        [
-            {"$match": {"booking_id": {"$in": live_ids}, "type": "REFUND", "date": {"$gte": f, "$lte": t}}},
-            {"$group": {"_id": None, "j": {"$sum": "$jama_paise"}}},
-        ]
-    ).to_list(1)
-    return definitions.receipts_bridge(pays, day, set(live_ids), f, t, ref_rows[0]["j"] if ref_rows else 0)
-
-
-@router.get("/collections-v2")
-async def collections_v2(
-    request: Request,
-    from_date: str | None = None,
-    to_date: str | None = None,
-    project_id: str | None = None,
-    block_id: str | None = None,
-    group_by: str = "month",
-    date_basis: str = "receipt",
-    format: str | None = None,
-    user: dict = Depends(require("reports.collections.view")),
-):
-    _strict_params(request, {"from_date", "to_date", "project_id", "block_id", "group_by", "date_basis"})
-    args = (request, from_date, to_date, project_id, block_id, group_by, date_basis, format, user)
-    if format:
-        return await _collections_v2(*args)
-    params = [from_date, to_date, project_id, block_id, group_by, date_basis]
-    return await cached_report(request, "collections-v2", user, params, lambda: _collections_v2(*args))
-
-
-async def _collections_v2(request, from_date, to_date, project_id, block_id, group_by, date_basis, format, user):
-    _strict_params(request, {"from_date", "to_date", "project_id", "block_id", "group_by", "date_basis"})
-    f, t = _dates(from_date, to_date)
-    if date_basis not in ("receipt", "clearance"):
-        raise ApiError(400, "date_basis must be receipt or clearance", "BAD_PARAM")
+async def received_rows(user, f, t, date_basis="cleared", project_id=None, block_id=None, by_bucket=False):
+    """REQ-319/323: the one row set Collections and Bank-wise both read — every cleared receipt on its received day and
+    every reversal (negative) on its reversal day. Returns ({booking_id: booking}, rows, receipts read)."""
     cid = user["company_id"]
-    blocks, projects, users = await _names(cid)
     bq = {**_scope(user, project_id, block_id)}
     bids = {
         b["id"]: b
@@ -184,7 +144,9 @@ async def _collections_v2(request, from_date, to_date, project_id, block_id, gro
     }
 
     # Jama side from receipts: status Cleared (pending excluded) + reversed receipts (their receipt, then a negative row on the reversal date)
-    def on(p):  # effective date by basis
+    def on(p):  # effective date by basis; default "cleared" = REQ-319 (cheque / DD on its clearing day)
+        if date_basis == "cleared":
+            return definitions.received_on(p)
         return (
             clock.day_of(p.get("cleared_at") or p["payment_date"]) if date_basis == "clearance" else p["payment_date"]
         )
@@ -212,13 +174,82 @@ async def _collections_v2(request, from_date, to_date, project_id, block_id, gro
     rows = []
     for p in pays:
         d = on(p)
-        if f <= d <= t:
-            rows += _receipt_rows(p, d, receipt_parts(p), False, group_by == "bucket")
+        if d and f <= d <= t:
+            rows += _receipt_rows(p, d, receipt_parts(p), False, by_bucket)
         if p["status"] == "Reversed" and p.get("reversal"):
             rd = clock.day_of(p["reversal"].get("at") or p["updated_at"])
             if f <= rd <= t:  # E9: a reversal nets out of its own bucket(s), so Cash + Account + Other == Net received
                 neg = {c: -a for c, a in receipt_parts(p).items()}
-                rows += _receipt_rows(p, rd, neg, True, group_by == "bucket")
+                rows += _receipt_rows(p, rd, neg, True, by_bucket)
+
+    return bids, rows, pays
+
+
+async def money_lines(rows: list[dict], bids: set, scope: dict, f: str, t: str) -> dict:
+    """REQ-320/323/327: the named lines beside Received — by mode (Bank-wise + Cash = Collections), cheques in hand at
+    the period end (never inside Received) and refunds paid out in the period (never netted from Received)."""
+    cash = sum(r["_amt"] for r in rows if r.get("payment_mode_code") == "CASH")
+    rev = -sum(r["_amt"] for r in rows if r["_rev"])
+    hand = [p for p in await definitions.cheques_in_hand(scope, t) if p["booking_id"] in bids]
+    ref = await db.ledger_entries.aggregate(
+        [
+            {"$match": {"booking_id": {"$in": list(bids)}, "type": "REFUND", "date": {"$gte": f, "$lte": t}}},
+            {"$group": {"_id": None, "j": {"$sum": "$jama_paise"}, "n": {"$sum": 1}}},
+        ]
+    ).to_list(1)
+    return {
+        "cash_mode_paise": cash,
+        "bank_mode_paise": sum(r["_amt"] for r in rows) - cash,
+        "reversed_in_period_paise": rev,
+        "in_hand_paise": sum(p["amount_paise"] for p in hand),
+        "in_hand_n": len(hand),
+        "refunds_paid_paise": abs(ref[0]["j"]) if ref else 0,
+        "refunds_paid_n": ref[0]["n"] if ref else 0,
+    }
+
+
+async def _received_bridge(pays: list[dict], live_ids: list[str], f: str, t: str) -> dict:
+    """Collections (receipt date) → carried "received in period" (ledger / clearance date), term by term."""
+    # the ledger dates a receipt row on its received day (ledger._row_day = definitions.received_on), no ledger read
+    day = {p["receipt_number"]: definitions.received_on(p) for p in pays if p.get("receipt_number")}
+    ref_rows = await db.ledger_entries.aggregate(
+        [
+            {"$match": {"booking_id": {"$in": live_ids}, "type": "REFUND", "date": {"$gte": f, "$lte": t}}},
+            {"$group": {"_id": None, "j": {"$sum": "$jama_paise"}}},
+        ]
+    ).to_list(1)
+    return definitions.receipts_bridge(pays, day, set(live_ids), f, t, ref_rows[0]["j"] if ref_rows else 0)
+
+
+@router.get("/collections-v2")
+async def collections_v2(
+    request: Request,
+    from_date: str | None = None,
+    to_date: str | None = None,
+    project_id: str | None = None,
+    block_id: str | None = None,
+    group_by: str = "month",
+    date_basis: str = "cleared",
+    format: str | None = None,
+    user: dict = Depends(require("reports.collections.view")),
+):
+    _strict_params(request, {"from_date", "to_date", "project_id", "block_id", "group_by", "date_basis"})
+    args = (request, from_date, to_date, project_id, block_id, group_by, date_basis, format, user)
+    if format:
+        return await _collections_v2(*args)
+    params = [from_date, to_date, project_id, block_id, group_by, date_basis]
+    return await cached_report(request, "collections-v2", user, params, lambda: _collections_v2(*args))
+
+
+async def _collections_v2(request, from_date, to_date, project_id, block_id, group_by, date_basis, format, user):
+    _strict_params(request, {"from_date", "to_date", "project_id", "block_id", "group_by", "date_basis"})
+    f, t = _dates(from_date, to_date)
+    if date_basis not in ("cleared", "receipt", "clearance"):
+        raise ApiError(400, "date_basis must be cleared, receipt or clearance", "BAD_PARAM")
+    cid = user["company_id"]
+    blocks, projects, users = await _names(cid)
+    bids, rows, pays = await received_rows(user, f, t, date_basis, project_id, block_id, group_by == "bucket")
+    bq = {**_scope(user, project_id, block_id)}
 
     def gkey(r):
         b = bids[r["booking_id"]]
@@ -296,6 +327,7 @@ async def _collections_v2(request, from_date, to_date, project_id, block_id, gro
     }
     totals["pending_instruments"] = pend[0]["n"] if pend else 0
     totals["pending_paise"] = pend[0]["amt"] if pend else 0
+    totals |= await money_lines(rows, set(bids), _scope(user, project_id, block_id), f, t)
     label = {
         "day": "Day",
         "week": "Week",
@@ -329,7 +361,11 @@ async def _collections_v2(request, from_date, to_date, project_id, block_id, gro
             ("total_paise", "Net received", "money"),
         ]
     )
-    basis_text = "Date basis: receipt date" if date_basis == "receipt" else "Date basis: clearance date"
+    basis_text = {
+        "cleared": "Date basis: cleared (cheque / DD on its clearing day)",
+        "receipt": "Date basis: receipt date",
+        "clearance": "Date basis: clearance date",
+    }[date_basis]
     live_ids = [b["id"] async for b in db.bookings.find({**bq, "status": {"$in": LIVE}}, {"_id": 0, "id": 1})]
     carried = await definitions.carried(live_ids, f, t)
     payload = {

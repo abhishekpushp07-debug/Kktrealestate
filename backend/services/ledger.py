@@ -13,6 +13,32 @@ from utils import new_id, now_iso
 CLEAR_IMMEDIATELY = {"CASH", "UPI", "NEFT_RTGS", "LOAN_DISBURSEMENT"}
 
 
+def _row_day(kind: str, at: str, src: dict) -> str:
+    """REQ-319: a receipt's row carries the day its money was received (definitions.received_on) — a back-dated cash /
+    online entry on its receipt day, a cheque on its clearing day. Row order (and so allocation) stays by posting time."""
+    if kind in ("PAYMENT", "OTHER_CHARGE_PAYMENT"):
+        from services.definitions import received_on
+
+        return received_on(src) or clock.day_of(at)
+    return clock.day_of(at)
+
+
+async def redate_receipt_rows() -> int:
+    """One-time (3H): rebuild the ledger of bookings whose receipt rows still carry the posting day."""
+    from services.definitions import received_on
+
+    todo = set()
+    async for p in db.payments.find(
+        {"status": {"$in": ["Cleared", "Reversed"]}, "payment_mode_code": {"$nin": ["CHEQUE", "DD"]}},
+        {"_id": 0, "booking_id": 1, "receipt_number": 1, "payment_date": 1, "posted_at": 1, "payment_mode_code": 1},
+    ):
+        if clock.day_of(p.get("posted_at")) != received_on(p):
+            todo.add(p["booking_id"])
+    for bid in todo:
+        await rebuild(bid)
+    return len(todo)
+
+
 def _orders(cash_agreed: int, account_agreed: int, pct: float) -> tuple[int, int]:
     return pct_of(cash_agreed, pct), pct_of(account_agreed, pct)
 
@@ -265,7 +291,7 @@ async def _rebuild(booking_id: str) -> list[dict]:
                 "booking_id": booking_id,
                 "seq": seq,
                 "at": at,
-                "date": clock.day_of(at),
+                "date": _row_day(kind, at, src),
                 "type": kind,
                 "construction_percent": pct,
                 "category": category,
@@ -563,3 +589,18 @@ def _inr(paise: int) -> str:
     from services.money import inr
 
     return inr(paise)
+
+
+async def share_cap(booking: dict, cat: str) -> int:
+    """REQ-343 (owner decision 5): a share's cap = its agreed amount + every manual bill raised on it, so a payment
+    against a manual bill is accepted even when the share's agreed amount was already fully paid."""
+    agreed = booking["cash_agreed_paise"] if cat == "Cash" else booking["account_agreed_paise"]
+    k = "cash_demand_paise" if cat == "Cash" else "account_demand_paise"
+    q = {
+        "booking_id": booking["id"],
+        "trigger_type": "MANUAL",
+        "voided": {"$ne": True},
+        "status": {"$nin": ["Voided", "Cancelled"]},
+    }
+    ds = await db.demands.find(q, {"_id": 0, k: 1, "trigger_type": 1}).to_list(None)
+    return agreed + sum(d.get(k) or 0 for d in ds if is_manual_bill(d))

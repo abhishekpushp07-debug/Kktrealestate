@@ -64,6 +64,8 @@ def _live_at(b: dict, as_of: date) -> str:
     """Booking status on the as-of day: a booking cancelled after that day was still live on it."""
     if b["status"] in D.LIVE_BOOKING_STATUSES:
         return "Active"
+    if b["status"] == "Cancelled":  # REQ-337 (owner): a cancelled booking is not a sale on any date
+        return "Cancelled"
     gone = clock.day_of((b.get("cancellation") or {}).get("at")) or ""
     return "Active" if gone and gone > as_of.isoformat() else b["status"]
 
@@ -248,12 +250,7 @@ def customer_status_formula(t: dict) -> str:
         f"Cash {inr(t.get('cash_dues', 0))}) + other charges due "
         f"{inr(t.get('total_due', 0) - t.get('account_dues', 0) - t.get('cash_dues', 0))} = total due "
         f"{inr(t.get('total_due', 0))} (as in Overdue & ageing)"
-        + (
-            f" · bills raised = Bills vs Collection {inr(t['br_instalment'])} − on cancelled / transferred bookings "
-            f"{inr(t['br_not_live'])} {'−' if t['br_adjust'] < 0 else '+'} transfer adjustments {inr(abs(t['br_adjust']))}"
-            if "br_live" in t
-            else ""
-        )
+        + (f" · bills raised = Bills vs Collection (live bookings) {inr(t['br_bvc'])}" if "br_bvc" in t else "")
     )
 
 
