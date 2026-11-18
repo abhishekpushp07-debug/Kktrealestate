@@ -1,0 +1,278 @@
+(trapped) error reading bcrypt version
+Traceback (most recent call last):
+  File "/root/.venv/lib/python3.11/site-packages/passlib/handlers/bcrypt.py", line 620, in _load_backend_mixin
+    version = _bcrypt.__about__.__version__
+              ^^^^^^^^^^^^^^^^^
+AttributeError: module 'bcrypt' has no attribute '__about__'
+index audit_logs.id skipped: An existing index has the same name as the requested index. When index names are not specified, they are auto generated 
+[startup] indexes ensured in 0.10s
+UoW mode: ordered-writes+compensation
+KKT backend serving after 0.11s (uow=ordered-writes+compensation); background startup tasks running
+[startup] another replica holds the startup lease; skipping migrations here
+Object storage initialized
+{"request_id": "c27e9c07213b41cf", "method": "GET", "path": "/api/health", "status": 200, "duration_ms": 2.3, "user_id": null}
+{"request_id": "b4fda78433014949", "method": "POST", "path": "/api/auth/login", "status": 200, "duration_ms": 215.1, "user_id": null}
+{"request_id": "68f007956f584edc", "method": "POST", "path": "/api/admin/hard-purge", "status": 200, "duration_ms": 60.3, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "ffec5ff6abad4301", "method": "POST", "path": "/api/auth/login", "status": 200, "duration_ms": 209.6, "user_id": null}
+{"request_id": "ff62ceb3cda341d2", "method": "GET", "path": "/api/reports/v3/customer-status", "status": 200, "duration_ms": 45.5, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "95ffc1ae37d348e0", "method": "GET", "path": "/api/reports/collections-v2", "status": 200, "duration_ms": 107.3, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://internal/api/reports/collections-v2?group_by=receipt "HTTP/1.1 200 OK"
+{"request_id": "3f625f661e6840b3", "method": "GET", "path": "/api/reports/roznamcha-summary", "status": 200, "duration_ms": 30.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://internal/api/reports/roznamcha-summary?group_by=day "HTTP/1.1 200 OK"
+{"request_id": "23a7642b53d8444f", "method": "GET", "path": "/api/reports/bank-receipts", "status": 200, "duration_ms": 12.7, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://internal/api/reports/bank-receipts "HTTP/1.1 200 OK"
+{"request_id": "b1354bb441fe4884", "method": "GET", "path": "/api/reports/cheques", "status": 200, "duration_ms": 49.7, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://internal/api/reports/cheques "HTTP/1.1 200 OK"
+{"request_id": "69581d82d7cb47c4", "method": "GET", "path": "/api/reports/demand-vs-collection", "status": 200, "duration_ms": 23.5, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://internal/api/reports/demand-vs-collection "HTTP/1.1 200 OK"
+{"request_id": "5d96367a4b6f41c3", "method": "GET", "path": "/api/reports/outstanding-v2", "status": 200, "duration_ms": 35.1, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://internal/api/reports/outstanding-v2?group_by=booking "HTTP/1.1 200 OK"
+{"request_id": "a62aa192a1874d11", "method": "GET", "path": "/api/reports/cash-vs-account", "status": 200, "duration_ms": 15.2, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://internal/api/reports/cash-vs-account?group_by=booking "HTTP/1.1 200 OK"
+{"request_id": "214118fc9f6e4a3b", "method": "GET", "path": "/api/reports/other-charges", "status": 200, "duration_ms": 17.3, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://internal/api/reports/other-charges?group_by=booking "HTTP/1.1 200 OK"
+{"request_id": "27602da2338340b0", "method": "GET", "path": "/api/reports/receivables-forecast", "status": 200, "duration_ms": 130.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://internal/api/reports/receivables-forecast?group_by=booking "HTTP/1.1 200 OK"
+{"request_id": "ec61271a64684029", "method": "GET", "path": "/api/reports/waiver-register", "status": 200, "duration_ms": 4.2, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://internal/api/reports/waiver-register "HTTP/1.1 200 OK"
+{"request_id": "8f2561b50c6947b4", "method": "GET", "path": "/api/reports/discount-register", "status": 200, "duration_ms": 10.3, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://internal/api/reports/discount-register?group_by=booking "HTTP/1.1 200 OK"
+{"request_id": "4b0f725c6d294158", "method": "GET", "path": "/api/reports/cancellations", "status": 200, "duration_ms": 6.0, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://internal/api/reports/cancellations "HTTP/1.1 200 OK"
+{"request_id": "079a71d2c7634809", "method": "GET", "path": "/api/reports/sales-team", "status": 200, "duration_ms": 48.7, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://internal/api/reports/sales-team "HTTP/1.1 200 OK"
+{"request_id": "3950112412bb4641", "method": "GET", "path": "/api/reports/v3", "status": 200, "duration_ms": 938.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796", "slow": true}
+{"request_id": "e1f50477146947eb", "method": "GET", "path": "/api/reports/v3/customer-status", "status": 200, "duration_ms": 8.4, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "f6dbff5c1e87470a", "method": "GET", "path": "/api/reports/v3/customer-status", "status": 200, "duration_ms": 6.7, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "bbe53274ac4641b0", "method": "GET", "path": "/api/reports/v3/customer-status", "status": 422, "duration_ms": 3.0, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "e89317a96fe243c1", "method": "GET", "path": "/api/reports/v3/customer-status", "status": 422, "duration_ms": 3.3, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "1206872636294e2a", "method": "GET", "path": "/api/reports/v3/customer-status", "status": 200, "duration_ms": 8.4, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "fe49241c8172494a", "method": "GET", "path": "/api/reports/v3/customer-status", "status": 200, "duration_ms": 34.4, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "104b5eb06e1d4c6c", "method": "GET", "path": "/api/reports/v3/customer-status", "status": 200, "duration_ms": 8.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "51bf1b3a292d4c7b", "method": "POST", "path": "/api/auth/login", "status": 200, "duration_ms": 208.4, "user_id": null}
+{"request_id": "5ab8f2f5eed840e4", "method": "GET", "path": "/api/reports/v3/customer-status", "status": 403, "duration_ms": 3.3, "user_id": "7a07f9db-5321-4f33-a132-4d753b75fcd2"}
+{"request_id": "0cac367656054b08", "method": "GET", "path": "/api/reports/v3/customer-status/export.xlsx", "status": 200, "duration_ms": 188.5, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "be81d31e9e20413c", "method": "GET", "path": "/api/reports/v3/customer-status/export.pdf", "status": 200, "duration_ms": 208.9, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "90c096243b6844af", "method": "POST", "path": "/api/reports/presets", "status": 201, "duration_ms": 16.7, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "088d4c8e0ef645e1", "method": "POST", "path": "/api/reports/presets", "status": 201, "duration_ms": 9.5, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "ae039d92fdb34718", "method": "POST", "path": "/api/reports/presets", "status": 201, "duration_ms": 7.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "a3d7347e04c74191", "method": "POST", "path": "/api/reports/presets", "status": 201, "duration_ms": 9.0, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "40840edd1bd14625", "method": "POST", "path": "/api/reports/presets", "status": 201, "duration_ms": 7.4, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "f2521bbc7bad47e4", "method": "POST", "path": "/api/reports/presets", "status": 201, "duration_ms": 7.9, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "d2f225dbcf2a4a0b", "method": "POST", "path": "/api/reports/presets", "status": 409, "duration_ms": 3.4, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "63960c91088243f7", "method": "DELETE", "path": "/api/reports/presets/092532dd-a9ae-4394-9560-1fc30a157c2e", "status": 200, "duration_ms": 3.9, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "e93f77e00ffb42e6", "method": "DELETE", "path": "/api/reports/presets/e1282a17-ebbe-4dd7-a66a-898e4dfb0fa3", "status": 200, "duration_ms": 3.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "6005496e80a74db3", "method": "DELETE", "path": "/api/reports/presets/0bb971c2-bd89-49c1-81da-f7d26ec57272", "status": 200, "duration_ms": 3.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "7811d32ca56f4a27", "method": "DELETE", "path": "/api/reports/presets/c2e39b20-6422-4a52-8be4-58ec42e9f09d", "status": 200, "duration_ms": 3.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "7ae0cd66da36482b", "method": "DELETE", "path": "/api/reports/presets/347b228f-8e27-4801-85d0-9cec29768ba6", "status": 200, "duration_ms": 3.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "d7c2875badb94516", "method": "DELETE", "path": "/api/reports/presets/3190dc87-94d4-47a3-aa26-7cbaf47645d0", "status": 200, "duration_ms": 3.7, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "eb25bc8b8df944a6", "method": "GET", "path": "/api/reports/v3/customer-status", "status": 422, "duration_ms": 3.0, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "4af43ec3050f4002", "method": "GET", "path": "/api/reports/v3/customer-status", "status": 422, "duration_ms": 2.9, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "4e51c7bfc4734f62", "method": "GET", "path": "/api/reports/v3/customer-status", "status": 422, "duration_ms": 2.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "368fa990c3c0418e", "method": "GET", "path": "/api/reports/v3/customer-status", "status": 422, "duration_ms": 3.0, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "02718959c68641b3", "method": "GET", "path": "/api/reports/v3/customer-status", "status": 422, "duration_ms": 3.1, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "d1353f83e3684802", "method": "GET", "path": "/api/reports/v3/customer-status", "status": 422, "duration_ms": 2.9, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "4ef9bf4591e042c0", "method": "GET", "path": "/api/reports/v3/customer-statement", "status": 200, "duration_ms": 6.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "c30e65b9ec934aaa", "method": "GET", "path": "/api/reports/v3/customer-statement/export.xlsx", "status": 200, "duration_ms": 12.5, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "9bf2f556a9194fbd", "method": "GET", "path": "/api/reports/v3/customer-ageing", "status": 200, "duration_ms": 6.5, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "90a2b86e7ddb4c0f", "method": "GET", "path": "/api/reports/v3/customer-ageing/export.xlsx", "status": 200, "duration_ms": 24.3, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "b546048f700c485f", "method": "GET", "path": "/api/reports/v3/advance-holders", "status": 200, "duration_ms": 5.2, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "3d460bad7f6f45ae", "method": "GET", "path": "/api/reports/v3/advance-holders/export.xlsx", "status": 200, "duration_ms": 11.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "e6385e9d54f84cdb", "method": "GET", "path": "/api/reports/v3/call-list", "status": 200, "duration_ms": 6.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "a2bcbd5a1edd4233", "method": "GET", "path": "/api/reports/v3/call-list/export.xlsx", "status": 200, "duration_ms": 21.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "e9fc0710b2bc4ba3", "method": "GET", "path": "/api/reports/v3/kyc-pending", "status": 200, "duration_ms": 8.5, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "ffdf5e63cb8746d7", "method": "GET", "path": "/api/reports/v3/kyc-pending/export.xlsx", "status": 200, "duration_ms": 26.0, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "3684e239b9e347b7", "method": "GET", "path": "/api/reports/v3/payment-behaviour", "status": 200, "duration_ms": 6.5, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "7a603580be914388", "method": "GET", "path": "/api/reports/v3/payment-behaviour/export.xlsx", "status": 200, "duration_ms": 32.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "e1a254da70e849ac", "method": "GET", "path": "/api/reports/v3/customer-directory", "status": 200, "duration_ms": 6.7, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "d52ffa0a08bc4c55", "method": "GET", "path": "/api/reports/v3/customer-directory/export.xlsx", "status": 200, "duration_ms": 32.7, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "3fd9be9c5b0a4fe3", "method": "GET", "path": "/api/reports/v3/cancelled-customers", "status": 200, "duration_ms": 5.5, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "c36f78e9aab04fd2", "method": "GET", "path": "/api/reports/v3/cancelled-customers/export.xlsx", "status": 200, "duration_ms": 12.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "51277ebe306348e3", "method": "GET", "path": "/api/reports/v3/customer-statement", "status": 200, "duration_ms": 5.2, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "d83f69472d5642c5", "method": "GET", "path": "/api/reports/v3/customer-statement", "status": 200, "duration_ms": 9.5, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "eb2e32de989c43ea", "method": "GET", "path": "/api/reports/v3/customer-ageing", "status": 200, "duration_ms": 6.2, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "46b57b0a3f354429", "method": "GET", "path": "/api/reports/v3", "status": 200, "duration_ms": 38.3, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "fc21a1126a50445a", "method": "GET", "path": "/api/reports/collections-v2", "status": 200, "duration_ms": 84.2, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://internal/api/reports/collections-v2?group_by=receipt&from_date=2026-04-01&to_date=2026-11-18 "HTTP/1.1 200 OK"
+{"request_id": "f23086d323774ef6", "method": "GET", "path": "/api/reports/v3/collections", "status": 200, "duration_ms": 127.0, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "54b50b6a602b4d6e", "method": "GET", "path": "/api/reports/collections-v2", "status": 200, "duration_ms": 43.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "f8060e1d6b8c4d9b", "method": "GET", "path": "/api/reports/v3/collections-v2", "status": 200, "duration_ms": 15.0, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "7fecb6ade6f24b22", "method": "GET", "path": "/api/reports/roznamcha-summary", "status": 200, "duration_ms": 24.5, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://internal/api/reports/roznamcha-summary?group_by=day&from_date=2026-04-01&to_date=2026-11-18 "HTTP/1.1 200 OK"
+{"request_id": "ba75b30719234cc8", "method": "GET", "path": "/api/reports/v3/day-book", "status": 200, "duration_ms": 37.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "6b2ca21c913443a9", "method": "GET", "path": "/api/reports/roznamcha-summary", "status": 200, "duration_ms": 21.1, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "1f07496f3c3e42e6", "method": "GET", "path": "/api/reports/v3/roznamcha-summary", "status": 200, "duration_ms": 6.4, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "650e91287c9e4783", "method": "GET", "path": "/api/reports/bank-receipts", "status": 200, "duration_ms": 12.2, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://internal/api/reports/bank-receipts?from_date=2026-04-01&to_date=2026-11-18 "HTTP/1.1 200 OK"
+{"request_id": "b0c5c0e2d9404f25", "method": "GET", "path": "/api/reports/v3/bank-receipts", "status": 200, "duration_ms": 23.1, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "70666be33cf9454b", "method": "GET", "path": "/api/reports/bank-receipts", "status": 200, "duration_ms": 8.0, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "11c5655d23a64864", "method": "GET", "path": "/api/reports/v3/bank-receipts", "status": 200, "duration_ms": 4.5, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "b927dd9e88194f2e", "method": "GET", "path": "/api/reports/v3/cheques", "status": 200, "duration_ms": 9.0, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "0f4f19340b4b46fb", "method": "GET", "path": "/api/reports/cheques", "status": 200, "duration_ms": 50.1, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "56bd10e5afc0444a", "method": "GET", "path": "/api/reports/v3/cheques", "status": 200, "duration_ms": 8.9, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "f52bba9c28ad4436", "method": "GET", "path": "/api/reports/v3/bills-vs-collection", "status": 200, "duration_ms": 5.0, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "6bc26a40e3514e10", "method": "GET", "path": "/api/reports/demand-vs-collection", "status": 200, "duration_ms": 21.2, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "7acdbdfeca954cd8", "method": "GET", "path": "/api/reports/v3/demand-vs-collection", "status": 200, "duration_ms": 5.1, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "4f95b6c022b74776", "method": "GET", "path": "/api/reports/v3/outstanding", "status": 200, "duration_ms": 7.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "5ef1233f1caf4120", "method": "GET", "path": "/api/reports/outstanding-v2", "status": 200, "duration_ms": 30.7, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "b13a5a61f67c4386", "method": "GET", "path": "/api/reports/v3/outstanding-v2", "status": 200, "duration_ms": 7.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "0ca21292ecfd4b3c", "method": "GET", "path": "/api/reports/v3/cash-vs-account", "status": 200, "duration_ms": 7.7, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "14677ae2a1374929", "method": "GET", "path": "/api/reports/cash-vs-account", "status": 200, "duration_ms": 14.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "9eb686e6d2ca4671", "method": "GET", "path": "/api/reports/v3/cash-vs-account", "status": 200, "duration_ms": 8.0, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "2df11e5be18b441c", "method": "GET", "path": "/api/reports/v3/other-charges", "status": 200, "duration_ms": 8.0, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "666b90e6c5de435a", "method": "GET", "path": "/api/reports/other-charges", "status": 200, "duration_ms": 17.0, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "a5b1fda8dc864767", "method": "GET", "path": "/api/reports/v3/other-charges", "status": 200, "duration_ms": 8.1, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "3afe3d008ecc443d", "method": "GET", "path": "/api/reports/v3/receivables-forecast", "status": 200, "duration_ms": 7.7, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "95eb9d1a63284a65", "method": "GET", "path": "/api/reports/receivables-forecast", "status": 200, "duration_ms": 52.2, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "200a2e5a37274fa9", "method": "GET", "path": "/api/reports/v3/receivables-forecast", "status": 200, "duration_ms": 7.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "4bc6769b23ad4087", "method": "GET", "path": "/api/reports/waiver-register", "status": 200, "duration_ms": 3.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://internal/api/reports/waiver-register?from_date=2026-04-01&to_date=2026-11-18 "HTTP/1.1 200 OK"
+{"request_id": "9945f9185666443d", "method": "GET", "path": "/api/reports/v3/waivers", "status": 200, "duration_ms": 14.1, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "2f668d69853144c2", "method": "GET", "path": "/api/reports/waiver-register", "status": 200, "duration_ms": 4.0, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "1813e5cae0224f6b", "method": "GET", "path": "/api/reports/v3/waiver-register", "status": 200, "duration_ms": 4.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "fd3fd25fecaf44bf", "method": "GET", "path": "/api/reports/collections-v2", "status": 200, "duration_ms": 48.9, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://internal/api/reports/collections-v2?group_by=receipt&from_date=2026-04-01&to_date=2026-06-30 "HTTP/1.1 200 OK"
+{"request_id": "6e811da36ffb4a4d", "method": "GET", "path": "/api/reports/v3/collections", "status": 200, "duration_ms": 73.9, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "3973cc57aefa4859", "method": "GET", "path": "/api/reports/collections-v2", "status": 200, "duration_ms": 39.2, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "9dfec9f61c7e4726", "method": "GET", "path": "/api/reports/v3/collections", "status": 200, "duration_ms": 16.2, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "09f61cd28da74e99", "method": "GET", "path": "/api/reports/v3/booking-register", "status": 200, "duration_ms": 9.3, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "8a09dd035b9a4039", "method": "GET", "path": "/api/reports/v3/booking-register/export.xlsx", "status": 200, "duration_ms": 40.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "5fc113ecda4d46be", "method": "GET", "path": "/api/reports/v3/booking-register/export.pdf", "status": 200, "duration_ms": 214.1, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "ac94a36be7f54b07", "method": "GET", "path": "/api/reports/v3/sales-summary", "status": 200, "duration_ms": 6.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "9ca8e7f54fb34a5d", "method": "GET", "path": "/api/reports/v3/sales-summary/export.xlsx", "status": 200, "duration_ms": 16.3, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "2c5e44d94d8a4950", "method": "GET", "path": "/api/reports/v3/sales-summary/export.pdf", "status": 200, "duration_ms": 31.3, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "45cf55f4979141a0", "method": "GET", "path": "/api/reports/discount-register", "status": 200, "duration_ms": 9.1, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://internal/api/reports/discount-register?group_by=booking&from_date=2026-04-01&to_date=2026-11-18 "HTTP/1.1 200 OK"
+{"request_id": "d5fc0700fbec4c3c", "method": "GET", "path": "/api/reports/v3/discount-register", "status": 200, "duration_ms": 22.5, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "b6f9752eca9643ad", "method": "GET", "path": "/api/reports/v3/discount-register/export.xlsx", "status": 200, "duration_ms": 20.7, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "04f94139e5fe4756", "method": "GET", "path": "/api/reports/v3/discount-register/export.pdf", "status": 200, "duration_ms": 49.4, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "f06745171ff14efe", "method": "GET", "path": "/api/reports/v3/plan-position", "status": 200, "duration_ms": 9.1, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "c2bca2dda7454b38", "method": "GET", "path": "/api/reports/v3/plan-position/export.xlsx", "status": 200, "duration_ms": 37.5, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "34bb7a9ed5794f26", "method": "GET", "path": "/api/reports/v3/plan-position/export.pdf", "status": 200, "duration_ms": 110.1, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "b7506d7b9baa4b4f", "method": "GET", "path": "/api/reports/v3/agreements", "status": 200, "duration_ms": 9.4, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "ae954a4a460f4fe1", "path": "/api/reports/v3/agreements/export.xlsx", "error": "unhandled"}
+Traceback (most recent call last):
+  File "/root/.venv/lib/python3.11/site-packages/starlette/middleware/base.py", line 159, in call_next
+    message = await recv_stream.receive()
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/.venv/lib/python3.11/site-packages/anyio/streams/memory.py", line 133, in receive
+    raise EndOfStream from None
+anyio.EndOfStream
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/app/backend/infra.py", line 292, in dispatch
+    response = await asyncio.wait_for(call_next(request), timeout=budget)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/asyncio/tasks.py", line 489, in wait_for
+    return fut.result()
+           ^^^^^^^^^^^^
+  File "/root/.venv/lib/python3.11/site-packages/starlette/middleware/base.py", line 165, in call_next
+    raise app_exc
+  File "/root/.venv/lib/python3.11/site-packages/starlette/middleware/base.py", line 151, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "/root/.venv/lib/python3.11/site-packages/starlette/middleware/base.py", line 189, in __call__
+    with collapse_excgroups():
+  File "/usr/local/lib/python3.11/contextlib.py", line 158, in __exit__
+    self.gen.throw(typ, value, traceback)
+  File "/root/.venv/lib/python3.11/site-packages/starlette/_utils.py", line 93, in collapse_excgroups
+    raise exc
+  File "/root/.venv/lib/python3.11/site-packages/starlette/middleware/base.py", line 191, in __call__
+    response = await self.dispatch_func(request, call_next)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/app/backend/infra.py", line 411, in dispatch
+    return await call_next(request)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/.venv/lib/python3.11/site-packages/starlette/middleware/base.py", line 165, in call_next
+    raise app_exc
+  File "/root/.venv/lib/python3.11/site-packages/starlette/middleware/base.py", line 151, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "/root/.venv/lib/python3.11/site-packages/starlette/middleware/gzip.py", line 24, in __call__
+    await responder(scope, receive, send)
+  File "/root/.venv/lib/python3.11/site-packages/starlette/middleware/gzip.py", line 44, in __call__
+    await self.app(scope, receive, self.send_with_gzip)
+  File "/root/.venv/lib/python3.11/site-packages/starlette/middleware/base.py", line 189, in __call__
+    with collapse_excgroups():
+  File "/usr/local/lib/python3.11/contextlib.py", line 158, in __exit__
+    self.gen.throw(typ, value, traceback)
+  File "/root/.venv/lib/python3.11/site-packages/starlette/_utils.py", line 93, in collapse_excgroups
+    raise exc
+  File "/root/.venv/lib/python3.11/site-packages/starlette/middleware/base.py", line 191, in __call__
+    response = await self.dispatch_func(request, call_next)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/app/backend/infra.py", line 34, in dispatch
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/.venv/lib/python3.11/site-packages/starlette/middleware/base.py", line 165, in call_next
+    raise app_exc
+  File "/root/.venv/lib/python3.11/site-packages/starlette/middleware/base.py", line 151, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "/root/.venv/lib/python3.11/site-packages/starlette/middleware/cors.py", line 85, in __call__
+    await self.app(scope, receive, send)
+  File "/root/.venv/lib/python3.11/site-packages/starlette/middleware/exceptions.py", line 65, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/root/.venv/lib/python3.11/site-packages/starlette/_exception_handler.py", line 64, in wrapped_app
+    raise exc
+  File "/root/.venv/lib/python3.11/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    await app(scope, receive, sender)
+  File "/root/.venv/lib/python3.11/site-packages/starlette/routing.py", line 756, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/root/.venv/lib/python3.11/site-packages/starlette/routing.py", line 776, in app
+    await route.handle(scope, receive, send)
+  File "/root/.venv/lib/python3.11/site-packages/starlette/routing.py", line 297, in handle
+    await self.app(scope, receive, send)
+  File "/root/.venv/lib/python3.11/site-packages/starlette/routing.py", line 77, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/root/.venv/lib/python3.11/site-packages/starlette/_exception_handler.py", line 64, in wrapped_app
+    raise exc
+  File "/root/.venv/lib/python3.11/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    await app(scope, receive, sender)
+  File "/root/.venv/lib/python3.11/site-packages/starlette/routing.py", line 72, in app
+    response = await func(request)
+               ^^^^^^^^^^^^^^^^^^^
+  File "/root/.venv/lib/python3.11/site-packages/fastapi/routing.py", line 278, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/.venv/lib/python3.11/site-packages/fastapi/routing.py", line 191, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/app/backend/routers/reports_v3.py", line 263, in export_xlsx
+    return await _export(key, request, user, "xlsx")
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/app/backend/routers/reports_v3.py", line 252, in _export
+    data = E.to_xlsx(spec, cols, lines, out["totals"], head)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/app/backend/reports_v3/engine.py", line 194, in to_xlsx
+    ws.title = spec["title"][:30]
+    ^^^^^^^^
+  File "/root/.venv/lib/python3.11/site-packages/openpyxl/workbook/child.py", line 93, in title
+    raise ValueError(msg)
+ValueError: Invalid character / found in sheet title
+{"request_id": "ae954a4a460f4fe1", "method": "GET", "path": "/api/reports/v3/agreements/export.xlsx", "status": 500, "duration_ms": 10.3, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "8e34a3d349cd4e4e", "method": "GET", "path": "/api/reports/cancellations", "status": 200, "duration_ms": 5.3, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://internal/api/reports/cancellations?from_date=2026-04-01&to_date=2026-11-18 "HTTP/1.1 200 OK"
+{"request_id": "64d5638fc1794ab0", "method": "GET", "path": "/api/reports/v3/cancellations", "status": 200, "duration_ms": 17.1, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "5db84107c86244ef", "method": "GET", "path": "/api/reports/v3/cancellations/export.xlsx", "status": 200, "duration_ms": 10.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "2d0230da33694402", "method": "GET", "path": "/api/reports/v3/cancellations/export.pdf", "status": 200, "duration_ms": 17.5, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "2c98490e572b49c8", "method": "GET", "path": "/api/reports/v3/transfers", "status": 200, "duration_ms": 5.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "e8ab807ccd8b4947", "method": "GET", "path": "/api/reports/v3/transfers/export.xlsx", "status": 200, "duration_ms": 11.9, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "5929a303ecd445d2", "method": "GET", "path": "/api/reports/v3/transfers/export.pdf", "status": 200, "duration_ms": 19.2, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "f87d966025e54ed8", "method": "GET", "path": "/api/reports/sales-team", "status": 200, "duration_ms": 39.0, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://internal/api/reports/sales-team?from_date=2026-04-01&to_date=2026-11-18 "HTTP/1.1 200 OK"
+{"request_id": "c0df617ce2774355", "method": "GET", "path": "/api/reports/v3/sales-team", "status": 200, "duration_ms": 51.1, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "d677c05f846b4ed1", "method": "GET", "path": "/api/reports/v3/sales-team/export.xlsx", "status": 200, "duration_ms": 12.0, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "ca13af86de554b5a", "method": "GET", "path": "/api/reports/v3/sales-team/export.pdf", "status": 200, "duration_ms": 19.1, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "31eecae6a5ff4033", "method": "GET", "path": "/api/reports/v3/realised-rate", "status": 200, "duration_ms": 8.4, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "a0fa036fe3294908", "method": "GET", "path": "/api/reports/v3/realised-rate/export.xlsx", "status": 200, "duration_ms": 38.1, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "2720e84199624f2a", "method": "GET", "path": "/api/reports/v3/realised-rate/export.pdf", "status": 200, "duration_ms": 125.2, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "2aba51e2d19b45f9", "method": "GET", "path": "/api/reports/v3/booking-health", "status": 200, "duration_ms": 8.5, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "e2f0b43068044bd7", "method": "GET", "path": "/api/reports/v3/booking-health/export.xlsx", "status": 200, "duration_ms": 36.0, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "5847960d003c457f", "method": "GET", "path": "/api/reports/v3/booking-health/export.pdf", "status": 200, "duration_ms": 102.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "3361328fa7dc4e01", "method": "GET", "path": "/api/reports/v3", "status": 200, "duration_ms": 40.2, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "1b607f36ee334890", "method": "GET", "path": "/api/reports/v3/sales-summary", "status": 200, "duration_ms": 5.0, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "c5c41265ebb14cf9", "method": "GET", "path": "/api/reports/v3/discount-register", "status": 200, "duration_ms": 5.4, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "c235105197cb4886", "method": "GET", "path": "/api/reports/v3/cancellations", "status": 200, "duration_ms": 3.9, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "9649ea98ddc64677", "method": "GET", "path": "/api/reports/v3/transfers", "status": 200, "duration_ms": 4.4, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "4ca1e8b8293a4add", "method": "GET", "path": "/api/reports/v3/sales-team", "status": 200, "duration_ms": 4.7, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "b98753f4d37f4150", "method": "GET", "path": "/api/reports/v3/booking-health", "status": 200, "duration_ms": 6.5, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}

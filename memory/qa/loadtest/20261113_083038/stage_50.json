@@ -1,0 +1,175 @@
+{
+ "vus": 50,
+ "duration_s": 62,
+ "requests": 2069,
+ "rps": 33.3,
+ "stopped": null,
+ "errors": {
+  "client:RemoteProtocolError": 18
+ },
+ "assertions": {
+  "lead_created:ok": 204,
+  "lead_converted:ok": 204,
+  "booking_created:ok": 164,
+  "booking_total_matches_preview:ok": 164,
+  "payment_posted:ok": 150,
+  "c360_shows_booking:ok": 147,
+  "ledger_received_equals_payment:ok": 147,
+  "ledger_bill_raised_positive:ok": 147,
+  "inventory_flat_booked:ok": 147,
+  "receipt_pdf:ok": 147,
+  "booking_created:FAIL": 18,
+  "flat_dropped_from_pool": 18,
+  "demand_register:ok": 144,
+  "project_statement:ok": 144,
+  "integrity_ok_after_stage:ok": 1
+ },
+ "failed_assertions": [
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: "
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: "
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: "
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: "
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: "
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: "
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: "
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: "
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: "
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: "
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: "
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: "
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: "
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: "
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: "
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: "
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: "
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: "
+  }
+ ],
+ "groups": {
+  "bookings": {
+   "n": 182,
+   "p50": 2729.4,
+   "p95": 7629.3,
+   "p99": 8549.2
+  },
+  "breakdown": {
+   "n": 196,
+   "p50": 192.9,
+   "p95": 303.9,
+   "p99": 353.9
+  },
+  "construction": {
+   "n": 3,
+   "p50": 137.3,
+   "p95": 195.7,
+   "p99": 195.7
+  },
+  "customers": {
+   "n": 351,
+   "p50": 172.2,
+   "p95": 328.1,
+   "p99": 380.1
+  },
+  "demand_register": {
+   "n": 144,
+   "p50": 69.9,
+   "p95": 140.9,
+   "p99": 204.9
+  },
+  "flats": {
+   "n": 147,
+   "p50": 203.6,
+   "p95": 311.4,
+   "p99": 327.7
+  },
+  "leads": {
+   "n": 408,
+   "p50": 288.4,
+   "p95": 426.0,
+   "p99": 487.8
+  },
+  "ledger": {
+   "n": 147,
+   "p50": 95.3,
+   "p95": 166.2,
+   "p99": 198.5
+  },
+  "login": {
+   "n": 50,
+   "p50": 239.6,
+   "p95": 245.6,
+   "p99": 279.4
+  },
+  "payments": {
+   "n": 150,
+   "p50": 2247.6,
+   "p95": 2952.3,
+   "p99": 3179.7
+  },
+  "project_statement": {
+   "n": 144,
+   "p50": 215.7,
+   "p95": 354.4,
+   "p99": 440.4
+  },
+  "receipt_pdf": {
+   "n": 147,
+   "p50": 133.1,
+   "p95": 213.6,
+   "p99": 278.2
+  }
+ }
+}

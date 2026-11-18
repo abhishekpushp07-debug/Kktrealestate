@@ -1,0 +1,6 @@
+computed_at 2026-11-15T22:27:10.097856+00:00
+counts {'projects': 2, 'leads_open': 33, 'visits_today': 1, 'cheques_pending': 1, 'tickets_open': 8, 'followups_due': 1}
+ageing_counts {'not_due': 27, 'd0_30': 9, 'd31_60': 6, 'd61_90': 13, 'd90': 12}
+ageing_paise {'not_due': 1474310000, 'd0_30': 434437400, 'd31_60': 328363000, 'd61_90': 664488000, 'd90': 552828000}
+today {'demands_raised': 0}
+widgets follow_ups_due 1

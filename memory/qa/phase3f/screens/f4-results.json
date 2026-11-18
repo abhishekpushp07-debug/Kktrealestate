@@ -1,0 +1,314 @@
+[
+ {
+  "theme": "light",
+  "width": 1440,
+  "screen": "hub-bookings",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 1440,
+  "screen": "booking-register",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 1440,
+  "screen": "sales-summary",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 1440,
+  "screen": "discount-register",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 1440,
+  "screen": "plan-position",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 1440,
+  "screen": "agreements",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 1440,
+  "screen": "cancellations",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 1440,
+  "screen": "transfers",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 1440,
+  "screen": "sales-team",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 1440,
+  "screen": "realised-rate",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 1440,
+  "screen": "booking-health",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 1440,
+  "screen": "booking-register-filters",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 1440,
+  "screen": "booking-health-grouped",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 390,
+  "screen": "hub-bookings",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 390,
+  "screen": "booking-register",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 390,
+  "screen": "sales-summary",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 390,
+  "screen": "discount-register",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 390,
+  "screen": "plan-position",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 390,
+  "screen": "agreements",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 390,
+  "screen": "cancellations",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 390,
+  "screen": "transfers",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 390,
+  "screen": "sales-team",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 390,
+  "screen": "realised-rate",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 390,
+  "screen": "booking-health",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 390,
+  "screen": "booking-register-filters",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 390,
+  "screen": "booking-health-grouped",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 1440,
+  "screen": "hub-bookings",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 1440,
+  "screen": "booking-register",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 1440,
+  "screen": "sales-summary",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 1440,
+  "screen": "discount-register",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 1440,
+  "screen": "plan-position",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 1440,
+  "screen": "agreements",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 1440,
+  "screen": "cancellations",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 1440,
+  "screen": "transfers",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 1440,
+  "screen": "sales-team",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 1440,
+  "screen": "realised-rate",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 1440,
+  "screen": "booking-health",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 1440,
+  "screen": "booking-register-filters",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 1440,
+  "screen": "booking-health-grouped",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 390,
+  "screen": "hub-bookings",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 390,
+  "screen": "booking-register",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 390,
+  "screen": "sales-summary",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 390,
+  "screen": "discount-register",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 390,
+  "screen": "plan-position",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 390,
+  "screen": "agreements",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 390,
+  "screen": "cancellations",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 390,
+  "screen": "transfers",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 390,
+  "screen": "sales-team",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 390,
+  "screen": "realised-rate",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 390,
+  "screen": "booking-health",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 390,
+  "screen": "booking-register-filters",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 390,
+  "screen": "booking-health-grouped",
+  "h_overflow_px": 0
+ }
+]

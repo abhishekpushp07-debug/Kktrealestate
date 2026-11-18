@@ -1,0 +1,57 @@
+{
+  "summary": "Phase 2D Home Command Center tested on the preview URL. The full pytest suite and the matrix were NOT rerun, as asked. I ran API smoke scripts and Playwright UI flows as Owner/Super Admin, Accounts, Sales and Site Engineer. Working: the bundle endpoint, server-enforced role widget sets, Sales masking, period switch, project filter, Ye empty states (mostly), Night theme at 390px with no horizontal scroll, and the server-side drill tie (41/42 drill.api totals equal the widget numbers; the one miss is a 0-count Bounced key). Broken: many front-end drill links (drill.to) do not apply their filters, so the list opened does not equal the clicked number. Also, a saved Customize layout looks reverted on reload because the bundle cache is not cleared.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "PUT/DELETE /api/me/home-layout -> GET /api/home/bundle", "issue": "The bundle ttlcache (10 s, key home:bundle:{user}:...) is not cleared when the layout is saved or reset. After PUT, the bundle keeps returning the OLD layout and widget set for up to 10 s. Seen in the UI: hide inflow_30 + move ageing first -> Save -> reload within about 3 s -> the default layout comes back (looks like the save did not persist). Repro: /app/backend/tests/home_layout_persist_smoke.py (t=0 s and 4 s stale, t=11 s correct). Fix: call ttlcache.invalidate(f'home:bundle:{user[\"id\"]}:') in put_layout and reset_layout.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "GET /api/home/bundle (ageing drills)", "issue": "Every ageing drill.to, including the total and all 5 bands, is '/reports/outstanding-v2?x=1' with no bucket parameter. Clicking '0-30 ₹49.9 L' opens the full ₹7.43 Cr report. drill.api ties pick ageing[bucket=..] server-side, but the UI link cannot show the band. The stray 'x=1' parameter also looks like a placeholder."},
+      {"endpoint": "GET /api/home/bundle (pipeline visits / bookings)", "issue": "drill.api filters status=Completed (visits) and status=Active,Completed (bookings), but drill.to has no status parameter. The list the user lands on is a different set from the one counted."},
+      {"endpoint": "GET /api/home/bundle unauthenticated", "issue": "Returns 401 UNAUTHENTICATED. The brief said 403. 401 is the correct code; just flagging the difference."},
+      {"endpoint": "inventory widget (Sales/masked)", "issue": "row.total is computed from real statuses even when masked. It is not rendered today, but it leaks the real flat count in the API for masked roles."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Needs attention -> Holds expiring in 48 h", "issue": "The drill link /inventory?hold_expiring=1 has no route, so the catch-all sends the user to /dashboard. Even /flats?hold_expiring=1 ignores the filter and lists all 186 flats.", "selector": "[data-testid='attention-holds'] a", "priority": "HIGH"},
+      {"component": "Inventory chips / Flat status cells / Construction progress / Next billing milestone", "issue": "All drill to /blocks/{id}?status=X | ?tab=construction | ?flat=id. BlockRedirect (ErpApp.jsx:128) drops every query parameter and always goes to /projects/{pid}?tab=structure&tower={id}. Clicking 'Hold 2' on Tower B shows the whole tower (32 flats). The construction and milestone drills land on Structure, not Construction.", "selector": "[data-testid^='inventory-'][data-testid$='-hold'], [data-testid^='construction-'] a, [data-testid^='milestone-'] a, [data-testid^='flat-cell-']", "priority": "HIGH"},
+      {"component": "Leads page drills (Sales pipeline Leads/Lost, Call today Follow-ups due)", "issue": "/leads?created_from=..&created_to=.., /leads?status=Lost&..., /leads?due_today=1: Leads.jsx reads only tab/new/source/project_id from the URL. The user lands on the unfiltered pipeline (93 leads), not the 7 leads, 2 lost or 1 follow-up that was clicked.", "selector": "[data-testid='pipeline-leads'] a, [data-testid='pipeline-lost'] a, [data-testid='call-today-followups'] a", "priority": "HIGH"},
+      {"component": "Customize preview", "issue": "Turning on a widget that was hidden (e.g. Accounts -> Construction progress) shows a skeleton that never resolves until Save, because the bundle only computes visible widgets.", "selector": "[data-testid='widget-construction-skeleton']", "priority": "LOW"}
+    ],
+    "integration_issues": [
+      {"flow": "Money today -> Collections report", "issue": "The total matches (₹4,07,504). But the report's period toggle highlights 'FY' while the range is 16 Nov–16 Nov, so the selected period chip does not match the range.", "affected_selectors": ["/reports/collections-v2 period tabs"]},
+      {"flow": "Needs attention -> Part-paid stale", "issue": "Count matches (4 demands). The stale_days=30 filter is applied but no filter chip is shown on the Demand register, so the user can't see why only 4 rows appear.", "affected_selectors": ["/demands?stale_days=30 filter bar"]}
+    ],
+    "design_issues": [
+      {"screen": "Home - project Ye", "issues": ["Next 30 days inflow shows the empty text but still renders bare 'Bills due in 30 days ₹0', 'Cheques pending clearance ₹0' and '0 instalments' rows below it", "Overdue by age says 'Nothing outstanding — every bill is paid', which is misleading when there are no bookings or bills at all", "Inventory shows chips 'Hold 0 Booked 0 Sold 0 Blocked 0'"]},
+      {"screen": "Home - Next billing milestone", "issues": ["SGH Tower A shows 'No bookings to bill' next to 'Next: Flooring · 20 bookings'. The text contradicts itself; when bookings > 0 but the expected amount is 0, use something like 'Stage not billed in plan'"]},
+      {"screen": "Home - Call today (Sales)", "issues": ["Sales has no outstanding permission, so the overdue list is always empty and shows 'No overdue customers to call'. That reads as a fact rather than a permission limit"]},
+      {"screen": "Home 390px", "issues": ["No horizontal scroll (scrollWidth 390) in Light or Night. The Customize panel title wraps beside the Reset/Save buttons; this is minor"]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/home_bundle_smoke.py", "/app/backend/tests/home_drill_tie_smoke.py", "/app/backend/tests/home_layout_persist_smoke.py"],
+  "action_items": [
+    "Clear the home bundle ttlcache for the user in PUT and DELETE /api/me/home-layout. Customize -> Save -> reload currently shows the old layout.",
+    "Fix the Holds-expiring drill: point it at an existing route (/flats?hold_expiring=1) and make the Flats page honour hold_expiring (and project_id).",
+    "BlockRedirect must forward query params (status, tab, flat) and ProjectDetail must apply them (status filter on the tower flats, tab=construction, highlight the flat). Otherwise the Inventory, Flat status, Construction and Milestone numbers don't drill to a matching list.",
+    "Leads page: read created_from/created_to/status/due_today (and tab=visits date/from/to + status) from the URL and filter the list, so the pipeline and follow-up counts match.",
+    "Ageing drills: add a bucket parameter to drill.to (e.g. /reports/outstanding-v2?bucket=0-30) and have the report filter by it; drop the 'x=1' placeholder.",
+    "Pipeline visits/bookings drill.to: include the same status filter as drill.api.",
+    "Ye empty state: hide the ₹0 rows in Next 30 days inflow when total is 0; change the Ageing empty text when there are no bookings.",
+    "Next milestone: change the 'No bookings to bill' text when active_bookings > 0."
+  ],
+  "critical_code_review_comments": [
+    "home_layout.py defines SCHEMA_VERSION twice (1, then 2). Remove the dead first assignment.",
+    "home_defs.py is 675 lines, close to the 700-line limit.",
+    "Home.jsx uses a module-level `let customizeOpened` flag. It persists across mounts and users in the same tab (after logout/login the stale flag makes useFetch call /me/home-layout). Use state or a ref instead.",
+    "WidgetCard `loading={loading || !st}`: a visible widget that is missing from a stale bundle stays a skeleton with no retry. Show 'Save to load' or refetch instead."
+  ],
+  "updated_files": ["/app/backend/tests/home_bundle_smoke.py", "/app/backend/tests/home_drill_tie_smoke.py", "/app/backend/tests/home_layout_persist_smoke.py"],
+  "success_rate": {"backend": "90% (role gating, rupee twins, 401, 422 bad period, 403 forbidden widget PUT, drill.api ties 41/42; the layout->bundle cache bug fails)", "frontend": "60% (widgets, role sets, period, project filter, masking, night/390 pass; about 9 of 15 drill links open an unfiltered or wrong list; customise persistence looks broken because of the cache)"},
+  "test_credentials": "admin@kkt.in, accounts@kkt.in, sales@kkt.in, siteengineer@kkt.in / Kkt@12345. siteengineer@kkt.in works but is not listed in /app/memory/test_credentials.md; please add it.",
+  "seed_data_creation": "None. Only personal preference rows were touched: the admin home layout was saved and then reset with DELETE (back to default), and the sales user's theme was switched to night and back to light. No business data was changed and the Ye project was not touched.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Bundle JSON dumps from this run are in /tmp/bundle_*.json. To check drill ties, run home_drill_tie_smoke.py <email> after home_bundle_smoke.py, which writes /tmp/tokens.json. Retest: (1) Customize Save -> immediate reload persists; (2) the attention-holds drill; (3) inventory chip -> filtered tower list count; (4) Leads drills for pipeline and follow-ups; (5) ageing band drills; (6) Ye inflow empty state. Space out logins because of the rate limit. Use a fresh browser_automation call per user, since clearing localStorage alone does not log out.",
+  "rca of the issue": "Customize persistence: compute() in home_bundle.py is wrapped in ttlcache.cached(key, 10). put_layout/reset_layout write user_home_layouts but never call ttlcache.invalidate, so a reload within 10 s gets the cached layout. Drill mismatches: home_defs drill.to URLs point at routes or params the frontend does not handle. /inventory is not in the ErpApp ROUTES table, BlockRedirect drops the query string, Leads.jsx ignores created_from/created_to/status/due_today, and the ageing drill.to has no bucket parameter. The server-side drill.api ties pass, so only the UI deep links are wrong."
+}

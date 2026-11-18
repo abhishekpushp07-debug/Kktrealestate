@@ -1,0 +1,53 @@
+# Phase K.13 — alert rules as code. Evaluated every minute in-process (services/alerts.py) against the ops ring buffer, job_runs and settings.
+# Each rule: id, severity, source, condition (expression over the snapshot), message. Firing → notification to Super Admin (deduped per day) + System Health "Alerts" card.
+rules:
+  - id: api_down
+    severity: critical
+    source: ring
+    condition: "snap['requests'] == 0 and snap['uptime_s'] > 900"
+    message: "No API requests served in the last 15 minutes"
+  - id: http_5xx_rate
+    severity: critical
+    source: ring
+    condition: "snap['requests'] >= 20 and snap['rate_5xx'] > 0.02"
+    message: "5xx rate above 2% over 15 min"
+  - id: p95_latency
+    severity: warning
+    source: ring
+    condition: "snap['requests'] >= 20 and (snap['p95_ms'] or 0) > 300"
+    message: "p95 latency above 300 ms over 15 min"
+  - id: load_shedding
+    severity: warning
+    source: loadshed
+    condition: "snap['shed_total'] > 0"
+    message: "Requests were shed (503 OVERLOADED) since process start"
+  - id: login_failure_spike
+    severity: warning
+    source: login_events
+    condition: "snap['login_failures_15m'] >= 30"
+    message: "30+ failed logins in 15 minutes"
+  - id: job_failed
+    severity: warning
+    source: job_runs
+    condition: "len(snap['jobs_failed_24h']) > 0"
+    message: "A scheduled job finished FAILED/ABANDONED in the last 24 h"
+  - id: job_stale
+    severity: critical
+    source: job_runs
+    condition: "len(snap['jobs_stale']) > 0"
+    message: "DAILY_DUES or NIGHTLY_INTEGRITY has no OK run in 26 h"
+  - id: integrity_findings
+    severity: critical
+    source: settings
+    condition: "snap['integrity_findings'] > 0"
+    message: "Nightly integrity reported findings"
+  - id: backup_stale
+    severity: warning
+    source: settings
+    condition: "snap['backup_age_h'] is None or snap['backup_age_h'] > 26"
+    message: "No app-level backup in the last 26 h"
+  - id: db_down
+    severity: critical
+    source: db
+    condition: "not snap['db_ok']"
+    message: "MongoDB ping failed"

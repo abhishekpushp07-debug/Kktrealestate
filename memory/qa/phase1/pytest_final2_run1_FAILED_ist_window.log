@@ -1,0 +1,210 @@
+bringing up nodes...
+bringing up nodes...
+
+........................................................................ [  9%]
+........................................................................ [ 19%]
+........................................................................ [ 29%]
+...........................................F..............sF.........F.. [ 39%]
+........................................................................ [ 49%]
+........................................................................ [ 59%]
+........................................................................ [ 69%]
+........................................................................ [ 79%]
+...........................................................sss.......... [ 89%]
+.....................................s......s........................... [ 99%]
+.......                                                                  [100%]
+=================================== FAILURES ===================================
+_________________________ test_payment_reverse_effects _________________________
+[gw1] linux -- Python 3.11.18 /root/.venv/bin/python
+
+H = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxODBlMTgyOC02OTBjLTRmN2ItYjdiOS1lNDI0MTNiMjB...zLCJleHAiOjE3OTQ3NzExNTN9.Uj8R6VABMWKcqGBbfETAF0fNcw12DT-xj2Mva_PdNfU', 'X-Rate-Limit-Bypass': 'kkt-test-bypass-local'}
+registry = {'lead.create': {'event': 'lead.create', 'entity': 'lead', 'surfaces': ['leads', 'home', 'bootstrap', 'reports', 'sear...d.convert', 'entity': 'lead', 'surfaces': ['leads', 'home', 'reports', 'audit', 'customer360'], 'roles': [], ...}, ...}
+booking = {'b': {'id': 'e8618307-6d34-4f63-8b6c-34f0cc6d033e', 'company_id': 'ce127b4f-3997-45da-a7b0-1fe952915495', 'created_at...ony', 'line2': None, 'city': 'Patna', 'state': 'Bihar', ...}, 'address_permanent': None, ...}, 'price': 6452500.0, ...}
+modes = ({'CASH': {'id': '838d6b1b-b163-45aa-8d06-6d3de9e95d73', 'company_id': 'ce127b4f-3997-45da-a7b0-1fe952915495', 'create...fe952915495', 'created_at': '2026-11-15T18:43:03.333726+00:00', 'updated_at': '2026-11-15T18:43:03.333726+00:00', ...})
+
+    def test_payment_reverse_effects(H, registry, booking, modes):
+        pm, bank = modes
+        b = booking["b"]
+        p = post(
+            H,
+            "/payments",
+            {
+                "booking_id": b["id"],
+                "payment_category": "Cash",
+                "amount": 5000,
+                "payment_date": TODAY,
+                "payment_mode_id": pm["CASH"]["id"],
+                "remarks": "G-effects-rev",
+            },
+        )
+        r = post(H, f"/payments/{p['id']}/reverse", {"reason": "G-effects wrong amount"})
+        assert r["status"] == "Reversed"
+        j = entry(H, "payment", p["id"], "payment.reverse")
+        assert_propagated(j, registry["payment.reverse"]["surfaces"])
+        rz = g(H, "/roznamcha", date=TODAY)
+>       assert any(x["receipt_number"] == p["receipt_number"] for x in rz["reversals"]), (
+            "reversal must appear as a dated contra on the reversal day"
+        )
+E       AssertionError: reversal must appear as a dated contra on the reversal day
+E       assert False
+E        +  where False = any(<generator object test_payment_reverse_effects.<locals>.<genexpr> at 0xfe79ff88af80>)
+
+tests/effects/test_events.py:178: AssertionError
+______________ test_cancel_creates_refund_and_payout_posts_contra ______________
+[gw1] linux -- Python 3.11.18 /root/.venv/bin/python
+
+H = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxODBlMTgyOC02OTBjLTRmN2ItYjdiOS1lNDI0MTNiMjB...zLCJleHAiOjE3OTQ3NzExNTN9.Uj8R6VABMWKcqGBbfETAF0fNcw12DT-xj2Mva_PdNfU', 'X-Rate-Limit-Bypass': 'kkt-test-bypass-local'}
+registry = {'lead.create': {'event': 'lead.create', 'entity': 'lead', 'surfaces': ['leads', 'home', 'bootstrap', 'reports', 'sear...d.convert', 'entity': 'lead', 'surfaces': ['leads', 'home', 'reports', 'audit', 'customer360'], 'roles': [], ...}, ...}
+booking = {'b': {'id': 'e8618307-6d34-4f63-8b6c-34f0cc6d033e', 'company_id': 'ce127b4f-3997-45da-a7b0-1fe952915495', 'created_at...ony', 'line2': None, 'city': 'Patna', 'state': 'Bihar', ...}, 'address_permanent': None, ...}, 'price': 6452500.0, ...}
+
+    def test_cancel_creates_refund_and_payout_posts_contra(H, registry, booking):
+        b = g(H, f"/bookings/{booking['b']['id']}")
+        paid = b["summary"]["paid_paise"]
+        pv = g(H, f"/bookings/{b['id']}/cancellation-preview", deduction=1000)
+        assert (
+            pv["deduction_paise"] == 100000
+            and pv["refund_paise"] == pv["received_paise"] - 100000 - pv["charges_due_paise"]
+            and len(pv["lines"]) >= 4
+        )
+        assert b["summary"]["outstanding_paise"] == max(b["summary"]["cash_due_paise"], 0) + max(
+            b["summary"]["account_due_paise"], 0
+        ) + max(b["summary"]["other_charges_due_paise"], 0)
+        r = post(
+            H, f"/bookings/{b['id']}/cancel", {"reason": "G-effects cancel", "deduction": 1000, "version": b["version"]}
+        )
+        assert (
+            r["status"] == "Cancelled"
+            and r["cancellation"]["refund_paise"] == pv["refund_paise"]
+            and r["cancellation"]["received_paise"] == pv["received_paise"]
+        )
+        rf = r["refund"]
+        # CASH payout must respect cash in hand: set a tiny opening so the rule can be exercised deterministically
+        cash_now = g(H, "/roznamcha", date=TODAY)["closing_cash_paise"]
+        if cash_now < rf["amount_paise"]:
+            rr = requests.post(
+                f"{API}/refunds/{rf['id']}/pay",
+                headers={**H, "Idempotency-Key": str(uuid.uuid4())},
+                json={"paid_date": TODAY, "mode": "CASH", "reference": "x"},
+                timeout=60,
+            )
+            assert rr.status_code == 422 and rr.json()["code"] == "CASH_INSUFFICIENT"
+        bank = g(H, "/master/bank-accounts")["items"][0]
+        pd = post(
+            H,
+            f"/refunds/{rf['id']}/pay",
+            {"paid_date": TODAY, "mode": "NEFT_RTGS", "bank_account_id": bank["id"], "reference": "G-effects-UTR"},
+        )
+        assert pd["status"] == "Paid"
+        jr = entry(H, "refund", rf["id"], "refund.paid")
+        assert_propagated(jr, registry["refund.paid"]["surfaces"])
+        led = g(H, f"/bookings/{b['id']}/ledger")["rows"]
+        refund_rows = [x for x in led if x["type"] == "REFUND"]
+        assert refund_rows and sum(-x["amount_paise"] for x in refund_rows) == rf["amount_paise"]
+        assert led[-1]["total_due_paise"] == 0
+        rz = g(H, "/roznamcha", date=TODAY)
+        assert rz["refunds_paise"] >= rf["amount_paise"]
+        rep = g(H, "/reports/cancellations", from_date=TODAY, to_date=TODAY)
+>       row = next(x for x in rep["rows"] if x["booking_number"] == b["booking_number"])
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       StopIteration
+
+tests/effects/test_events.py:332: StopIteration
+___________________ test_forfeiture_when_nothing_refundable ____________________
+[gw1] linux -- Python 3.11.18 /root/.venv/bin/python
+
+H = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxODBlMTgyOC02OTBjLTRmN2ItYjdiOS1lNDI0MTNiMjB...zLCJleHAiOjE3OTQ3NzExNTN9.Uj8R6VABMWKcqGBbfETAF0fNcw12DT-xj2Mva_PdNfU', 'X-Rate-Limit-Bypass': 'kkt-test-bypass-local'}
+modes = ({'CASH': {'id': '838d6b1b-b163-45aa-8d06-6d3de9e95d73', 'company_id': 'ce127b4f-3997-45da-a7b0-1fe952915495', 'create...fe952915495', 'created_at': '2026-11-15T18:43:03.333726+00:00', 'updated_at': '2026-11-15T18:43:03.333726+00:00', ...})
+
+    def test_forfeiture_when_nothing_refundable(H, modes):
+        """Cancel with deduction == received → forfeiture record (no refund), report shows gross paid + forfeiture."""
+        pm, _ = modes
+        f = g(H, "/flats", status="Available", page_size=3)["items"][-1]
+        cust = g(H, "/customers", page_size=6)["items"][4]
+        price = f.get("price") or 5000000
+        b = post(
+            H,
+            "/bookings",
+            {
+                "flat_id": f["id"],
+                "customer_id": cust["id"],
+                "booking_date": TODAY,
+                "agreement_value": price,
+                "cash_agreed": round(price * 0.6, 2),
+                "account_agreed": round(price - round(price * 0.6, 2), 2),
+                "remarks": "G-forfeit",
+            },
+        )
+        post(
+            H,
+            "/payments",
+            {
+                "booking_id": b["id"],
+                "payment_category": "Cash",
+                "amount": 20000,
+                "payment_date": TODAY,
+                "payment_mode_id": pm["CASH"]["id"],
+                "remarks": "G-forfeit",
+            },
+        )
+        r = post(H, f"/bookings/{b['id']}/cancel", {"reason": "G-forfeit cancel", "deduction": 20000})
+        assert r["cancellation"]["refund_paise"] == 0 and r["cancellation"]["forfeiture_paise"] == 2000000
+        assert r["refund"]["status"] == "Forfeited" and r["refund"]["kind"] == "forfeiture"
+        rep = g(H, "/reports/cancellations", from_date=TODAY, to_date=TODAY)
+>       row = next(x for x in rep["rows"] if x["booking_number"] == b["booking_number"])
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       StopIteration
+
+tests/effects/test_events.py:383: StopIteration
+=============================== warnings summary ===============================
+../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
+../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
+  /root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12: PendingDeprecationWarning: Please use `import python_multipart` instead.
+    import multipart
+
+../../root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854
+../../root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854
+  /root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854: DeprecationWarning: 'crypt' is deprecated and slated for removal in Python 3.13
+    from crypt import crypt as _crypt
+
+tests/test_startup_s1_s3_idempotent.py:71
+tests/test_startup_s1_s3_idempotent.py:71
+  /app/backend/tests/test_startup_s1_s3_idempotent.py:71: PytestUnknownMarkWarning: Unknown pytest.mark.timeout - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.timeout(900)
+
+tests/test_phase_k_p1.py::test_loadshed_sheds_with_prebuilt_503_and_exempts_probes
+  /root/.venv/lib/python3.11/site-packages/starlette/testclient.py:41: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    [], typing.ContextManager[anyio.abc.BlockingPortal]
+
+tests/test_phase_q.py::test_void_watermark_deterministic
+tests/test_phase_q.py::test_void_watermark_deterministic
+tests/test_phase_q.py::test_void_watermark_deterministic
+tests/test_phase_q.py::test_void_watermark_deterministic
+tests/test_phase_q.py::test_void_watermark_deterministic
+tests/test_phase_q.py::test_void_watermark_deterministic
+tests/test_phase_q.py::test_void_watermark_deterministic
+tests/test_phase_q.py::test_void_watermark_deterministic
+  /root/.venv/lib/python3.11/site-packages/pypdf/_page.py:1368: DeprecationWarning: Calling `PageObject.replace_contents()` for pages not assigned to a writer is deprecated and will be removed in pypdf 7.0.0. Attach the page to the writer first or use `PdfWriter(clone_from=...)` directly. The existing approach has proved being unreliable.
+    self.replace_contents(ContentStream(new_content_array, self.pdf))
+
+tests/test_kkt_erp.py::TestBlock::test_create_block_and_generation
+tests/test_kkt_erp.py::TestFlatType::test_create_flat_type_auto_area
+tests/test_phase_7.py::TestPortalPhase7::test_portal_booking_payment_plan
+tests/test_phase_7.py::TestPortalPhase7::test_portal_booking_payment_plan
+  /root/.venv/lib/python3.11/site-packages/_pytest/fixtures.py:1313: PytestRemovedIn10Warning: Class-scoped fixture defined as instance method is deprecated.
+  Instance attributes set in this fixture will NOT be visible to test methods,
+  as each test gets a new instance while the fixture runs only once per class.
+  Use @classmethod decorator and set attributes on cls instead.
+  See https://docs.pytest.org/en/stable/deprecations.html#class-scoped-fixture-as-instance-method
+    fixturefunc = resolve_fixture_function(fixturedef, request)
+
+tests/test_phase_5.py::TestPortalData::test_booking_detail_and_subresources
+  /root/.venv/lib/python3.11/site-packages/_pytest/python.py:171: PytestReturnNotNoneWarning: Test functions should return None, but tests/test_phase_5.py::TestPortalData::test_booking_detail_and_subresources returned <class 'str'>.
+  Did you mean to use `assert` instead of `return`?
+  See https://docs.pytest.org/en/stable/how-to/assert.html#return-not-none for more information.
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/effects/test_events.py::test_payment_reverse_effects - Assertion...
+FAILED tests/effects/test_events.py::test_cancel_creates_refund_and_payout_posts_contra
+FAILED tests/effects/test_events.py::test_forfeiture_when_nothing_refundable
+3 failed, 718 passed, 6 skipped, 20 warnings in 651.49s (0:10:51)

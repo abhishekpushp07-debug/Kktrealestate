@@ -1,0 +1,1 @@
+ESLint (npx eslint --no-eslintrc -c .eslintrc.cli.cjs --max-warnings 0 src), 2026-11-14: exit 0 — 0 errors, 0 warnings

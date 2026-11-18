@@ -1,0 +1,129 @@
+{
+  "iteration_note": "Phase 2 batch (a). Number picked as next unused after the existing reports; rename it if that clashes.",
+  "passed": 8,
+  "failed": 2,
+  "retest_needed": true,
+  "bugs": [
+    {
+      "severity": "medium",
+      "criterion": "JRN-42 Cancel → refund, every screen agrees",
+      "title": "A paid cash refund never shows up on the Roznamcha screen",
+      "evidence": "Refund RF-2627-0976 (₹40,000, CASH) was paid through the booking Refunds tab: POST /refunds/{id}/pay → 200. GET /api/roznamcha?date=2026-11-16 returns refunds=40000.0 and cash_refunds=40000.0, and closing cash includes it. But the /roznamcha page shows no refund row or tile: no 'Refund' and no 'RF-' anywhere in main. The only place the word appears is the closing-cash formula note. Data is written but never displayed."
+    },
+    {
+      "severity": "medium",
+      "criterion": "JRN-44 Both themes readable",
+      "title": "axe colour-contrast (AA) fails on the booking avatar and a tiny Customer 360 badge",
+      "evidence": "axe-core 4.11 color-contrast, checked after animations finished, 2 consistent runs. Light: home 0, booking 1, customer360 1, outstanding 0, masters 0. Night: home 0, booking 1, customer360 1, outstanding 0, masters 0. Booking header monogram tile ('PV', gold text, ~17pt, normal weight) measures 3.01:1 in Light and about 1.8:1 in Night. In Night the tile inverts to a near-white background with gold text, which fails, so it is not covered by the 'chips pass contrast' known-cosmetic deviation. Customer 360: an 8px badge also fails in both themes. Backend is healthy: the pages render their full data."
+    }
+  ],
+  "action_items": [
+    {
+      "type": "note",
+      "severity": "medium",
+      "item": "JRN-42 spec vs policy: on GGV P1 (₹1 Cr) the system's default policy deducts 2% of agreement (₹2,00,000), capped at received. A ₹50,000 payment therefore becomes a forfeiture with ₹0 refund (BK-2627-2437, 'Forfeited'). To exercise the refund path, the check enters a manual deduction of ₹10,000 in the cancel dialog's override field, giving a ₹40,000 refund. That figure is not the system-calculated one, so either the journey's amount or the policy needs revisiting."
+    },
+    {
+      "type": "note",
+      "severity": "low",
+      "item": "JRN-42 'letters VOID': a booking created and cancelled in the same session has no letters. The Documents tab shows 'No documents', so letter voiding could not be observed. Builder-evidenced only."
+    },
+    {
+      "type": "note",
+      "severity": "low",
+      "item": "JRN-40: a Cash-mode ₹10,000 payment on BK-2526-2275 is applied to the oldest open bill (Club Membership other charge). So Home Money today moves in its 'Other' bucket, not 'Cash'. The total, booking Outstanding, Customer 360 Balance and Roznamcha total each moved by exactly ₹10,000 and all returned after the reversal. The Roznamcha 'Cash received' tile is gross: it keeps reversed receipts and shows the reversal separately; closing cash nets it out. The API's cash_received is 333,128 and closing_cash is back to its before value. This is a design choice; flagging it in case 'every number returns' is meant literally."
+    },
+    {
+      "type": "note",
+      "severity": "low",
+      "item": "JRN-41 was run on SGH Tower B (Plastering, 16 bookings, preview ₹1,43,58,750). Ye/Orion has 0 bookings (next stage Plinth) and Villa Block P has 0 active bookings, so neither can be billed. Tower C was not touched."
+    },
+    {
+      "type": "note",
+      "severity": "low",
+      "item": "JRN-41 run logged 12 console 404 'Failed to load resource' errors. Not investigated; they did not affect the flow."
+    },
+    {
+      "type": "improvement",
+      "severity": "low",
+      "item": "At phone width, the open mobile menu drawer does not close on Escape; the close button has to be used."
+    },
+    {
+      "type": "residue",
+      "severity": "medium",
+      "item": "Changes this run made outside the tscheck namespace, all as the briefing asked: (1) 3 reversed ₹10,000 Cash receipts on demo booking BK-2526-2275 (KKT/2627/26263, 26264, 26265; the extra ones came from script retries, all reversed). Balances are back to before, but today's Roznamcha lists them as Reversed. (2) SGH Tower B Plastering was completed and then undone: 16 demands voided, 128 notifications retracted; Bills raised and Next billing milestone are back to before. Inside the tscheck namespace: customer tscheck-jrn42-30739 (CUST-2627-7045) with cancelled bookings BK-2627-2435 to 2439 on GGV P1 (P1 is Available again). Three ₹50,000 receipts on those bookings stay Cleared in today's collections (+₹1,50,000 to Money today), and refunds RF-2627-0975 and 0976 (₹40,000 each) were paid. Admin theme reset to Light."
+    }
+  ],
+  "checks": [
+    {
+      "criterion": "JRN-40 One payment, every screen agrees",
+      "name": "jrn40-payment-every-screen",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Payment posted via New → Payment on BK-2526-2275 (₹10,000 Cash, POST /payments 201). Changes: booking Outstanding −10,000; Customer 360 Balance −10,000; Home money_today total +10,000; Roznamcha total +10,000. The allocation preview and Charges tab match (Club Membership). 'Where this entry went' lists the receipt. Reversed from the booking Payments tab (200), after which every number returned, including the Collections Today net."
+    },
+    {
+      "criterion": "JRN-41 Stage complete, every screen agrees",
+      "name": "jrn41-stage-complete-every-screen",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Tower B preview: '16 booking(s) … total ₹1,43,58,750'. Completing it: POST /blocks/{id}/construction/stage → 200. Bills raised 580→596 (+16), total +14,358,750 (matches the preview exactly). Next milestone moved Plastering→Finishing. Undo → 200 (demands_voided 16), after which bills are back to 580 / 375,481,053 and Next milestone is back to Plastering ₹1.44 Cr."
+    },
+    {
+      "criterion": "JRN-42 Cancel → refund, every screen agrees",
+      "name": "jrn42-cancel-refund-every-screen",
+      "lane": "browser",
+      "status": "failed",
+      "evidence": "3-step wizard (Who · Price & Plan · Confirm): POST /bookings 201 (BK-2627-2439); ₹50,000 Cash payment 201; cancel 200; refund paid 200. Afterwards: Home Flat status P1 Available, Inventory-by-tower available back to 6 (was 5), Inventory page P1 Available, Outstanding back to the before value. Cancellations & refunds row: BK-2627-2439 · ₹50,000 · ₹10,000 · ₹40,000 · Paid. FAILED: no refund entry on the Roznamcha screen (see bugs)."
+    },
+    {
+      "criterion": "JRN-43 + JRN-45 Light / Night switch remembered, no flash",
+      "name": "theme-light-night-remembered",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Switch shows exactly [Light, Night]. Night PATCH → 200; widths and ₹ figures identical between Light and Night. In a fresh browser context after login: 0 shell frames rendered in light, html data-theme=night. With PATCH aborted, the theme still changes and 'Theme not saved — will retry' shows. Reset to Light → 200."
+    },
+    {
+      "criterion": "JRN-43 + JRN-45 Light / Night switch remembered, no flash",
+      "name": "test_tscheck_theme_prefs.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "PATCH /auth/me/preferences night → 200; 'auto' → 422; light → 200; with no token → 401."
+    },
+    {
+      "criterion": "JRN-44 Both themes readable",
+      "name": "themes-contrast-axe",
+      "lane": "browser",
+      "status": "failed",
+      "evidence": "axe color-contrast found 4 violations across 10 page/theme combinations: booking avatar tile in both themes (3.01:1 Light, about 1.8:1 Night) and the Customer 360 8px badge in both themes. Home, Outstanding & ageing and Masters: 0 in both themes."
+    },
+    {
+      "criterion": "JRN-46 + JRN-48 Sidebar 9 areas + New menu",
+      "name": "shell-sidebar-new-menu",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Sidebar order is Home…Admin, and Payments contains Received / Bills raised / Roznamcha. Collapsed width persists after reload. New menu is exactly [Booking, Payment, Lead, Customer, Site visit]; Booking opens the 3-step wizard; Payment opens the sheet. sales@kkt.in sees no Admin."
+    },
+    {
+      "criterion": "JRN-47 ⌘K search",
+      "name": "cmdk-search-grouped",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Ctrl+K: customer name, phone, BK, KKT receipt and C-1604 each show the expected group. ArrowDown + Enter opens the booking. Nonsense query shows 'No match for ‘zzqxnonsense’' with New customer and New lead."
+    },
+    {
+      "criterion": "JRN-47 ⌘K search",
+      "name": "test_tscheck_search_groups.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "GET /search returns 200 with the expected group for all 5 queries, each under 400 ms server round-trip; nonsense query returns empty groups."
+    },
+    {
+      "criterion": "JRN-49 + JRN-50 Never blank, phone width",
+      "name": "never-blank-and-phone-width",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "With CDP Fast-3G throttling, clicking all 10 areas gave 0 blank frames (skeleton or content every frame) and 0 console errors. At 390×844 in Light and Night: overflow 0 px on Home, Bookings list, booking and Customer 360; mobile-menu button present and the menu opens."
+    }
+  ]
+}

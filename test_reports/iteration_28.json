@@ -1,0 +1,35 @@
+{
+  "summary": "E8 — End-to-end verification of Undo persistence on Leads & Service Requests kanbans (via API assertions AFTER Undo + audit log), ₹ Y-axis labels, pincode auto-fill, 60/40 SGH booking, and ₹10,000 cash payment. The shared `frontend/src/lib/undo.js` helper works as specified: Undo awaits the reverting POST, toast shows 'Reverted · …', and backend state actually reverts. Independent-tester regression on LD-2627-0102 is fixed: forward POST /leads/{id}/stage → 1 request (200); Undo → 2nd POST (200); GET lead shows status 'New'; audit shows ≥2 lead.stage entries. Same contract verified for /service-requests/{id}/status.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_e8_undo_api.py",
+    "/app/test_reports/pytest/e8_results.xml",
+    "/app/memory/qa/frontend/e8_leads_undo_toast.jpeg",
+    "/app/memory/qa/frontend/e8_leads_reverted.jpeg",
+    "/app/memory/qa/frontend/e8_sr_undo_toast.jpeg",
+    "/app/memory/qa/frontend/e8_sr_reverted.jpeg",
+    "/app/memory/qa/frontend/e8_dashboard_axis.jpeg",
+    "/app/memory/qa/frontend/e8_pincode_autofill.jpeg",
+    "/app/memory/qa/frontend/e8_wizard_step1.jpeg"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "frontend/src/lib/undo.js correctly awaits onUndo() before toasting the Reverted message, so no premature success is shown while the revert POST is in flight.",
+    "frontend/src/pages/v2/Leads.jsx move() captures the forward response version and threads it as `version` into the revert POST, avoiding 409 VERSION_CONFLICT; ServiceRequests.jsx move() revert POST does not need version (no optimistic lock on SR status).",
+    "Backend writes a fresh `lead.stage` / `service.status` audit entry for the reverting POST (same action name as forward), so audit history correctly shows two entries (forward + revert) rather than a single net-zero collapse."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_e8_undo_api.py (new regression)"
+  ],
+  "success_rate": {
+    "backend": "100% — 4/4 (lead undo persistence, service undo persistence, Kankarbagh pincode = 800020, SGH 60/40 booking + ₹10,000 cash receipt KKT/…)",
+    "frontend": "100% — Leads kanban Undo (POST count 1→2, 'Reverted · Arvind Kumar back in New'); SR kanban Undo (POST count 1→2, 'Reverted · SR-2627-0009 back in New'); pincode Bihar→Patna→Kankarbagh auto-fills 800020 (readOnly, 'Auto-filled from locality'); dashboard & reports chart Y-axes render ₹ labels (visible in screenshot)."
+  },
+  "test_credentials": "admin@kkt.in / Kkt@12345 (Super Admin), accounts@kkt.in / Kkt@12345 (Accounts role for ₹10,000 cash receipt).",
+  "seed_data_creation": "Created one new SGH booking + ₹10,000 Cash payment (receipt KKT/2627/…) through API during test_sgh_booking_60_40_and_cash_payment. The protected seed BK-2627-0001 / KKT/2627/00049 was NOT touched. A new TEST SR was auto-created by the SR seed system but tests only toggled status on seed SRs then reverted. All lead/SR status toggles end with the entity back in its original state (New).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Independent tester's LD-2627-0102 complaint (stayed in 'Contacted' after Undo) is NOT reproducible on the current build. API-level proof: POST /api/leads/{id}/stage fires exactly once on forward, exactly once more on Undo (both 200), GET /api/leads/{id} returns status='New' after Undo, GET /api/audit-logs?entity_type=lead&entity_id={id} returns ≥2 lead.stage entries. Identical pattern on /service-requests/{id}/status. The sonner toast action onClick in frontend/src/lib/undo.js awaits onUndo() before toast.success('Reverted'), so the Reverted toast is only shown after the reverting POST resolves. Regression test checked in: `cd /app/backend && python -m pytest tests/test_e8_undo_api.py -v`.",
+  "rca of the issue": "The previously-reported 'Undo didn't persist' bug was fixed by routing both kanban moves through the shared `undoToast` helper in frontend/src/lib/undo.js, which (a) awaits the revert POST before toasting success, (b) uses the forward response's `version` so the revert PATCH does not 409, and (c) returns the human message so sonner shows 'Reverted · … back in …'. The Leads.jsx and ServiceRequests.jsx move() functions each supply their own onUndo callback that performs the second POST and updates local state. API assertions after Undo now confirm the state is actually reverted in Mongo, with two matching audit entries."
+}

@@ -1,0 +1,41 @@
+{
+ "before_rebuild": {
+  "lead_number:2425": 32,
+  "visit_number:2526": 544,
+  "customer_number:2526": 636,
+  "booking_number:2526": 611,
+  "demand_number:2526": 2443,
+  "receipt_number:2526": 3808,
+  "lead_number:2526": 622,
+  "visit_number:2425": 2,
+  "refund_number:2526": 18,
+  "receipt_number:2627": 6705,
+  "demand_number:2627": 4140,
+  "visit_number:2627": 336,
+  "customer_number:2627": 6369,
+  "booking_number:2627": 1759,
+  "lead_number:2627": 4133,
+  "service_request_number:2627": 392,
+  "refund_number:2627": 973
+ },
+ "after_rebuild": {
+  "lead_number:2425": 35,
+  "visit_number:2526": 603,
+  "customer_number:2526": 704,
+  "booking_number:2526": 677,
+  "demand_number:2526": 2709,
+  "receipt_number:2526": 4225,
+  "lead_number:2526": 690,
+  "visit_number:2425": 2,
+  "refund_number:2526": 20,
+  "receipt_number:2627": 7316,
+  "demand_number:2627": 4423,
+  "visit_number:2627": 374,
+  "customer_number:2627": 6393,
+  "booking_number:2627": 1783,
+  "lead_number:2627": 4190,
+  "service_request_number:2627": 411,
+  "refund_number:2627": 973
+ },
+ "lowered": {}
+}

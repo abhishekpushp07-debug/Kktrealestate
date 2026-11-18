@@ -1,0 +1,28 @@
+# Perf budget — 2026-11-17 13:43 UTC
+
+Scratch copy of the preview DB, private backend (1 worker, no reload), 30 warm requests per path after 2 warm-ups; server time = `Server-Timing: total`.
+
+| Kind | Path | Endpoint | p50 ms | p95 ms | first ms | Budget p95 | Within |
+|---|---|---|---|---|---|---|---|
+| hot | Home Command Center (month) | `/api/home/bundle?period=month` | 9.5 | 10.5 | 866.0 | ≤ 200 | yes |
+| hot | Home Command Center (FY) | `/api/home/bundle?period=fy` | 9.2 | 9.9 | 731.0 | ≤ 200 | yes |
+| hot | Home Command Center (Today, project) | `/api/home/bundle?period=today&project_id=kkt-reports-hub--7kz2bq77` | 5.5 | 7.8 | 231.0 | ≤ 200 | yes |
+| hot | Home legacy snapshot | `/api/dashboard/home` | 3.4 | 3.9 | 202.4 | ≤ 200 | yes |
+| hot | Project list | `/api/projects?page_size=50` | 32.1 | 33.7 | 34.4 | ≤ 200 | yes |
+| hot | Project detail | `/api/projects/40d134fe-edbd-4103-a07e-a7c7b1e24060` | 15.3 | 17.0 | 21.8 | ≤ 200 | yes |
+| hot | Booking detail | `/api/bookings/0005e168-15b5-46f1-9e33-c750f1c43a17` | 6.0 | 6.4 | 6.5 | ≤ 200 | yes |
+| hot | Customer 360 | `/api/customers/156b29a3-ad82-4b3c-93c6-52e39fc044b7` | 7.1 | 7.6 | 14.5 | ≤ 200 | yes |
+| hot | Bills raised page | `/api/demands/register?page_size=50` | 195.7 | 198.8 | 428.1 | ≤ 200 | yes |
+| hot | Unit grid | `/api/flats?block_id=kkt-reports-hub--7kz2bq77&page_size=200` | 4.9 | 5.1 | 9.7 | ≤ 200 | yes |
+| hot | Catalogues bundle | `/api/catalogues` | 5.9 | 6.2 | 30.7 | ≤ 200 | yes |
+| report | FY collections | `/api/reports/collections-v2?from_date=2026-04-01&to_date=2026-11-17` | 680.0 | 766.4 | 710.8 | ≤ 100 | NO |
+| report | Outstanding & ageing | `/api/reports/outstanding-v2` | 256.5 | 312.7 | 262.7 | ≤ 100 | NO |
+| write | Post payment (auto allocation + ledger) | `POST /api/payments` | 131.1 | 176.8 |  | ≤ 600 | yes |
+| write | Create booking | `POST /api/bookings` | 373.7 | 582.5 |  | ≤ 600 | yes |
+| write | Stage complete (33 bookings) | `POST /api/blocks/{id}/construction/stage` | 2823.7 | 3032.5 |  | ≤ 600 | NO |
+
+Reports: `first` = first call (uncached budget ≤ 800 ms); p50/p95 = cached repeats (budget ≤ 100 ms).
+
+Initial JS (gzip, scripts in build/index.html): **112.6 KB** (budget ≤ 250 KB) — /static/js/main.fcd66b0b.js
+
+EXIT 0

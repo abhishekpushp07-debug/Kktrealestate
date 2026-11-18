@@ -1,0 +1,303 @@
+{
+ "vus": 50,
+ "duration_s": 62,
+ "requests": 2903,
+ "rps": 46.8,
+ "stopped": null,
+ "errors": {
+  "client:RemoteProtocolError": 4,
+  "409": 447
+ },
+ "assertions": {
+  "lead_created:ok": 509,
+  "lead_converted:ok": 509,
+  "booking_created:ok": 49,
+  "booking_total_matches_preview:ok": 49,
+  "payment_posted:ok": 49,
+  "c360_shows_booking:ok": 46,
+  "ledger_received_equals_payment:ok": 46,
+  "ledger_bill_raised_positive:ok": 46,
+  "inventory_flat_booked:ok": 46,
+  "receipt_pdf:ok": 46,
+  "booking_created:FAIL": 451,
+  "demand_register:ok": 46,
+  "project_statement:ok": 46,
+  "integrity_ok_after_stage:ok": 1
+ },
+ "failed_assertions": [
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: "
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: "
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: "
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: "
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: POST /api/bookings -> 409 {\"detail\":\"Flat LA-1402 is Booked\",\"code\":\"FLAT_NOT_AVAILABLE\",\"request_id\":\"99e8bae87503409c\",\"error\":{\"code\":\"FLAT_NOT_AVAILABLE\",\"message\":\"Flat LA-14"
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: POST /api/bookings -> 409 {\"detail\":\"Flat LA-1702 is Booked\",\"code\":\"FLAT_NOT_AVAILABLE\",\"request_id\":\"7bfbb85ce6de4fc5\",\"error\":{\"code\":\"FLAT_NOT_AVAILABLE\",\"message\":\"Flat LA-17"
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: POST /api/bookings -> 409 {\"detail\":\"Flat LA-1702 is Booked\",\"code\":\"FLAT_NOT_AVAILABLE\",\"request_id\":\"d4f69bf40682422d\",\"error\":{\"code\":\"FLAT_NOT_AVAILABLE\",\"message\":\"Flat LA-17"
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: POST /api/bookings -> 409 {\"detail\":\"Flat LA-1402 is Booked\",\"code\":\"FLAT_NOT_AVAILABLE\",\"request_id\":\"b2569d1c15ba4646\",\"error\":{\"code\":\"FLAT_NOT_AVAILABLE\",\"message\":\"Flat LA-14"
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: POST /api/bookings -> 409 {\"detail\":\"Flat LA-1204 is Booked\",\"code\":\"FLAT_NOT_AVAILABLE\",\"request_id\":\"d185f29936af4881\",\"error\":{\"code\":\"FLAT_NOT_AVAILABLE\",\"message\":\"Flat LA-12"
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: POST /api/bookings -> 409 {\"detail\":\"Flat LA-1204 is Booked\",\"code\":\"FLAT_NOT_AVAILABLE\",\"request_id\":\"9e28cd0e819d4dcf\",\"error\":{\"code\":\"FLAT_NOT_AVAILABLE\",\"message\":\"Flat LA-12"
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: POST /api/bookings -> 409 {\"detail\":\"Flat LA-1204 is Booked\",\"code\":\"FLAT_NOT_AVAILABLE\",\"request_id\":\"6bd4463a27c843f6\",\"error\":{\"code\":\"FLAT_NOT_AVAILABLE\",\"message\":\"Flat LA-12"
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: POST /api/bookings -> 409 {\"detail\":\"Flat LA-1204 is Booked\",\"code\":\"FLAT_NOT_AVAILABLE\",\"request_id\":\"3974f6ae3ddc4ab9\",\"error\":{\"code\":\"FLAT_NOT_AVAILABLE\",\"message\":\"Flat LA-12"
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: POST /api/bookings -> 409 {\"detail\":\"Flat LA-1204 is Booked\",\"code\":\"FLAT_NOT_AVAILABLE\",\"request_id\":\"3307a78a2b6c4aed\",\"error\":{\"code\":\"FLAT_NOT_AVAILABLE\",\"message\":\"Flat LA-12"
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: POST /api/bookings -> 409 {\"detail\":\"Flat LA-1204 is Booked\",\"code\":\"FLAT_NOT_AVAILABLE\",\"request_id\":\"f088494e79004985\",\"error\":{\"code\":\"FLAT_NOT_AVAILABLE\",\"message\":\"Flat LA-12"
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: POST /api/bookings -> 409 {\"detail\":\"Flat LA-1204 is Booked\",\"code\":\"FLAT_NOT_AVAILABLE\",\"request_id\":\"0c587a08f06e459b\",\"error\":{\"code\":\"FLAT_NOT_AVAILABLE\",\"message\":\"Flat LA-12"
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: POST /api/bookings -> 409 {\"detail\":\"Flat LA-1204 is Booked\",\"code\":\"FLAT_NOT_AVAILABLE\",\"request_id\":\"61d56170d8d1437e\",\"error\":{\"code\":\"FLAT_NOT_AVAILABLE\",\"message\":\"Flat LA-12"
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: POST /api/bookings -> 409 {\"detail\":\"Flat LA-1204 is Booked\",\"code\":\"FLAT_NOT_AVAILABLE\",\"request_id\":\"d422502219a8430b\",\"error\":{\"code\":\"FLAT_NOT_AVAILABLE\",\"message\":\"Flat LA-12"
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: POST /api/bookings -> 409 {\"detail\":\"Flat LA-1204 is Booked\",\"code\":\"FLAT_NOT_AVAILABLE\",\"request_id\":\"783aa5fe214d459a\",\"error\":{\"code\":\"FLAT_NOT_AVAILABLE\",\"message\":\"Flat LA-12"
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: POST /api/bookings -> 409 {\"detail\":\"Flat LA-1402 is Booked\",\"code\":\"FLAT_NOT_AVAILABLE\",\"request_id\":\"5fbb272f39e3430e\",\"error\":{\"code\":\"FLAT_NOT_AVAILABLE\",\"message\":\"Flat LA-14"
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: POST /api/bookings -> 409 {\"detail\":\"Flat LA-1402 is Booked\",\"code\":\"FLAT_NOT_AVAILABLE\",\"request_id\":\"362d9875b4494f61\",\"error\":{\"code\":\"FLAT_NOT_AVAILABLE\",\"message\":\"Flat LA-14"
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: POST /api/bookings -> 409 {\"detail\":\"Flat LA-1204 is Booked\",\"code\":\"FLAT_NOT_AVAILABLE\",\"request_id\":\"a0edc2b13d214d35\",\"error\":{\"code\":\"FLAT_NOT_AVAILABLE\",\"message\":\"Flat LA-12"
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: POST /api/bookings -> 409 {\"detail\":\"Flat LA-1204 is Booked\",\"code\":\"FLAT_NOT_AVAILABLE\",\"request_id\":\"4033d99b664c4453\",\"error\":{\"code\":\"FLAT_NOT_AVAILABLE\",\"message\":\"Flat LA-12"
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: POST /api/bookings -> 409 {\"detail\":\"Flat LA-1204 is Booked\",\"code\":\"FLAT_NOT_AVAILABLE\",\"request_id\":\"dfb1d192d6e246e3\",\"error\":{\"code\":\"FLAT_NOT_AVAILABLE\",\"message\":\"Flat LA-12"
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: POST /api/bookings -> 409 {\"detail\":\"Flat LA-1204 is Booked\",\"code\":\"FLAT_NOT_AVAILABLE\",\"request_id\":\"9a7520ef77e54884\",\"error\":{\"code\":\"FLAT_NOT_AVAILABLE\",\"message\":\"Flat LA-12"
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: POST /api/bookings -> 409 {\"detail\":\"Flat LA-1204 is Booked\",\"code\":\"FLAT_NOT_AVAILABLE\",\"request_id\":\"a792bb7419474852\",\"error\":{\"code\":\"FLAT_NOT_AVAILABLE\",\"message\":\"Flat LA-12"
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: POST /api/bookings -> 409 {\"detail\":\"Flat LA-1702 is Booked\",\"code\":\"FLAT_NOT_AVAILABLE\",\"request_id\":\"f7de89a7b1f546a9\",\"error\":{\"code\":\"FLAT_NOT_AVAILABLE\",\"message\":\"Flat LA-17"
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: POST /api/bookings -> 409 {\"detail\":\"Flat LA-1402 is Booked\",\"code\":\"FLAT_NOT_AVAILABLE\",\"request_id\":\"2d07aca30ec74bde\",\"error\":{\"code\":\"FLAT_NOT_AVAILABLE\",\"message\":\"Flat LA-14"
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: POST /api/bookings -> 409 {\"detail\":\"Flat LA-1402 is Booked\",\"code\":\"FLAT_NOT_AVAILABLE\",\"request_id\":\"37f98cd3bc39454f\",\"error\":{\"code\":\"FLAT_NOT_AVAILABLE\",\"message\":\"Flat LA-14"
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: POST /api/bookings -> 409 {\"detail\":\"Flat LA-1402 is Booked\",\"code\":\"FLAT_NOT_AVAILABLE\",\"request_id\":\"ce690773d4bd4aad\",\"error\":{\"code\":\"FLAT_NOT_AVAILABLE\",\"message\":\"Flat LA-14"
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: POST /api/bookings -> 409 {\"detail\":\"Flat LA-1402 is Booked\",\"code\":\"FLAT_NOT_AVAILABLE\",\"request_id\":\"348461a848ae422f\",\"error\":{\"code\":\"FLAT_NOT_AVAILABLE\",\"message\":\"Flat LA-14"
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: POST /api/bookings -> 409 {\"detail\":\"Flat LA-1402 is Booked\",\"code\":\"FLAT_NOT_AVAILABLE\",\"request_id\":\"20776de669414a40\",\"error\":{\"code\":\"FLAT_NOT_AVAILABLE\",\"message\":\"Flat LA-14"
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: POST /api/bookings -> 409 {\"detail\":\"Flat LA-1402 is Booked\",\"code\":\"FLAT_NOT_AVAILABLE\",\"request_id\":\"98a5f68959d344f2\",\"error\":{\"code\":\"FLAT_NOT_AVAILABLE\",\"message\":\"Flat LA-14"
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: POST /api/bookings -> 409 {\"detail\":\"Flat LA-1402 is Booked\",\"code\":\"FLAT_NOT_AVAILABLE\",\"request_id\":\"7adfb7577edb4c0e\",\"error\":{\"code\":\"FLAT_NOT_AVAILABLE\",\"message\":\"Flat LA-14"
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: POST /api/bookings -> 409 {\"detail\":\"Flat LA-1702 is Booked\",\"code\":\"FLAT_NOT_AVAILABLE\",\"request_id\":\"d50b69f1b5fe427c\",\"error\":{\"code\":\"FLAT_NOT_AVAILABLE\",\"message\":\"Flat LA-17"
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: POST /api/bookings -> 409 {\"detail\":\"Flat LA-1702 is Booked\",\"code\":\"FLAT_NOT_AVAILABLE\",\"request_id\":\"0a2eb6e2ba594fba\",\"error\":{\"code\":\"FLAT_NOT_AVAILABLE\",\"message\":\"Flat LA-17"
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: POST /api/bookings -> 409 {\"detail\":\"Flat LA-1402 is Booked\",\"code\":\"FLAT_NOT_AVAILABLE\",\"request_id\":\"6f13e385a9a44649\",\"error\":{\"code\":\"FLAT_NOT_AVAILABLE\",\"message\":\"Flat LA-14"
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: POST /api/bookings -> 409 {\"detail\":\"Flat LA-1402 is Booked\",\"code\":\"FLAT_NOT_AVAILABLE\",\"request_id\":\"ef7372a6838a4b80\",\"error\":{\"code\":\"FLAT_NOT_AVAILABLE\",\"message\":\"Flat LA-14"
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: POST /api/bookings -> 409 {\"detail\":\"Flat LA-1402 is Booked\",\"code\":\"FLAT_NOT_AVAILABLE\",\"request_id\":\"6f602682d39b4ad9\",\"error\":{\"code\":\"FLAT_NOT_AVAILABLE\",\"message\":\"Flat LA-14"
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: POST /api/bookings -> 409 {\"detail\":\"Flat LA-1702 is Booked\",\"code\":\"FLAT_NOT_AVAILABLE\",\"request_id\":\"bfb95f7cc6324a1c\",\"error\":{\"code\":\"FLAT_NOT_AVAILABLE\",\"message\":\"Flat LA-17"
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: POST /api/bookings -> 409 {\"detail\":\"Flat LA-1702 is Booked\",\"code\":\"FLAT_NOT_AVAILABLE\",\"request_id\":\"72a1c8b180f44964\",\"error\":{\"code\":\"FLAT_NOT_AVAILABLE\",\"message\":\"Flat LA-17"
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: POST /api/bookings -> 409 {\"detail\":\"Flat LA-1702 is Booked\",\"code\":\"FLAT_NOT_AVAILABLE\",\"request_id\":\"41417ead2d384043\",\"error\":{\"code\":\"FLAT_NOT_AVAILABLE\",\"message\":\"Flat LA-17"
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: POST /api/bookings -> 409 {\"detail\":\"Flat LA-1402 is Booked\",\"code\":\"FLAT_NOT_AVAILABLE\",\"request_id\":\"710c7993a2bf4883\",\"error\":{\"code\":\"FLAT_NOT_AVAILABLE\",\"message\":\"Flat LA-14"
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: POST /api/bookings -> 409 {\"detail\":\"Flat LA-1702 is Booked\",\"code\":\"FLAT_NOT_AVAILABLE\",\"request_id\":\"fd7a21dae5af4203\",\"error\":{\"code\":\"FLAT_NOT_AVAILABLE\",\"message\":\"Flat LA-17"
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: POST /api/bookings -> 409 {\"detail\":\"Flat LA-1402 is Booked\",\"code\":\"FLAT_NOT_AVAILABLE\",\"request_id\":\"c13c6500ea114a27\",\"error\":{\"code\":\"FLAT_NOT_AVAILABLE\",\"message\":\"Flat LA-14"
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: POST /api/bookings -> 409 {\"detail\":\"Flat LA-1204 is Booked\",\"code\":\"FLAT_NOT_AVAILABLE\",\"request_id\":\"f2a35bb37901436e\",\"error\":{\"code\":\"FLAT_NOT_AVAILABLE\",\"message\":\"Flat LA-12"
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: POST /api/bookings -> 409 {\"detail\":\"Flat LA-1204 is Booked\",\"code\":\"FLAT_NOT_AVAILABLE\",\"request_id\":\"bf6a66b00aaf4adf\",\"error\":{\"code\":\"FLAT_NOT_AVAILABLE\",\"message\":\"Flat LA-12"
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: POST /api/bookings -> 409 {\"detail\":\"Flat LA-1204 is Booked\",\"code\":\"FLAT_NOT_AVAILABLE\",\"request_id\":\"8acd9ed2e37a494d\",\"error\":{\"code\":\"FLAT_NOT_AVAILABLE\",\"message\":\"Flat LA-12"
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: POST /api/bookings -> 409 {\"detail\":\"Flat LA-1204 is Booked\",\"code\":\"FLAT_NOT_AVAILABLE\",\"request_id\":\"edb02203ce5f48b1\",\"error\":{\"code\":\"FLAT_NOT_AVAILABLE\",\"message\":\"Flat LA-12"
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: POST /api/bookings -> 409 {\"detail\":\"Flat LA-1204 is Booked\",\"code\":\"FLAT_NOT_AVAILABLE\",\"request_id\":\"2fd8b40e83764cd5\",\"error\":{\"code\":\"FLAT_NOT_AVAILABLE\",\"message\":\"Flat LA-12"
+  },
+  {
+   "assertion": "booking_created",
+   "detail": "booking POST failed: POST /api/bookings -> 409 {\"detail\":\"Flat LA-1204 is Booked\",\"code\":\"FLAT_NOT_AVAILABLE\",\"request_id\":\"2b3f8b97b5524c54\",\"error\":{\"code\":\"FLAT_NOT_AVAILABLE\",\"message\":\"Flat LA-12"
+  }
+ ],
+ "groups": {
+  "bookings": {
+   "n": 500,
+   "p50": 16.3,
+   "p95": 3014.8,
+   "p99": 5009.0
+  },
+  "breakdown": {
+   "n": 500,
+   "p50": 22.3,
+   "p95": 146.9,
+   "p99": 264.8
+  },
+  "construction": {
+   "n": 1,
+   "p50": 11.1,
+   "p95": 11.1,
+   "p99": 11.1
+  },
+  "customers": {
+   "n": 555,
+   "p50": 39.6,
+   "p95": 172.3,
+   "p99": 220.7
+  },
+  "demand_register": {
+   "n": 46,
+   "p50": 16.1,
+   "p95": 109.9,
+   "p99": 211.0
+  },
+  "flats": {
+   "n": 46,
+   "p50": 137.4,
+   "p95": 299.9,
+   "p99": 317.2
+  },
+  "leads": {
+   "n": 1018,
+   "p50": 52.3,
+   "p95": 297.8,
+   "p99": 401.4
+  },
+  "ledger": {
+   "n": 46,
+   "p50": 63.0,
+   "p95": 139.8,
+   "p99": 153.3
+  },
+  "login": {
+   "n": 50,
+   "p50": 239.6,
+   "p95": 254.3,
+   "p99": 276.3
+  },
+  "payments": {
+   "n": 49,
+   "p50": 2227.7,
+   "p95": 2751.8,
+   "p99": 2792.5
+  },
+  "project_statement": {
+   "n": 46,
+   "p50": 55.7,
+   "p95": 226.9,
+   "p99": 309.7
+  },
+  "receipt_pdf": {
+   "n": 46,
+   "p50": 79.0,
+   "p95": 196.4,
+   "p99": 200.6
+  }
+ }
+}

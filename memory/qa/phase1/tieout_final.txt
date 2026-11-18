@@ -1,0 +1,118 @@
+PASS collections FY total == Σ cleared receipts                   report=32377107500 raw=32377107500 
+PASS cheques-in-hand count == Pending payments                    report=1 raw=1 
+PASS cheques-in-hand amount == Σ Pending                          report=4000000 raw=4000000 
+PASS cheque register rows == instrument payments                  report=130 raw=130 raw by status {'Bounced': 2, 'Cleared': 127, 'Pending': 1}
+PASS inventory report by_status == flats                          report={'Available': 56, 'Hold': 3, 'Booked': 7 raw={'Booked': 78, 'Available': 56, 'Hold':  
+PASS home units/available tiles == flats                          report=(138, 56) raw=(138, 56) 
+PASS legacy dashboard inventory == flats                          report={'Available': 56, 'Hold': 3, 'Booked': 7 raw={'Booked': 78, 'Available': 56, 'Hold':  
+PASS outstanding total == Σ booking summary dues                  report=5241749100 raw=5241749100 
+PASS home overdue tile == Σ bookings overdue (definitions.ageing_bands) report=5241749100 raw=5241749100 
+PASS report overdue == Σ bookings overdue                         report=5241749100 raw=5241749100 
+PASS dashboard overdue == report overdue                          report=5241749100 raw=5241749100 
+PASS ageing bands sum == report total outstanding                 report=5241749100 raw=5241749100 
+PASS report bands == Σ booking bands                              report={'Not due': 0, '0-30': 137161600, '31-60 raw={'Not due': 0, '0-30': 137161600, '31-60 
+PASS home outstanding tile == Σ booking dues                      report=5241749100 raw=5241749100 
+PASS home outstanding tile == outstanding report due              report=5241749100 raw=5241749100 
+PASS ONE NUMBER: Home outstanding == Outstanding report total     report=5241749100 raw=5241749100 
+PASS ONE NUMBER: Outstanding report total == Σ booking.summary.outstanding_paise report=5241749100 raw=5241749100 
+PASS Home advance held == Σ booking.summary.advance_paise         report=125317600 raw=125317600 
+PASS refunds API Paid total == Σ paid refunds                     report=41815800 raw=41815800 
+PASS cancellations report refund paid == Σ paid refunds           report=41815800 raw=41815800 
+PASS ledger REFUND contra rows == Σ paid refunds (all buckets)    report=41815800 raw=41815800 
+PASS bounce charges on bookings == bounce-charge audit rows       report=2 raw=2 
+PASS transferred bookings' flats point back to booking            report=3 raw=3 
+PASS cancelled bookings carry no open demands                     report=0 raw=0 
+PASS demand-vs-collection demanded == Σ non-void demands          report=33438012500 raw=33438012500 
+PASS legacy dashboard collections.month == Σ cleared this month   report=1005102200 raw=1005102200 month=2026-11
+PASS cancellations rows == Cancelled bookings                     report=2 raw=2 
+PASS sales-leads total == leads                                   report=120 raw=120 
+PASS Σ cleared cash receipts == booking.summary.cash_paid (all active) report=0 raw=0 count of bookings that differ
+PASS Σ Udhar − Σ Jama == outstanding − advance (every booking)    report=0 raw=0 two-sided ledger law
+PASS Home month Cash·Account·Other == Σ allocation parts          report={'Cash': 582423000, 'Account': 418679200 raw={'Cash': 582423000, 'Account': 418679200 
+PASS Home month total == Cash + Account + Other                   report=1005102200 raw=1005102200 
+PASS trends current month split == Σ allocation parts             report={'Cash': 582423000, 'Account': 418679200 raw={'Cash': 582423000, 'Account': 418679200 
+PASS collections-v2 (this month, by bucket) == Σ allocation parts report={'Cash': 582423000, 'Account': 418679200 raw={'Cash': 582423000, 'Account': 418679200 
+PASS collections FY cash/account/other == Σ allocation parts      report={'Cash': 13148602300, 'Account': 1919795 raw={'Cash': 13148602300, 'Account': 1919795 
+PASS report [collections-v2] net Jama (receipt basis, all time) == Σ cleared receipts report= raw= tools/tieout_reports.py
+PASS report [collections-v2] net Jama == Σ ledger Jama rows (receipts + reversals) report= raw= tools/tieout_reports.py
+PASS report [collections-v2] FY total (receipt basis) == raw payments by receipt date report= raw= tools/tieout_reports.py
+PASS report [collections-v2] basis label present (receipt)        report= raw= tools/tieout_reports.py
+PASS report [collections-v2] FY total (clearance basis) == raw payments by clearance date report= raw= tools/tieout_reports.py
+PASS report [collections-v2] basis label present (clearance)      report= raw= tools/tieout_reports.py
+PASS report [collections-v2] receipt basis == legacy collections (payment_date, Cleared) report= raw= tools/tieout_reports.py
+PASS report [collections-v2] Σ by project == total (total_paise)  report= raw= tools/tieout_reports.py
+PASS report [collections-v2] Σ by block == total (total_paise)    report= raw= tools/tieout_reports.py
+PASS report [collections-v2] Σ by bucket == total (total_paise)   report= raw= tools/tieout_reports.py
+PASS report [collections-v2] Σ by mode == total (total_paise)     report= raw= tools/tieout_reports.py
+PASS report [collections-v2] Σ by bank == total (total_paise)     report= raw= tools/tieout_reports.py
+PASS report [collections-v2] Σ by rm == total (total_paise)       report= raw= tools/tieout_reports.py
+PASS report [collections-v2] Σ by day == total (total_paise)      report= raw= tools/tieout_reports.py
+PASS report [outstanding-v2] outstanding == Σ definitions.outstanding(summary) report= raw= tools/tieout_reports.py
+PASS report [outstanding-v2] advance held == Σ definitions.advance report= raw= tools/tieout_reports.py
+PASS report [outstanding-v2] net == outstanding − advance == Σ Udhar − Σ Jama report= raw= tools/tieout_reports.py
+PASS report [outstanding-v2] per booking: report net == ledger net == summary net; report outstanding == summary outstanding report= raw= tools/tieout_reports.py
+PASS report [outstanding-v2] outstanding == Home outstanding tile report= raw= tools/tieout_reports.py
+PASS report [outstanding-v2] bands Σ == outstanding               report= raw= tools/tieout_reports.py
+PASS report [outstanding-v2] report bands == Σ definitions.ageing_bands report= raw= tools/tieout_reports.py
+PASS report [outstanding-v2] Σ by customer == total (outstanding_paise) report= raw= tools/tieout_reports.py
+PASS report [outstanding-v2] Σ by customer == total (net_balance_paise) report= raw= tools/tieout_reports.py
+PASS report [outstanding-v2] Σ by project == total (outstanding_paise) report= raw= tools/tieout_reports.py
+PASS report [outstanding-v2] Σ by project == total (net_balance_paise) report= raw= tools/tieout_reports.py
+PASS report [outstanding-v2] Σ by block == total (outstanding_paise) report= raw= tools/tieout_reports.py
+PASS report [outstanding-v2] Σ by block == total (net_balance_paise) report= raw= tools/tieout_reports.py
+PASS report [demand-vs-collection] demanded == Σ non-void demands report= raw= tools/tieout_reports.py
+PASS report [demand-vs-collection] collected == Σ demand.paid     report= raw= tools/tieout_reports.py
+PASS report [cash-vs-account] cash raised == Σ summary.cash_order_raised report= raw= tools/tieout_reports.py
+PASS report [cash-vs-account] account received == Σ summary.account_paid report= raw= tools/tieout_reports.py
+PASS report [cash-vs-account] cash agreed == Σ booking.cash_agreed report= raw= tools/tieout_reports.py
+PASS report [cash-vs-account] Σ by project == total (cash_balance_paise) report= raw= tools/tieout_reports.py
+PASS report [cash-vs-account] Σ by block == total (cash_balance_paise) report= raw= tools/tieout_reports.py
+PASS report [cheques] rows == cheque/DD payments                  report= raw= tools/tieout_reports.py
+PASS report [cheques] amount == Σ instrument amounts              report= raw= tools/tieout_reports.py
+PASS report [receivables-forecast] Σ forecast + Σ raised == Σ agreement (live bookings) report= raw= tools/tieout_reports.py
+PASS report [receivables-forecast] per booking: forecast == agreement − raised report= raw= tools/tieout_reports.py
+PASS report [receivables-forecast] Σ by project == total (expected_paise) report= raw= tools/tieout_reports.py
+PASS report [receivables-forecast] Σ by block == total (expected_paise) report= raw= tools/tieout_reports.py
+PASS report [receivables-forecast] Σ by booking == total (expected_paise) report= raw= tools/tieout_reports.py
+PASS report [receivables-forecast] Σ by stage == total (expected_paise) report= raw= tools/tieout_reports.py
+PASS report [receivables-forecast] Σ by month == total (expected_paise) report= raw= tools/tieout_reports.py
+PASS report [receivables-forecast] default grouping is tower → stage when no planned dates report= raw= tools/tieout_reports.py
+PASS report [receivables-forecast] stage grouping: one row per tower·stage, Σ == total report= raw= tools/tieout_reports.py
+PASS report [cancellations] rows == Cancelled bookings            report= raw= tools/tieout_reports.py
+PASS report [cancellations] refund paid == Σ paid refunds         report= raw= tools/tieout_reports.py
+PASS report [cancellations] ledger REFUND rows == Σ paid refunds  report= raw= tools/tieout_reports.py
+PASS report [bank-receipts] cleared == Σ non-cash cleared         report= raw= tools/tieout_reports.py
+PASS report [bank-receipts] pending == Σ non-cash pending         report= raw= tools/tieout_reports.py
+PASS report [other-charges] demanded == Σ other_charges.demanded  report= raw= tools/tieout_reports.py
+PASS report [other-charges] collected == Σ other_charges.paid     report= raw= tools/tieout_reports.py
+PASS report [other-charges] collected == Σ Other ledger Jama (OTHER_CHARGE_PAYMENT + Other reversals) report= raw= tools/tieout_reports.py
+PASS report [other-charges] Σ by project == total (demanded_paise) report= raw= tools/tieout_reports.py
+PASS report [other-charges] Σ by booking == total (demanded_paise) report= raw= tools/tieout_reports.py
+PASS report [roznamcha-summary] cash received == Σ cleared CASH receipts report= raw= tools/tieout_reports.py
+PASS report [roznamcha-summary] deposits == Σ contra DEPOSIT      report= raw= tools/tieout_reports.py
+PASS report [roznamcha-summary] closing == opening + cash in − deposits + withdrawals − cash refunds report= raw= tools/tieout_reports.py
+PASS report [roznamcha-summary] Σ by month == range total (cash in) report= raw= tools/tieout_reports.py
+PASS report [roznamcha-summary] monthly closing == daily closing  report= raw= tools/tieout_reports.py
+PASS report [inventory] units by status == flats                  report= raw= tools/tieout_reports.py
+PASS report [inventory] sold value == Σ price of booked/sold flats report= raw= tools/tieout_reports.py
+PASS report [sales-leads] leads == leads collection               report= raw= tools/tieout_reports.py
+PASS report [sales-leads] converted == Converted leads            report= raw= tools/tieout_reports.py
+PASS report [site-visits] visits == site_visits                   report= raw= tools/tieout_reports.py
+PASS report [site-visits] completed == Completed visits           report= raw= tools/tieout_reports.py
+PASS report [site-visits] Σ by project == total (scheduled)       report= raw= tools/tieout_reports.py
+PASS report [site-visits] Σ by month == total (scheduled)         report= raw= tools/tieout_reports.py
+PASS report [sales-team] sold value == Σ live agreement values    report= raw= tools/tieout_reports.py
+PASS report [sales-team] collections == Σ cleared receipts of live bookings report= raw= tools/tieout_reports.py
+PASS report [sales-team] overdue == outstanding report overdue    report= raw= tools/tieout_reports.py
+PASS report [construction-vs-plan] stage rows == Σ stages of active towers report= raw= tools/tieout_reports.py
+PASS report [construction-vs-plan] stage demands == Σ ON_STAGE/ON_POSSESSION demands report= raw= tools/tieout_reports.py
+PASS report [construction-vs-plan] subtotals == Σ their stage rows (demanded) report= raw= tools/tieout_reports.py
+PASS report [construction-vs-plan] no tower name with leading/trailing space report= raw= tools/tieout_reports.py
+PASS report [construction-vs-plan] GET /payments/demands honours block_id report= raw= tools/tieout_reports.py
+PASS report [service-sla] tickets == service_requests             report= raw= tools/tieout_reports.py
+PASS report [activity] audit actions == audit_logs                report= raw= tools/tieout_reports.py
+PASS report [data-quality] open demands on cancelled bookings == 0 (integrity) report= raw= tools/tieout_reports.py
+PASS report [data-quality] towers without stage plan excludes inactive towers report= raw= tools/tieout_reports.py
+PASS report [data-quality] payment plans not summing 100 == 0     report= raw= tools/tieout_reports.py
+PASS report [data-quality] integrity report ok                    report= raw= tools/tieout_reports.py
+PASS Phase I report tie-outs all PASS                             report=True raw=True 82 report ties

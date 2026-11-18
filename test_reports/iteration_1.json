@@ -1,0 +1,21 @@
+{
+  "summary": "Full backend + frontend regression for KKT Real Estate ERP Phase 1. 31/31 pytest cases pass covering health/openapi, auth gates & error envelope, JWT login for all 5 seeded users, refresh-token rotation with reuse detection + logout, account lockout (new throwaway user, 5 wrong passwords -> 423, correct password still 423), RBAC + project scope (projectadmin restricted to SGH, sales/employee enforcement), flat-type auto area + area hierarchy validation, block creation (32 flats, numbering + floor-rise pricing verified), regenerate 409 on Hold, booked manual 409, add floors (36 total), bulk price, block grid, audit log flat.status entries, master deactivate 409/200 usage checks, pagination/search/dashboard parity, users self-deactivate 409, system role delete 409, permissions grouping, settings bank account masking (endswith 4433, no plaintext leak). Frontend playwright verified: login page split layout, demo buttons, admin dashboard stat-total renders, SGH->Blocks->Tower A loads inventory-grid, grid-flat-A-802 opens flat drawer, Hold button changes data-status to 'Hold'. Audit log page shows flat.status entries. Master Data -> Flat Types -> master-new-btn opens form; ft-room-0-length=12, width=10 auto-computes area to 120. Employee sidebar shows only Dashboard/Projects/Inventory/Master Data and master-new-btn is hidden. Project Admin (projectadmin@kkt.in) sees only SGH in Projects list. No console errors observed.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": ["/app/backend/tests/test_kkt_erp.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "master.py is 336 LoC and growing - consider splitting the dynamic factory (register) into a separate module for maintainability.",
+    "Settings bank_account.account_number validation uses min_length=4 which is permissive; consider enforcing numeric-only and length>=9 for Indian bank accounts.",
+    "routers/auth.py _rate_limit uses an in-memory defaultdict keyed by IP - won't survive multi-worker/replica deployments; fine for single-process but should be documented or moved to Mongo/Redis before scaling.",
+    "deps.get_current_user sets user['permissions'] as a Python set which is not JSON-serialisable; auth.me manually sorts it to list but any accidental return of the whole user object elsewhere would 500 on serialization. Safe today but fragile."
+  ],
+  "updated_files": ["/app/backend/tests/test_kkt_erp.py"],
+  "success_rate": {"backend": "100% (31/31)", "frontend": "100% of critical flows verified"},
+  "test_credentials": "Seeded users (password Kkt@12345): admin@kkt.in, projectadmin@kkt.in, accounts@kkt.in, sales@kkt.in, employee@kkt.in. Throwaway lockout users created with 'locktest_<hex>@kkt.in' prefix left in DB (deactivated once locked).",
+  "seed_data_creation": "Backend tests created a new SGH block (code T<hex>, 36 flats after +1 floor), one new TEST_FT_* flat type (deactivated), new TEST_RT_* room type (deactivated), locktest_* user (locked). Dashboard total is now 112 (76 seeded + 36 from new block).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Dashboard inventory.total has drifted from the original 76 to 112 due to test block creation; adjust any 'expected 76' assertions. New block uses pattern {block}-{floor}{pos2} with floor_start 1. Lockout fixture leaves user locked for 15 min - use fresh uuid-based email. Rate limit 10 logins/min per IP meant login responses are cached in a module-level dict; drop cache entries if testing refresh/logout behaviour.",
+  "rca of the issue": "No issues found."
+}

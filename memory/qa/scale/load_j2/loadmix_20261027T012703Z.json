@@ -1,0 +1,81 @@
+{
+  "meta": {
+    "base": "http://127.0.0.1:8002",
+    "levels": [
+      600
+    ],
+    "seconds": 40,
+    "at": "20261027T012703Z",
+    "note": "Sandbox: ONE uvicorn worker, shared CPU with the preview stack and MongoDB on the same container. Production capacity = measured per-worker RPS \u00d7 workers (ESTIMATE)."
+  },
+  "results": [
+    {
+      "users": 600,
+      "requests": 1892,
+      "rps": 34.1,
+      "p50_ms": 19515.6,
+      "p95_ms": 29215.0,
+      "p99_ms": 31698.9,
+      "errors": {
+        "503 OVERLOADED": 1642,
+        "RemoteProtocolError": 3,
+        "ReadError": 2
+      },
+      "5xx_non_shed": 0,
+      "shed_503": 1642,
+      "rss_mb_before": 621.9,
+      "rss_mb_after": 591.4,
+      "hot_paths": [
+        {
+          "scenario": "booking_ledger",
+          "p95_ms": 31315.1,
+          "n": 155,
+          "db_p95_ms": 489.9
+        },
+        {
+          "scenario": "customer_create",
+          "p95_ms": 30572.1,
+          "n": 95,
+          "db_p95_ms": 5312.6
+        },
+        {
+          "scenario": "search",
+          "p95_ms": 29919.7,
+          "n": 279,
+          "db_p95_ms": 1082.0
+        },
+        {
+          "scenario": "payments_list",
+          "p95_ms": 29215.0,
+          "n": 319,
+          "db_p95_ms": 9949.5
+        },
+        {
+          "scenario": "bookings_list",
+          "p95_ms": 28988.7,
+          "n": 375,
+          "db_p95_ms": 468.9
+        },
+        {
+          "scenario": "report_outstanding",
+          "p95_ms": 28590.8,
+          "n": 90,
+          "db_p95_ms": 211.4
+        },
+        {
+          "scenario": "customer_360",
+          "p95_ms": 28434.3,
+          "n": 205,
+          "db_p95_ms": 675.2
+        },
+        {
+          "scenario": "home",
+          "p95_ms": 27705.8,
+          "n": 369,
+          "db_p95_ms": 213.0
+        }
+      ],
+      "kind": "measured"
+    }
+  ]
+}

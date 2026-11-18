@@ -1,0 +1,34 @@
+{
+  "summary": "Frontend-only check of G1 (Masters/Admin→Advanced links, Hold reasons, Allocation categories, Unknown list) and H2 (Site Visits calendar and slot picker date maths) on the preview production build (bundle built 04:40 UTC), logged in as admin@kkt.in. G1 passes everywhere: all 14 Masters hub nav links and all 15 Admin→Advanced links open their own page. None lands on Floor Plans or /dashboard. Catalogues opens /settings/catalogues. Hold reasons opens /masters/m/hold-reasons with heading 'Hold Reasons', the active tab and 'Token received (custom)'. I created, edited, deactivated, restored and deactivated again a TEST_ reason. The where-used text shows the count once ('Used in 2 active hold(s)'). Allocation categories shows 7 rows (Bank/mortgage, Builder saleable, ...) with fields name/code/bookable/colour/sort_order and 'Used in N flat(s)' with the count once. /masters/m/nope shows master-unknown 'Unknown list'. The Pricing tab's 'Edit master' link opens /masters/m/charge-types (Charge Heads). H2 works on today's date (Monday 16 Nov 2026): /site-visits redirects to /leads?tab=visits. The week view runs Mon 16 to Sun 22 with today highlighted. Next and Prev move 7 days and Today returns to the current week. The day view moves 1 day and Today returns to 16 Nov with the highlight. The slot picker shows 7 days from today and Next/Prev work. Two H2 date bugs found: (1) weekStart is wrong on Sundays (proved with node). (2) In the slot picker, the first Prev into an empty week bounces straight back.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "SiteVisits.jsx weekStart (line 36)", "issue": "weekStart(day) = addDays(day, 1 - getUTCDay()). On a Sunday getUTCDay() is 0, so the result is +1 day, the NEXT Monday. Every Sunday the calendar opens on next week, today is not in view or highlighted, and 'Today' jumps to next week. Proved: weekStart('2026-11-22' Sun) = '2026-11-23'. The old code had the same flaw (d.getDate()-d.getDay()+1). Fix: addDays(day, -((getUTCDay()+6)%7)).", "selector": "[data-testid=visit-calendar]", "priority": "HIGH"},
+      {"component": "SiteVisits.jsx SlotPicker auto-jump effect", "issue": "The useEffect that skips ahead when a week has no slots runs once at any time, not only on the first load. From the current week (16–22 Nov, which has slots), the first 'Previous week' click fetches 09–15 Nov (no slots), and the effect bounces straight back to 16 Nov, so the click seems to do nothing. The second click works. Seen in UI: prev#1 still shows 16 Nov, prev#2 shows 09 Nov. Fix: set jumped=true once the first fetch arrives (or on any manual navigation), or only auto-jump when from === businessToday(). Also consider disabling Prev for weeks that are fully in the past.", "selector": "[data-testid=slot-picker] [aria-label='Previous week']", "priority": "MEDIUM"},
+      {"component": "MasterPage card subtitle (summary())", "issue": "For hold-reasons, allocation-categories and any kind without its own summary, the card shows the code twice ('INTEREST · INTEREST', 'BANK · BANK'). r.code is rendered and then summary() falls back to r.code. Return '' (or a kind-specific summary, e.g. 'Bookable · #2E7D32' for allocation categories) instead of r.code.", "selector": "[data-testid^=master-card-]", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Masters list cards", "issues": ["The where-used label 'Used in 0 active hold(s)' wraps onto 3 lines because History, Edit and Deactivate crowd the card footer. Use whitespace-nowrap or put the usage on its own row.", "The breadcrumb on every structured master reads 'Settings › Catalogues › <Master>', which is wrong for Hold Reasons, Allocation Categories and others (not new)."]},
+      {"screen": "Admin → Advanced → Message templates", "issues": ["The page h1 shows the first template name ('Demand raised') and not a page title (not new, minor)."]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Fix weekStart in SiteVisits.jsx so a Sunday maps to the Monday before it: addDays(day, -((dow+6)%7)).",
+    "SlotPicker: limit the auto-jump to the first load so the first manual 'Previous week' click is not undone.",
+    "MasterPage summary(): stop falling back to r.code (the code shows twice on cards)."
+  ],
+  "critical_code_review_comments": [
+    "MasterPage write permission is hard-coded to can('masters.payment_plan.edit') for every master kind and does not use a per-kind edit permission (not new).",
+    "PricingSetupTab 'Edit master' uses a plain <a href> and not a router <Link>, so the whole SPA reloads."
+  ],
+  "updated_files": ["/app/test_reports/iteration_31.json"],
+  "success_rate": {"backend": "not tested (frontend only)", "frontend": "~92% (all G1 checks pass; H2 passes on today's Monday date; 2 date bugs: Sunday weekStart and slot-picker first Prev)"},
+  "test_credentials": "admin@kkt.in / Kkt@12345 (Super Admin)",
+  "seed_data_creation": "Created hold reason 'TEST_G1 hold reason edited' (code TEST_G1HR, id 0003ac2f-d033-4b20-aab2-6961b3f3d2f6). It is left DEACTIVATED as cleanup. No other data changed. A 'tscheck custom reason' hold reason already existed from an earlier run (not mine).",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Today on preview is Mon 2026-11-16 IST, so the Sunday weekStart bug can't be seen in the UI. Check it with the pure function, or check on a Sunday. Advanced links are [data-testid^=advanced-link-] on /admin/advanced (toggle admin-advanced-toggle). Hub links are masters-link-*. Calendar Prev/Next use aria-label 'Previous'/'Next'. Slot picker uses aria-label 'Previous week'/'Next week' and slots are slot-YYYY-MM-DD-HH:MM.",
+  "rca of the issue": "Sunday: JS getUTCDay() counts Sunday as 0, and the formula 1 - dow assumes Monday-first numbering. Slot picker: the 'jumped' flag only turns true when an empty week shows up. Because the first week had slots, the flag was still false when the user moved into a past (empty) week, so the effect ran then and moved the picker forward 7 days."
+}

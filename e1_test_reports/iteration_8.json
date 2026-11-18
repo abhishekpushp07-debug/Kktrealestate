@@ -1,0 +1,28 @@
+{
+  "iteration": 8,
+  "mode": "retest",
+  "phase": "2",
+  "passed": 12,
+  "failed": 0,
+  "bugs": [],
+  "action_items": [
+    {"type": "coverage_note", "severity": "low", "detail": "JRN-54: the same-tab leak probe covers admin -> logout -> sales (only 4 widgets, no ₹). Accounts and owner layouts are checked per login, and owner-11 passes. Not covered: a strict accounts-after-sales-in-same-tab hop, and recent searches staying private to each user. A human should spot-check that recent searches do not carry over between users."},
+    {"type": "test_fixture_updated", "severity": "info", "detail": "Earlier demo refresh renumbered seeded docs; cmdk-search-grouped + test_tscheck_search_groups.py hardcoded BK-2526-2275/KKT-2526-15131, now updated to Priya Verma's current BK-2526-2331/KKT/2526/15134. Not an app bug."},
+    {"type": "tester_note", "severity": "info", "detail": "First shell-sidebar-new-menu run hit login 429 because I ran two checks in parallel (tester error); passed on sequential rerun."}
+  ],
+  "retest_needed": false,
+  "checks": [
+    {"criterion": "Home API regression", "name": "test_tscheck_home_command_center.py + test_tscheck_theme_prefs.py", "lane": "backend", "status": "passed", "evidence": "9 passed"},
+    {"criterion": "Phase 2 regression: grouped search API", "name": "test_tscheck_search_groups.py", "lane": "backend", "status": "passed", "evidence": "After fixture ids updated: 1 passed; GET /api/search groups customers/bookings/receipts/flats <400ms"},
+    {"criterion": "JRN-54 No data leak between users", "name": "home-role-defaults", "lane": "browser", "status": "passed", "evidence": "LEAK PROBE sales-after-owner widgets call_today,pipeline,inventory,flat_status | has ₹: false; accounts = money_today,due_vs_received,ageing,call_today,inflow_30,attention; token not in storage"},
+    {"criterion": "JRN-54 owner all 11", "name": "home-owner-11-widgets", "lane": "browser", "status": "passed", "evidence": "11 widgets in order money_today..attention"},
+    {"criterion": "JRN-52 Filtered-from-Home chip on every drill", "name": "home-drill-adds-up", "lane": "browser", "status": "passed", "evidence": "SUMS all ok, CHIPS all true for ageing, money-today (16 Nov single-day), due-month, inflow-bills, stale 30d, holds, leads, followups, inv-booked"},
+    {"criterion": "JRN-58 No bare zero", "name": "home-period-project-filters", "lane": "browser", "status": "passed", "evidence": "Ye: 'No dated bills or cheques due in the next 30 days · Open Bills'; GGV+Today same; BARE [] BARE2 []"},
+    {"criterion": "JRN-60 Home speed after login", "name": "home-isolation-speed-phone", "lane": "browser", "status": "passed", "evidence": "5 logins: median first 841 ms, median all 845 ms; 390px hscroll 0 both themes"},
+    {"criterion": "Regression: Light/Night + no flash", "name": "theme-light-night-remembered", "lane": "browser", "status": "passed", "evidence": "shell frames light: 0; PATCH 200; layout identical"},
+    {"criterion": "Regression: sidebar order/collapse + New menu", "name": "shell-sidebar-new-menu", "lane": "browser", "status": "passed", "evidence": "New menu Booking,Payment,Lead,Customer,Site visit; widths 260/72; sales sidebar trimmed (passed on sequential rerun after tester-caused 429)"},
+    {"criterion": "Regression: ⌘K grouped search", "name": "cmdk-search-grouped", "lane": "browser", "status": "passed", "evidence": "All 5 queries grouped correctly, ~290-325ms wall; booking opens /bookings/:id"},
+    {"criterion": "Regression: Roznamcha cash paid out + balancing", "name": "roznamcha-refunds-retest", "lane": "browser", "status": "passed", "evidence": "Opening ₹87,46,349 + in ₹3,00,628 − out ₹72,17,000 = closing ₹18,29,977"},
+    {"criterion": "Regression: axe contrast both themes", "name": "themes-contrast-axe", "lane": "browser", "status": "passed", "evidence": "0 violations on home/booking/customer360/outstanding/masters, light+night"}
+  ]
+}

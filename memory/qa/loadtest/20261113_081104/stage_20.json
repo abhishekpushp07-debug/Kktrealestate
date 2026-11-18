@@ -1,0 +1,120 @@
+{
+ "vus": 20,
+ "duration_s": 65,
+ "requests": 1689,
+ "rps": 26.1,
+ "stopped": null,
+ "errors": {},
+ "assertions": {
+  "lead_created:ok": 138,
+  "lead_converted:ok": 138,
+  "booking_created:ok": 138,
+  "booking_total_matches_preview:ok": 138,
+  "payment_posted:ok": 138,
+  "c360_shows_booking:ok": 138,
+  "ledger_received_equals_payment:ok": 138,
+  "ledger_bill_raised_positive:ok": 138,
+  "inventory_flat_booked:ok": 138,
+  "receipt_pdf:ok": 138,
+  "demand_register:ok": 134,
+  "project_statement:ok": 134,
+  "stage_demands_equal_active_bookings:ok": 2,
+  "documents_register:ok": 5,
+  "stage_demands_equal_active_bookings:FAIL": 3,
+  "integrity_ok_after_stage:ok": 1
+ },
+ "failed_assertions": [
+  {
+   "assertion": "stage_demands_equal_active_bookings",
+   "detail": "14 vs 15"
+  },
+  {
+   "assertion": "stage_demands_equal_active_bookings",
+   "detail": "19 vs 21"
+  },
+  {
+   "assertion": "stage_demands_equal_active_bookings",
+   "detail": "26 vs 29"
+  }
+ ],
+ "groups": {
+  "bookings": {
+   "n": 143,
+   "p50": 355.5,
+   "p95": 892.5,
+   "p99": 1204.7
+  },
+  "breakdown": {
+   "n": 138,
+   "p50": 22.0,
+   "p95": 41.4,
+   "p99": 46.7
+  },
+  "construction": {
+   "n": 11,
+   "p50": 14.5,
+   "p95": 4565.9,
+   "p99": 4565.9
+  },
+  "customers": {
+   "n": 276,
+   "p50": 24.6,
+   "p95": 65.6,
+   "p99": 83.3
+  },
+  "demand_register": {
+   "n": 134,
+   "p50": 6.5,
+   "p95": 12.7,
+   "p99": 22.1
+  },
+  "documents": {
+   "n": 5,
+   "p50": 6.0,
+   "p95": 13.4,
+   "p99": 13.4
+  },
+  "flats": {
+   "n": 138,
+   "p50": 13.6,
+   "p95": 46.1,
+   "p99": 63.0
+  },
+  "leads": {
+   "n": 276,
+   "p50": 45.4,
+   "p95": 156.5,
+   "p99": 162.0
+  },
+  "ledger": {
+   "n": 138,
+   "p50": 8.2,
+   "p95": 19.6,
+   "p99": 24.8
+  },
+  "login": {
+   "n": 20,
+   "p50": 237.7,
+   "p95": 240.1,
+   "p99": 240.1
+  },
+  "payments": {
+   "n": 138,
+   "p50": 215.9,
+   "p95": 349.0,
+   "p99": 360.0
+  },
+  "project_statement": {
+   "n": 134,
+   "p50": 19.8,
+   "p95": 40.2,
+   "p99": 60.5
+  },
+  "receipt_pdf": {
+   "n": 138,
+   "p50": 9.7,
+   "p95": 27.7,
+   "p99": 32.3
+  }
+ }
+}
