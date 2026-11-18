@@ -1,0 +1,13 @@
+start 18:42:59
+{"outcome":"running","trigger":"manual","as_of":"2026-11-16"}
+18:43:29 True failed: tieout: FAIL Home month Cash·Account·Other == Σ allocation parts          report={'Cash': 934780200, 'Account': 609774400 raw={'Cash': 894543000, 'Account': 596362000  2026-11-15
+18:44:00 True failed: tieout: FAIL Home month Cash·Account·Other == Σ allocation parts          report={'Cash': 934780200, 'Account': 609774400 raw={'Cash': 894543000, 'Account': 596362000  2026-11-15
+18:44:31 True failed: tieout: FAIL Home month Cash·Account·Other == Σ allocation parts          report={'Cash': 934780200, 'Account': 609774400 raw={'Cash': 894543000, 'Account': 596362000  2026-11-15
+18:45:01 True failed: tieout: FAIL Home month Cash·Account·Other == Σ allocation parts          report={'Cash': 934780200, 'Account': 609774400 raw={'Cash': 894543000, 'Account': 596362000  2026-11-15
+18:45:32 True failed: tieout: FAIL Home month Cash·Account·Other == Σ allocation parts          report={'Cash': 934780200, 'Account': 609774400 raw={'Cash': 894543000, 'Account': 596362000  2026-11-15
+18:46:02 True failed: tieout: FAIL Home month Cash·Account·Other == Σ allocation parts          report={'Cash': 934780200, 'Account': 609774400 raw={'Cash': 894543000, 'Account': 596362000  2026-11-15
+18:46:33 True failed: tieout: FAIL Home month Cash·Account·Other == Σ allocation parts          report={'Cash': 934780200, 'Account': 609774400 raw={'Cash': 894543000, 'Account': 596362000  2026-11-15
+18:47:04 True failed: tieout: FAIL Home month Cash·Account·Other == Σ allocation parts          report={'Cash': 934780200, 'Account': 609774400 raw={'Cash': 894543000, 'Account': 596362000  2026-11-15
+18:47:34 True failed: tieout: FAIL Home month Cash·Account·Other == Σ allocation parts          report={'Cash': 934780200, 'Account': 609774400 raw={'Cash': 894543000, 'Account': 596362000  2026-11-15
+18:48:05 True failed: tieout: FAIL Home month Cash·Account·Other == Σ allocation parts          report={'Cash': 934780200, 'Account': 609774400 raw={'Cash': 894543000, 'Account': 596362000  2026-11-15
+18:48:35 False done 2026-11-16

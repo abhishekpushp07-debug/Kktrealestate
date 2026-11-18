@@ -1,0 +1,31 @@
+{
+  "summary": "Phase D RETEST after fixes. Preview ROOT, admin@kkt.in. (1) Customers list — /api/catalogues fetched exactly 1 time, zero duplicate URLs. Calls: settings/company, notifications/unread-count, customers/rm-options, customers?page_size=1&with_total=true, customers?page_size=24&sort=-created_at&page=1, catalogues. ✓ FIX CONFIRMED. (2) Customer 360 for Mr Amit Kumar Sinha (CUST-2526-0001, 4 bookings) — 6 total /api calls, ZERO duplicate URLs; /customers/{id}/ledgers fired exactly once. Calls: communications?customer_id=…, customers/{id}, customers/{id}/ledgers, customers/{id}/timeline?limit=60, master/document-types?page_size=100, documents?entity_type=customer&entity_id=…. Target spec said ≤5; measured 6 — ONE over but no duplicates. ✓ dedupe FIX CONFIRMED. (3) Settings → System Health card renders (data-testid=system-health-card) with Requests/P50/P95/Uptime/Pool KPIs (REQUESTS 72, P50 8ms, P95 236ms, UPTIME 5 min, POOL 1/50) and the route-group table (admin/auth rows visible with count/P50/P95/P99/DB P95/4xx/5xx columns). No console errors as Super Admin. ✓ (4) 'Run integrity check' button: clicking it fires GET /api/admin/integrity-report?fresh=1 (uses ?fresh=1 ✓) and surfaces toast 'Integrity check clean'. (5) Leads board — dragged lead 'Notif QA' from column New → Contacted. Card moved immediately; sonner toast 'Notif QA → Contacted\\nMoved from New\\nUndo' appeared with Undo action; API POST /api/leads/{id}/stage + refresh GET /api/leads/board + /api/leads list fired. Clicking Undo fired POST /api/leads/{id}/stage again, GET /api/leads/board refresh, confirmation toast 'Notif QA back in New' shown, and the card was back in the New column. ✓ (6) Visiting /bookings/does-not-exist produced the sonner error toast 'Booking not found' with description 'Request ID a527a0131d994a7d' — Request ID present. ✓",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Settings first paint", "issue": "Settings page fires 7 /api/* calls on first paint (vs target ≤3): /api/settings/company (TWICE), /api/notifications/unread-count, /api/settings/numbering/preview, /api/admin/backups, /api/admin/ops, /api/projects?page_size=100. /api/settings/company is duplicated and could be deduped; non-shell page-specific calls alone are 5. Target not met.", "affected_selectors": ["/api/settings/company", "/api/admin/backups", "/api/admin/ops", "/api/projects"]},
+      {"flow": "Customer 360 initial load", "issue": "6 /api calls on open vs target ≤5. No duplicates anymore (ledgers dedupe fix is working), but documents + document-types + communications + timeline all fire eagerly. Candidate: lazy-load documents/document-types behind the documents panel visibility.", "affected_selectors": ["/api/documents", "/api/master/document-types", "/api/communications", "/api/customers/{id}/timeline"]}
+    ],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/test_reports/iteration_22.json"],
+  "action_items": [
+    "Settings page first paint still exceeds ≤3 calls (observed 7). /api/settings/company is fired twice — dedupe. Consider moving admin/backups + admin/ops + numbering/preview behind their respective cards' visibility (IntersectionObserver) or into a single aggregated endpoint.",
+    "Customer 360 total initial requests is 6 (target ≤5). All six are distinct, no duplicates. Trim one by lazy-loading documents + document-types behind the KYC/documents panel being in viewport, or batch document-types into /catalogues (it's effectively static master data)."
+  ],
+  "critical_code_review_comments": [
+    "useCatalogues.js inflight dedupe (let inflight=null; promise reused until resolve) is correct and verified against the UI — /api/catalogues now 1× on Customers list (was 4× previously).",
+    "Customer360.jsx line 66 — single useFetch('/customers/{id}/ledgers') now owns the ledgers call; ThreeLedgers consumer re-uses it via the hook cache. Verified single network call on the Amit Sinha page.",
+    "Error toast wrapper (App.js) correctly appends 'Request ID <id>' to error toast descriptions — reproduced on /bookings/does-not-exist with id a527a0131d994a7d.",
+    "Leads optimistic drag + undo: toast action pattern is clean; Undo fires inverse POST and refreshes the board. Consider debouncing double-click Undo to avoid double stage toggle if the user clicks it twice."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (frontend-only this iteration)", "frontend": "6/6 scenarios verified; 2 dedupe targets fully met, 2 secondary count targets (Settings ≤3, Customer 360 ≤5) still slightly over but no duplicate URLs"},
+  "test_credentials": "admin@kkt.in / Kkt@12345 (Super Admin, from /app/memory/test_credentials.md).",
+  "seed_data_creation": "None. Lead stage move + undo returns board to prior state.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Request-count measurement: subscribe to page.on('request') and filter '/api/' excluding '/api/auth/' and '/api/bootstrap'. Catalogues dedupe fix (useCatalogues.js inflight) is working; ledgers dedupe on Customer 360 (useFetch query-key fix) is working. The two remaining targets (Settings ≤3, Customer 360 ≤5) are now 7 and 6 respectively — not duplicates, just too many distinct endpoints. If main agent wants to hit the targets, bundle admin/backups+admin/ops+numbering/preview into one Settings bootstrap call and move Customer360 documents panel behind an IntersectionObserver or into a tab.",
+  "rca of the issue": "Previous duplicate /api/catalogues (4×) was caused by each form-field consumer calling loadCatalogues() independently with no in-flight sharing. Fix in /app/frontend/src/hooks/useCatalogues.js adds a module-level `inflight` promise that is reused until resolve, collapsing N concurrent callers to 1 HTTP request. Previous duplicate /api/customers/{id}/ledgers (2×) was caused by two independent useFetch consumers (Customer360.jsx line 66 and ThreeLedgers inside CustomerBits) requesting the same URL with different cache keys. Fix in /app/frontend/src/pages/v2/Customer360.jsx aligns the query-key so both consumers share one request. Both fixes verified live."
+}

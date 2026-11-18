@@ -1,0 +1,44 @@
+{
+  "summary": "Phase S2 verification (backend + frontend, static build) on the preview URL as admin@kkt.in. Almost everything requested works. Sidebar has exactly the 10 core labels in order. Section tabs work on all 3 groups and every tab navigates. All 8 legacy routes resolve. The booking wizard has 3 steps (Who / Price & Plan / Confirm) and shows the prefill, plan and total. The agreement-signed control and pill work, and marking WhatsApp from the UI shows the pill. The payment sheet shows/hides fields by mode, auto-allocates and has the Change → manual picker. A small Cash payment from the UI was stored with allocation='auto'. Reports hub has no 'legacy' text. No forbidden wording on 13 user pages. One requested check FAILED: the Inventory actions sheet ('Owner share' / 'Show to sales as') cannot be reached from anywhere in the UI. components/common/InventoryActions.jsx is imported by nothing; its only consumer, BlockDetail.jsx, was deleted in commit e080111 (Phase S1).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/payments/{id}", "issue": "The new 'allocation' field is saved (DB shows allocation='auto') but is not returned. PaymentsOut in models_out.py has no allocation field, and response_model strips unknown keys."},
+      {"endpoint": "POST /api/payments", "issue": "PaymentIn.allocation defaults to 'manual', so API clients that send nothing are recorded as manual. Confirm this is intended."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Projects → Inventory / FlatDrawer", "issue": "No way to open Inventory actions (bulk category/hold/block/display). InventoryActions.jsx is orphaned since BlockDetail.jsx was removed in S1. The Inventory tab table has no row selection and the flat drawer has no 'Inventory actions' button. So 'Owner share' and 'Show to sales as' can never be seen, and set_category / set_display / clear_display can no longer be done from the UI.", "selector": "[data-testid=inventory-actions-sheet]", "priority": "HIGH"},
+      {"component": "SectionTabs on /payments?tab=roznamcha", "issue": "/roznamcha redirects to /payments?tab=roznamcha, but the 'Received' section tab is highlighted, not 'Roznamcha'. The active check uses pathname only and ignores ?tab=.", "selector": "[data-testid=section-tab-roznamcha]", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Payments", "issues": ["Two stacked tab rows: section tabs (Received / Bills raised / Roznamcha) above in-page tabs (Receipts / Cheques / Demands / Roznamcha). Roznamcha appears twice and 'Bills raised' vs 'Demands' are two names for one thing."]},
+      {"screen": "Post payment sheet", "issues": ["pp-auto-allocation shows 'open bills' as cash_due + account_due (₹33,15,875) even though it says it applies only to the Cash or Account share. It should show that share's due.", "pp-inst-date and the Roznamcha date use the browser's native date picker instead of the shadcn calendar."]},
+      {"screen": "Booking detail header", "issues": ["When the 'Mark agreement signed' select + button are shown, the action row gets crowded and the customer name wraps onto 2 lines. The History button is smaller than the buttons next to it."]},
+      {"screen": "Booking wizard step 2", "issues": ["Parking shows 100+ slot chips in one wall of buttons. Needs a search/filter or a collapsed picker."]},
+      {"screen": "Flat drawer header", "issues": ["Shows the raw category code ('BUILDER') instead of the owner-share name."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_phase_s2_api.py", "/app/backend/tests/test_phase_s2_wording.py", "/app/test_reports/pytest/pytest_s2.xml"],
+  "action_items": [
+    "Make InventoryActions reachable again: add row multi-select + an 'Inventory actions' button to the Project → Inventory table (and/or a button in FlatDrawer that opens it for the single flat).",
+    "Add 'allocation' to PaymentsOut (models_out.py) so GET /api/payments/{id} and the list return it.",
+    "SectionTabs: treat /payments?tab=roznamcha as the active Roznamcha tab (look at location.search).",
+    "PostPayment auto-allocation line: show the due for the chosen share, not the combined due.",
+    "Optional: merge the duplicate Payments tab rows; tidy the booking-detail header layout."
+  ],
+  "critical_code_review_comments": [
+    "components/common/InventoryActions.jsx is dead code (0 imports). The wording test test_phase_s2_wording.py passes on its text, but users never see it.",
+    "backend/tests/conftest.py sends every pytest request to a private backend on kkt_test (port 8021), even when REACT_APP_BACKEND_URL is set. So pytest results describe kkt_test, not the preview DB.",
+    "AgreementSigned treats plan_acceptance.marked_at as 'signed'. Seeded or wizard-created bookings have plan_acceptance without marked_at (bookings.py line 223), so all 79 existing Active bookings show the 'Mark agreement signed' control. This matches the spec, but the wizard's own acceptance record looks unsigned."
+  ],
+  "updated_files": ["/app/backend/tests/test_phase_s2_api.py"],
+  "success_rate": {"backend": "100% (5/5 new S2 API tests + 3/3 wording tests, run against the private kkt_test backend)", "frontend": "~92% (11/12 requested checks passed; the Inventory actions check failed)"},
+  "seed_data_creation": "PREVIEW DB CHANGES (requested by main agent): (1) BK-2627-0022 (id 02d58183-0695-4b00-827f-9b6acdac2821) plan_acceptance set to mode=WhatsApp, accepted_on=2026-11-13, marked_at set through the UI. It was previously mode 'In person', accepted_on 2026-10-13, no marked_at. (2) Cash payment ₹1,000, receipt KKT/2627/01809, id 4b41c65a-3bcf-4bab-9226-73ef2c21be34, remarks 'TEST_S2 UI cash auto', on BK-2627-0022, status Cleared, allocation='auto'. Not reversed. Pytest writes went only to kkt_test.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Login admin@kkt.in / Kkt@12345. Available flat used for the wizard: 6cc7b401-5fba-4072-b4ea-dc358c6524ca (M2-102, ₹42L). Booking with cash due: BK-2627-0022. Booking still showing the Mark control: BK-2627-0016 (043812bd-...). Select (v2) options use testid `${testId}-opt-${id}` with aria-label = option label; the trigger is `${testId}-trigger`. POST /api/payments needs an Idempotency-Key header (428 without it). Payment modes: GET /api/master/payment-modes. Retest: Inventory actions reachability, the Roznamcha tab highlight, and allocation in GET /api/payments/{id}.",
+  "rca of the issue": "Inventory actions missing: Phase S1 (commit e080111) deleted pages/BlockDetail.jsx, the only place that imported InventoryActions (multi-select + invOpen sheet). No replacement entry point was added to ProjectWorkspace's Inventory tab or to FlatDrawer. Repro: Projects → Shree Ganesh Heights → Inventory → click any row → the drawer has no inventory-actions button, and the page has no selection checkboxes. Fix: import InventoryActions in the Inventory tab (with row selection) and/or in FlatDrawer with flatIds=[flat.id]."
+}

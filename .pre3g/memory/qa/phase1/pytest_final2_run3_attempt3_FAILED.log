@@ -1,0 +1,143 @@
+bringing up nodes...
+bringing up nodes...
+
+........................................................................ [  9%]
+........................................................................ [ 19%]
+........................................................................ [ 28%]
+............................................................s........... [ 38%]
+........................................................................ [ 47%]
+........................................................................ [ 57%]
+..........F............................................................. [ 66%]
+........................................................................ [ 76%]
+........................................................................ [ 86%]
+.........sss...................................................s........ [ 95%]
+Fs...............................                                        [100%]
+=================================== FAILURES ===================================
+________________________ test_backend_ruff_format_clean ________________________
+[gw0] linux -- Python 3.11.18 /root/.venv/bin/python
+
+    def test_backend_ruff_format_clean():
+        r = _run([sys.executable, "-m", "ruff", "format", "--check", "."], BACKEND)
+>       assert r.returncode == 0, r.stdout[-2000:]
+E       AssertionError: unformatted: File would be reformatted
+E           --> tests/test_transfer_money_law.py:57:17
+E            |
+E         56 |     ]
+E            -     plan = next(p for p in call(H, "GET", "/master/payment-plans", page_size=200)["items"] if p.get("code") == "STANDARD_CLP")
+E         57 +     plan = next(
+E         58 +         p for p in call(H, "GET", "/master/payment-plans", page_size=200)["items"] if p.get("code") == "STANDARD_CLP"
+E         59 +     )
+E         60 |
+E            |
+E         
+E         1 file would be reformatted, 284 files already formatted
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/root/.venv/bin/python', '-m', 'ruff', 'format', '--check', '.'], returncode=1, stdout='unform...") == "STANDARD_CLP"\n59 +     )\n60 |\n   |\n\n1 file would be reformatted, 284 files already formatted\n', stderr='').returncode
+
+tests/test_format_gate.py:26: AssertionError
+___________________ test_transfer_keeps_the_money_law[True] ____________________
+[gw0] linux -- Python 3.11.18 /root/.venv/bin/python
+
+H = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzMzlkNmM0ZS1lYTU1LTRmNjMtYjRjZi0xYjk1NzgwODA...yLCJleHAiOjE3OTQ3OTYzODJ9.PfRpMCAioYh1qzVagnuiQaVMEatahe-ClBcmzoWpViU', 'X-Rate-Limit-Bypass': 'kkt-test-bypass-local'}
+revise_first = True
+
+    @pytest.mark.parametrize("revise_first", [False, True])
+    def test_transfer_keeps_the_money_law(H, revise_first):
+        flats = [
+            f for pg in (1, 2, 3) for f in call(H, "GET", "/flats", status="Available", page_size=200, page=pg)["items"]
+        ]
+        plan = next(p for p in call(H, "GET", "/master/payment-plans", page_size=200)["items"] if p.get("code") == "STANDARD_CLP")
+    
+        def with_plan(f):  # the flat's tower needs a payment plan so the booking raises bills; give it one if it has none
+            if not call(H, "GET", f"/projects/{f['project_id']}/blocks/{f['block_id']}/payment-plans")["items"]:
+                call(
+                    H,
+                    "POST",
+                    "/payment-plan-assignments",
+                    {
+                        "payment_plan_id": plan["id"],
+                        "project_id": f["project_id"],
+                        "block_id": f["block_id"],
+                        "is_default": True,
+                    },
+                )
+            return f
+    
+        ok = lambda f: bool(f.get("price"))  # noqa: E731
+>       f1, f2 = with_plan(claim_flat(flats, ok)), with_plan(claim_flat(flats, ok))
+                                                             ^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_transfer_money_law.py:75: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+flats = [{'inventory_state': 'Available', 'display_state': 'Show as Available', 'display_override': False, 'masked': False, .....ntory_state': 'Available', 'display_state': 'Show as Available', 'display_override': False, 'masked': False, ...}, ...]
+ok = <function test_transfer_keeps_the_money_law.<locals>.<lambda> at 0xfe87cc57afc0>
+
+    def claim_flat(flats, ok=lambda f: True) -> dict:
+        """First flat in `flats` passing `ok` that no other test in this session has claimed; the claim is recorded atomically."""
+        with open(_CLAIMS, "a+") as fh:
+            fcntl.flock(fh, fcntl.LOCK_EX)
+            try:
+                fh.seek(0)
+                raw = fh.read()
+                data = json.loads(raw) if raw else {}
+                taken = set(data.get(_SESSION, []))
+>               flat = next(f for f in flats if f["id"] not in taken and ok(f))
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E               StopIteration
+
+tests/flat_claims.py:20: StopIteration
+=============================== warnings summary ===============================
+../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
+../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
+  /root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12: PendingDeprecationWarning: Please use `import python_multipart` instead.
+    import multipart
+
+../../root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854
+../../root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854
+  /root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854: DeprecationWarning: 'crypt' is deprecated and slated for removal in Python 3.13
+    from crypt import crypt as _crypt
+
+tests/test_startup_s1_s3_idempotent.py:71
+tests/test_startup_s1_s3_idempotent.py:71
+  /app/backend/tests/test_startup_s1_s3_idempotent.py:71: PytestUnknownMarkWarning: Unknown pytest.mark.timeout - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.timeout(900)
+
+tests/test_phase_k_p1.py::test_loadshed_sheds_with_prebuilt_503_and_exempts_probes
+  /root/.venv/lib/python3.11/site-packages/starlette/testclient.py:41: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    [], typing.ContextManager[anyio.abc.BlockingPortal]
+
+tests/test_phase_q.py::test_void_watermark_deterministic
+tests/test_phase_q.py::test_void_watermark_deterministic
+tests/test_phase_q.py::test_void_watermark_deterministic
+tests/test_phase_q.py::test_void_watermark_deterministic
+tests/test_phase_q.py::test_void_watermark_deterministic
+tests/test_phase_q.py::test_void_watermark_deterministic
+tests/test_phase_q.py::test_void_watermark_deterministic
+tests/test_phase_q.py::test_void_watermark_deterministic
+  /root/.venv/lib/python3.11/site-packages/pypdf/_page.py:1368: DeprecationWarning: Calling `PageObject.replace_contents()` for pages not assigned to a writer is deprecated and will be removed in pypdf 7.0.0. Attach the page to the writer first or use `PdfWriter(clone_from=...)` directly. The existing approach has proved being unreliable.
+    self.replace_contents(ContentStream(new_content_array, self.pdf))
+
+tests/test_kkt_erp.py::TestBlock::test_create_block_and_generation
+tests/test_kkt_erp.py::TestFlatType::test_create_flat_type_auto_area
+tests/test_phase_7.py::TestPortalPhase7::test_portal_booking_payment_plan
+tests/test_phase_7.py::TestPortalPhase7::test_portal_booking_payment_plan
+  /root/.venv/lib/python3.11/site-packages/_pytest/fixtures.py:1313: PytestRemovedIn10Warning: Class-scoped fixture defined as instance method is deprecated.
+  Instance attributes set in this fixture will NOT be visible to test methods,
+  as each test gets a new instance while the fixture runs only once per class.
+  Use @classmethod decorator and set attributes on cls instead.
+  See https://docs.pytest.org/en/stable/deprecations.html#class-scoped-fixture-as-instance-method
+    fixturefunc = resolve_fixture_function(fixturedef, request)
+
+tests/test_phase_5.py::TestPortalData::test_booking_detail_and_subresources
+  /root/.venv/lib/python3.11/site-packages/_pytest/python.py:171: PytestReturnNotNoneWarning: Test functions should return None, but tests/test_phase_5.py::TestPortalData::test_booking_detail_and_subresources returned <class 'str'>.
+  Did you mean to use `assert` instead of `return`?
+  See https://docs.pytest.org/en/stable/how-to/assert.html#return-not-none for more information.
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_format_gate.py::test_backend_ruff_format_clean - AssertionE...
+FAILED tests/test_transfer_money_law.py::test_transfer_keeps_the_money_law[True]
+2 failed, 745 passed, 6 skipped, 20 warnings in 609.63s (0:10:09)

@@ -1,0 +1,116 @@
+[preview] building ERP bundle…
+yarn run v1.22.22
+$ /app/frontend/node_modules/.bin/craco build
+Cannot find ESLint plugin (ESLintWebpackPlugin).
+(node:88527) [DEP0176] DeprecationWarning: fs.F_OK is deprecated, use fs.constants.F_OK instead
+(Use `node --trace-deprecation ...` to show where the warning was created)
+Creating an optimized production build...
+Compiled successfully.
+
+File sizes after gzip:
+
+  137.85 kB         build/static/js/3200.14aede83.chunk.js
+  115.06 kB         build/static/js/main.bfcefca8.js
+  106.37 kB         build/static/js/6421.705c9074.chunk.js
+  35.27 kB          build/static/js/8354.8963f90b.chunk.js
+  21.77 kB          build/static/js/7406.1b8f4cfe.chunk.js
+  19.38 kB          build/static/js/750.e97346c5.chunk.js
+  17.33 kB          build/static/js/5327.ddea23d4.chunk.js
+  16.97 kB          build/static/css/main.cdf69027.css
+  16.86 kB          build/static/js/6016.3bdce96e.chunk.js
+  16.17 kB          build/static/js/3353.1cde7a8f.chunk.js
+  15.44 kB          build/static/js/9315.03996ded.chunk.js
+  15.26 kB          build/static/js/6097.fdff09fd.chunk.js
+  14.52 kB (+52 B)  build/static/js/9520.c014bc27.chunk.js
+  13.83 kB          build/static/js/1581.dd3c006b.chunk.js
+  13.58 kB          build/static/js/1111.9a901fbe.chunk.js
+  13.45 kB          build/static/js/7937.ff17df10.chunk.js
+  13.05 kB          build/static/js/7073.750c57e2.chunk.js
+  12.25 kB          build/static/js/9028.b5a53af7.chunk.js
+  11.75 kB          build/static/js/11.852a76cf.chunk.js
+  11.7 kB           build/static/js/3814.4a3e0721.chunk.js
+  11.31 kB          build/static/js/4921.bc5f6b5d.chunk.js
+  11.29 kB          build/static/js/9710.84d78802.chunk.js
+  11.21 kB          build/static/js/8899.b0bbe4b0.chunk.js
+  10.58 kB          build/static/js/9880.657cf689.chunk.js
+  10.48 kB          build/static/js/859.943c8014.chunk.js
+  10.4 kB           build/static/js/8619.f5e42cae.chunk.js
+  9.89 kB           build/static/js/916.285839a7.chunk.js
+  9.77 kB           build/static/js/3768.047c0add.chunk.js
+  9.62 kB           build/static/js/8535.2f97672f.chunk.js
+  9.27 kB           build/static/js/3839.cd033c67.chunk.js
+  9.19 kB           build/static/js/5573.eae8c2f2.chunk.js
+  8.83 kB           build/static/js/4406.ce14f772.chunk.js
+  8.81 kB           build/static/js/1552.c4ea3c51.chunk.js
+  8.53 kB           build/static/js/3760.96275a85.chunk.js
+  8.01 kB           build/static/js/2512.898382f4.chunk.js
+  7.96 kB           build/static/js/2937.b602c8bf.chunk.js
+  7.76 kB           build/static/js/955.7dff09a4.chunk.js
+  7.67 kB           build/static/js/8867.f02c6ea8.chunk.js
+  7.56 kB           build/static/js/3077.b524f3ad.chunk.js
+  7.56 kB           build/static/js/8145.df90fbc9.chunk.js
+  7.51 kB           build/static/js/2152.56666621.chunk.js
+  7.19 kB           build/static/js/4640.5d4741da.chunk.js
+  7.11 kB           build/static/js/7277.2a773fda.chunk.js
+  7.09 kB           build/static/js/7458.b1b2ec38.chunk.js
+  6.94 kB           build/static/js/846.1df085ce.chunk.js
+  6.81 kB           build/static/js/4184.aa4a1408.chunk.js
+  6.78 kB           build/static/js/932.1a9f0396.chunk.js
+  6.75 kB           build/static/js/5603.06dbc364.chunk.js
+  5.97 kB           build/static/js/901.033d2e0d.chunk.js
+  5.85 kB           build/static/js/6485.9f109591.chunk.js
+  5.82 kB           build/static/js/200.11ca6121.chunk.js
+  5.8 kB            build/static/js/2107.860a94f1.chunk.js
+  5.65 kB           build/static/js/5807.c9af913d.chunk.js
+  5.64 kB           build/static/js/995.c578f690.chunk.js
+  5.53 kB           build/static/js/5533.4adf0291.chunk.js
+  5.14 kB           build/static/js/1735.96fbdc9d.chunk.js
+  5.01 kB           build/static/js/7302.4c669546.chunk.js
+  4.95 kB           build/static/js/4116.10d4c20b.chunk.js
+  4.92 kB           build/static/js/8710.4707db4b.chunk.js
+  4.8 kB            build/static/js/6599.7dd58019.chunk.js
+  4.26 kB           build/static/js/1143.6065d030.chunk.js
+  4.25 kB           build/static/js/8339.779676ae.chunk.js
+  4.14 kB           build/static/js/7420.3d911e64.chunk.js
+  4.13 kB           build/static/js/4806.af2e204c.chunk.js
+  3.99 kB           build/static/js/1793.ffd343a3.chunk.js
+  3.92 kB           build/static/js/323.1b3fc1c3.chunk.js
+  3.66 kB           build/static/js/1335.fbacab79.chunk.js
+  3.4 kB            build/static/js/4592.5fed298c.chunk.js
+  3.35 kB           build/static/js/394.a6b8dc49.chunk.js
+  3.34 kB           build/static/js/8800.33cceaa4.chunk.js
+  3.21 kB           build/static/js/2021.4e73d687.chunk.js
+  2.93 kB           build/static/js/2350.64e306ba.chunk.js
+  2.87 kB           build/static/js/3297.dfd581a0.chunk.js
+  2.76 kB           build/static/js/2984.5a667d26.chunk.js
+  2.74 kB           build/static/js/6724.c188aa3b.chunk.js
+  2.41 kB           build/static/js/6937.98ce07b4.chunk.js
+  2.14 kB           build/static/js/6196.1cf46bb9.chunk.js
+  1.92 kB           build/static/js/610.99ca47f5.chunk.js
+  1.71 kB           build/static/js/9131.51c858cb.chunk.js
+  1.62 kB           build/static/js/2519.4797add7.chunk.js
+  1.61 kB           build/static/js/8687.01d09846.chunk.js
+  1.48 kB           build/static/js/8289.c711d4b7.chunk.js
+  1.47 kB           build/static/js/6620.f837b0be.chunk.js
+  1.36 kB           build/static/js/1448.f4a197a9.chunk.js
+  1.31 kB           build/static/js/1539.b5bc4404.chunk.js
+  1.22 kB           build/static/js/2721.8db0e912.chunk.js
+  1.16 kB           build/static/js/9590.8ff68b58.chunk.js
+  642 B             build/static/js/1568.3ebc92a0.chunk.js
+  481 B             build/static/js/3772.e4376bc9.chunk.js
+  254 B             build/static/js/2607.1ff5edc4.chunk.js
+
+The project was built assuming it is hosted at /.
+You can control this with the homepage field in your package.json.
+
+The build folder is ready to be deployed.
+You may serve it with a static server:
+
+  yarn global add serve
+  serve -s build
+
+Find out more about deployment here:
+
+  https://cra.link/deployment
+
+Done in 12.32s.

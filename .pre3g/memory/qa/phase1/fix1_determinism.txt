@@ -1,0 +1,2 @@
+story trace A vs B (bookings, payments, rng per month): IDENTICAL 1193 1193
+snapshot A vs B (money totals, counts, statuses, flat ids/rates/prices, project/tower ids, hold reasons, booked flats): IDENTICAL

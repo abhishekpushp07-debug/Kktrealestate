@@ -1,0 +1,53 @@
+{
+  "iteration": 7,
+  "phase": "2",
+  "batch": "b — Home Command Center JRN-51..60 + retest of iteration_6 failures",
+  "passed": 6,
+  "failed": 4,
+  "retest_needed": true,
+  "summary": "The backend bundle is correct: all 7 API tests pass. Every drill figure equals its list API for Today, Month and FY. Role widgets are enforced on the server, and Sales gets no money data. The browser found 4 failures. (1) HIGH: after a logout and login in the same tab, the next user sees the previous user's cached Home. Sales logging in after the Owner sees all 11 owner widgets with money. (2) Collections and Bills-raised (demands) drill-downs have no 'Filtered from Home · Clear' chip. (3) When there is no inflow, 'Next 30 days inflow' still shows bare ₹0 / 0 rows under its empty sentence. (4) First widget appears about 1.35 s after a warm login; the target is 1.0 s or less. Both iteration_6 failures are fixed: the Roznamcha refund row and line now add up, and axe finds 0 contrast violations.",
+  "bugs": [
+    {
+      "severity": "high",
+      "criterion": "JRN-54 Role defaults enforced by the server",
+      "title": "Logout does not clear the client cache: the next user in the same tab sees the previous user's Home, including money",
+      "evidence": "Check home-role-defaults, leak probe (2 consistent runs). admin@kkt.in login → Home → user-menu → menu-logout → sales@kkt.in login in the same tab, no reload. The Home grid then shows money_today, due_vs_received, ageing, call_today, inflow_30, next_milestone, inventory, flat_status, construction, pipeline, attention, with 'Money today ₹4.1 L … Cash ₹2.8 L … Overdue by age ₹7.43 Cr' (screenshot home-role-defaults-leak-probe.png). The first run hit the same issue the other way: Sales → logout → accounts@kkt.in, and Accounts saw Sales' layout and data ('Call today: No overdue customers', Sales pipeline, Inventory with no Booked state). The server is correct: GET /api/home/bundle as sales returns only call_today/inventory/flat_status/pipeline with no money keys (test_tscheck_home_command_center::test_role_defaults_server_enforced passed). After a full page reload, every role sees its correct default. Cause seen in code: AuthContext.logout clears tokens and the user, but does not clear the react-query/useFetch cache ('/home/bundle?period=month' key), and the module-level customizeOpened flag survives."
+    },
+    {
+      "severity": "medium",
+      "criterion": "JRN-52 Every number opens the list that adds up to it",
+      "title": "Collections and demand-register drill-downs have no 'Filtered from Home · Clear' chip",
+      "evidence": "Check home-drill-adds-up (2 consistent runs). Every drill's figure matches its list: ageing 0-30 → 'In band 0-30' ₹49.9 L, 10; money-today → collections ₹4.1 L / ₹2.8 L / ₹91,876; month due → ₹3,48,20,760; inflow → ₹1,33,18,010; stale → 4; holds → 1 record; leads → 6; follow-ups → 1. Chip present: ageing, holds, pipeline-leads, followups, inventory cell. Chip missing: /reports/collections-v2?from_date=2026-11-16&to_date=2026-11-16, /demands?basis=due&date_from=2026-11-01&date_to=2026-11-30, /demands?basis=due&date_from=2026-11-17&date_to=2026-12-16, /demands?stale_days=30. Only Reports (outstanding), Leads, Bookings and FlatsTable import DrillFilterChip. Also, on the collections drill the period pills highlight 'FY' while the range reads 16 Nov–16 Nov. The backend is healthy: every drill api equals its figure (test_every_drill_equals_its_list, today/month/fy, passed)."
+    },
+    {
+      "severity": "low",
+      "criterion": "JRN-56 + JRN-57 + JRN-58 no bare zero",
+      "title": "Next 30 days inflow shows bare ₹0 / 0 rows under its empty-state sentence",
+      "evidence": "Check home-period-project-filters. Project = Ye (month) and Project = Ganesh Green Villas + Today. widget-inflow_30 text: 'No dated bills or cheques due in the next 30 days · Bills due in 30 days ₹0 · Cheques pending clearance ₹0 · Awaiting stage (no date yet) 0 instalments'. Inflow() in CommandWidgets.jsx renders the rows unconditionally after <Empty>. All other widgets show only a sentence ('No receipts today yet · Post a payment', 'Nothing outstanding — every bill is paid', 'No leads in Today · Add a lead', 'Nothing needs attention right now'). API for Ye: inflow_30 total_paise 0, awaiting_stage.count 0."
+    },
+    {
+      "severity": "medium",
+      "criterion": "JRN-59 + JRN-60 Isolation and speed, both themes, phone",
+      "title": "Warm login → first widget ≈1.35 s (target ≤1.0 s)",
+      "evidence": "Check home-isolation-speed-phone, 2 runs of 5 warm logins on the preview URL. First run [first, all] ms: [1352,1358],[1359,1365],[1347,1352],[1855,1861],[1353,1358]. Second run: [1350,1356],[835,841],[1349,1354],[1352,1358],[1354,1359]. Median first widget 1350 ms (fails ≤1000). Median all widgets 1356 ms (passes ≤1800). Backend is fast: curl localhost:8001 POST /api/auth/login 0.24 s, GET /api/home/bundle ~5 ms. The steady ~1.35 s, with one 835 ms run, suggests a fixed client-side delay after login (redirect, auth/me, or a transition) rather than server time. The other parts of this criterion passed: one-widget failure isolation, Retry, Night theme, 390×844 with 0 px horizontal scroll (Night and Light), and 0 console errors."
+    }
+  ],
+  "action_items": [
+    {"type": "note", "detail": "Login rate limit (10/min/IP) gave one 429 during back-to-back browser checks. The rerun after cooldown was clean. Not an app bug."},
+    {"type": "note", "detail": "themes-contrast-axe used booking and customer ids that a demo refresh had deleted (404). Updated them to BK-2526-2331 (696d665b…) and its customer (643f0d5a…). Find anchors by role tag in future."},
+    {"type": "note", "detail": "No cash refund was posted today after the demo refresh (GET /api/roznamcha?date=2026-11-16 refunds_paise 0), so the refund row was checked on 2026-02-26 (RF-2526-0075, NEFT, shown as 'not cash'). That day's line adds up."},
+    {"type": "note", "detail": "Admin layout was customized, then reset. It is back at default (GET /api/me/home-layout is_default true, all 11 in order). Nothing else was written; no seeded data was changed."}
+  ],
+  "checks": [
+    {"criterion": "JRN-51..54, 56-58 (API)", "name": "test_tscheck_home_command_center.py", "lane": "backend", "status": "passed", "evidence": "7 passed in 4.5s. GET /api/home/bundle?period=month 200: 11 widgets in order; cash 27562800, account 9187600, other 4000000; due 3482076000 vs received 1555093000; ageing bands match; inflow bills 1331801000 + cheques 4000000; attention 1/0/4; call_today sorted by overdue desc. Every drill api equals its figure for today/month/fy. FY received 18704459100; today 40750400. Ye: ageing 0, only tower Orion, 48 available. Sales/Accounts/Site engineer visible layouts match; Sales bundle has no money widgets, no Booked/Blocked state and no overdue_paise."},
+    {"criterion": "JRN-51 Owner sees all 11 widgets with the right numbers", "name": "home-owner-11-widgets", "lane": "browser", "status": "passed", "evidence": "Order money_today…attention (11). ₹4.1 L (Cash ₹2.8 L / Account ₹91,876 / Other ₹40,000), cheques 1 · ₹40,000; due ₹3.48 Cr vs received ₹1.56 Cr; Outstanding ₹7.43 Cr = Not due ₹1.45 Cr·25 / 0-30 ₹49.9 L·10 / 31-60 ₹38.7 L·9 / 61-90 ₹68 L·12 / 90+ ₹4.42 Cr·70; inflow bills ₹1.33 Cr + cheques ₹40,000. 'outstanding' appears once on Home."},
+    {"criterion": "JRN-52 Every number opens the list that adds up to it", "name": "home-drill-adds-up", "lane": "browser", "status": "failed", "evidence": "All 9 drills show the matching total or count. The 'Filtered from Home' chip is missing on collections-v2 and the 3 /demands drills (see bugs)."},
+    {"criterion": "JRN-53 Period and project filters (+ JRN-58 empty states)", "name": "home-period-project-filters", "lane": "browser", "status": "failed", "evidence": "Today → received ₹4.1 L; FY → ₹18.7 Cr, pipeline 49; ageing ₹7.43 Cr and inventory unchanged across periods. SGH → ageing ₹6.67 Cr, no Orion; Ye → sentences only, apart from the inflow widget's bare ₹0 rows (bug). GGV+Today shows the same inflow issue."},
+    {"criterion": "JRN-54 Role defaults enforced by the server", "name": "home-role-defaults", "lane": "browser", "status": "failed", "evidence": "With a reload between users, all defaults are correct. Sales: call_today, pipeline, inventory, flat_status; no ₹ and no Booked/Blocked; Customize offers only those 4. Accounts: 6 widgets. Site engineer: next_milestone, construction, flat_status; offers no money widget. Same-tab logout→login leaks the previous user's cached Home (HIGH bug)."},
+    {"criterion": "JRN-55 Customize saved per user", "name": "home-customize-per-user", "lane": "browser", "status": "passed", "evidence": "Hid pipeline, moved attention to the top, PUT 200. Logout + reload + login → kept (attention first, 10 widgets). Sales layout via API unchanged. Reset (DELETE 200) → 11 default in order; admin left at default."},
+    {"criterion": "JRN-56 + JRN-57 + JRN-58 Call today, Needs attention", "name": "home-call-today-attention", "lane": "browser", "status": "passed", "evidence": "6 overdue customers, highest first (Ritu Malhotra ₹39.8 L), each with tel:+91… and wa.me/91… links; follow-ups 1, visits 1; attention holds 1, bounced 'None', stale 4. Name → /customers/6193fce9… shows Ritu Malhotra."},
+    {"criterion": "JRN-59 + JRN-60 Isolation and speed, both themes, phone", "name": "home-isolation-speed-phone", "lane": "browser", "status": "failed", "evidence": "Injected ageing ok:false → only widget-ageing-error with Couldn't load + Retry; the other widgets render; Retry → ₹7.43 Cr. Night and Light at 390×844: 0 px horizontal scroll, 0 console errors. Median first widget 1350 ms (>1000; bug); all widgets 1356 ms (≤1800)."},
+    {"criterion": "Retest iteration_6: Roznamcha refunds", "name": "roznamcha-refunds-retest", "lane": "browser", "status": "passed", "evidence": "Today: 'Cash paid out' ₹72,17,000 tile; 'Opening ₹87,46,349 + cash in ₹3,00,628 − cash out ₹72,17,000 = closing ₹18,29,977' adds up. 2026-02-26: refund row RF-2526-0075 '−₹4,22,892 · NEFT_RTGS · not cash · Paid' visible; that line adds up too."},
+    {"criterion": "Retest iteration_6: AA contrast", "name": "themes-contrast-axe", "lane": "browser", "status": "passed", "evidence": "axe color-contrast: 0 violations on home, booking (BK-2526-2331), customer360, outstanding and masters, in both Light and Night."}
+  ]
+}

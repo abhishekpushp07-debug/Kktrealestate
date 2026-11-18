@@ -1,0 +1,29 @@
+{
+  "summary": "Frontend-only verification of 10 fix items on preview (production build). All 10 PASS. BUG 1: on SGH, uploaded a TEST PNG, starred it as cover, clicked Save: no 409, no 4xx responses, sheet closed, hero cover changed to v=5436f1fb. Reopened Edit, starred the original photo back, pressed Escape: hero went back to v=192a0040 without a page reload. Removed the added photo afterwards (DELETE 200); SGH is back to its single original photo and cover (version 68 -> 73 from the photo ops). 'Ye' was not touched. BUG 2: at 390px, scrolled the /reports hub to scrollY 1924, opened Hold Register: scrollY 0. Data Quality: scrollY 0. /customers scrolled to 2200 then opened a customer: scrollY 0. Shalini Thakur (BK-2627-2661): Next due shows 'Other charges · Due today · ₹6,35,936'. In Record payment with NEFT / RTGS the amount pre-fills 6,35,936 and the hint reads 'Open now ₹6,35,936 · settled oldest first'. Not submitted. Customer cards: statuses seen were 'DUE TODAY', 'DUE ON 26 NOV' and 'OVERDUE N DAYS'; no 'DUE NOW'. /payments: a search with no results shows 'No receipts match these filters' with receipts-clear-filters; clicking it clears the search and 20 receipts come back. /leads: title 'leads & visits.', summary '104 leads in pipeline · 1 follow-up due · 1 visit today'; the header has only the project filter and one primary 'New lead'; no Book visit button anywhere. Follow-up due tile = 1, same as the Admin Home tile '1 follow-up due' (singular). Sales Home: '42% of all flats · as shown to sales'. /reports: Project Statement caption 'pick one for its full statement · today'. /masters/m/bank-accounts: title 'bank accounts.', summary '1 entry · used across projects, bookings and payments · deactivating keeps history', one 'New bank account'. /projects: QA Photo Test / QAPT is gone (3 projects: GGV, SGH, YE).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "HomeElite.jsx call-today row", "issue": "Hidden bug (not on screen in this run): the text is '{d.followups.count || \"No\"} follow-ups due', which is never singular, so a count of 1 reads '1 follow-ups due'. HomeWidgets tiles already handle singular.", "selector": "[data-testid='call-today-followups']", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Customer 360 Next due (Shalini)", "issues": ["Shows 'Due today' for other-charges bills dated 05 Apr 2026 and 16 May 2026, which are months in the past. This matches the requested spec, but the product owner may expect 'Overdue since'."]},
+      {"screen": "Record payment sheet", "issues": ["The 'Drawn on bank' placeholder is cut off ('Pick or type the')."]},
+      {"screen": "Home / report filters", "issues": ["The Home 'All projects' filter and the report filters on mobile still use native <select> controls instead of the Elite Select."]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Optional: make HomeElite.jsx:207 singular ('1 follow-up due') to match HomeWidgets",
+    "Optional: fix the cut-off 'Drawn on bank' placeholder in PostPayment"
+  ],
+  "critical_code_review_comments": [
+    "ProjectDialog: close() builds onSaved({...p, ...photos, version: ver}), but ProjectWorkspace's onSaved ignores the argument and reloads, which is fine. Projects.jsx onSaved should also handle this payload shape."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "skipped (frontend only)", "frontend": "100% (10/10 items)"},
+  "seed_data_creation": "One TEST PNG photo added to SGH and then deleted (id 5436f1fb...). SGH photos/cover are back to the original single photo 192a0040. No payment was recorded. 'Ye' was not touched.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "SGH id 8e4ef80c-0ce8-4fe6-8c46-7b552afe0d8a; original cover photo 192a004018544916a0485300e08b4925. Shalini Thakur customer id 0ae3d89a-7354-44a0-bef6-3f88834c60ab (CUST-2627-7266). Pressing 'p' on Customer 360 opens Record payment. Report hub tiles have no data-testid on the clickable element; click them by their text."
+}

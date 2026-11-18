@@ -1,0 +1,50 @@
+{
+  "iteration": 4,
+  "mode": "retest",
+  "passed": 15,
+  "failed": 1,
+  "retest_needed": true,
+  "bugs": [
+    {
+      "severity": "medium",
+      "criterion": "JRN-37 / JRN-27 Refresh keeps every master and stable ids",
+      "title": "Masters hub link 'Hold reasons' (/masters/m/hold-reasons) opens the Floor Plans master. The custom hold reasons kept by the refresh cannot be seen or managed in the UI.",
+      "evidence": "Browser check refresh-keeps-setup: on /masters/m/hold-reasons the page h1 reads 'Floor Plans' (screenshot refresh-keeps-setup-hold-reasons.png). Cause: MastersHub.jsx:54 links 'Hold reasons' to /masters/m/hold-reasons, but pages/master/masterConfig.js has no kind 'hold-reasons' (it has no 'allocation-categories' either, which is linked at MastersHub.jsx:53), so MasterPage falls back to the first config. The API is healthy: GET /api/master/hold-reasons -> 200 and lists 'tscheck custom reason' and 'Token received (custom)' after the refresh (e1_tests/test_tscheck_refresh_keeps_ids.py::test_masters_kept passed)."
+    }
+  ],
+  "action_items": [
+    {
+      "type": "note",
+      "severity": "low",
+      "detail": "Two demo refreshes were triggered, not one. The first POST /api/admin/demo-refresh/run (04:17:42 UTC) stopped with 'interrupted: backend restarted mid-run' 1 minute in. My own file write to /app/backend/e1_tests caused this, because uvicorn WatchFiles watches /app/backend. Before running again I checked the data: 78 active bookings, MTD ₹1,55,50,930 and outstanding ₹7,42,79,994 were all unchanged. One full refresh then ran from 04:19 to 04:27:09 UTC (outcome 'done', backup test_database-20261116T041903Z.archive.gz). Also note for the main agent: any write under /app/backend, including e1_tests, restarts the backend and will abort a running refresh."
+    },
+    {
+      "type": "stale_tests",
+      "severity": "low",
+      "detail": "Several older e1_tests hard-code numbers from earlier seeds that the reseeds have since moved on from: test_tscheck_home_today (MTD 15485546), reports_agree, not_due_bills, journey_order (BK-2526-1348/1349/1352), next_stage_preview, refresh_state (old hold-reason list and backup assertions), and split_reversal (setup error, booking gone). They fail against today's data and are not counted here. The current matrix is covered by the new files test_tscheck_headline_iter4.py, test_tscheck_hold_expiry.py and test_tscheck_refresh_keeps_ids.py, plus test_tscheck_business_day.py, which now targets BK-2526-2219."
+    },
+    {
+      "type": "note",
+      "severity": "low",
+      "detail": "Home Recent activity shows each receipt twice, e.g. 2x 'Payment · post KKT/2627/17087'. The API returns two audit rows with different payment entity ids under the same receipt number. This is probably the Cash/Account split of one receipt, but it reads as a duplicate. Also, System Health 'Last backup' shows the time in browser-local format (11/16/2026, 4:19:07 AM), not IST."
+    }
+  ],
+  "checks": [
+    {"criterion": "JRN-36 / JRN-8 One outstanding number everywhere", "name": "test_tscheck_headline_iter4.py::test_home_ageing_equals_reports_and_register", "lane": "backend", "status": "passed", "evidence": "GET /dashboard/home ageing_paise {not_due:1445527000(25), d0_30:498850100(10), d31_60:386609300(9), d61_90:679609400(12), d90:4417403600(70)} sum = outstanding_paise 7427999400; GET /reports/outstanding-v2 bands and Outstanding KPI identical; GET /demands/register basis=raised, reconcile 31830841+42297853+151300 rupees = 7,42,79,994"},
+    {"criterion": "JRN-36 / JRN-8 One outstanding number everywhere", "name": "reports-agree-headline", "lane": "browser", "status": "passed", "evidence": "Home Due ageing: 25/10/9/12/70 bookings, ₹1.45 Cr/₹49.9 L/₹38.7 L/₹68 L/₹4.42 Cr, '₹7,42,79,994 total open'. Reports > Outstanding contains all five exact band values and ₹7,42,79,994. Demand register: 'Raised bills only … Open bills ₹3,18,30,841 + other charges due ₹4,22,97,853 + bucket netting ₹1,51,300 = Outstanding ₹7,42,79,994'"},
+    {"criterion": "JRN-6 Nothing dated after today", "name": "test_tscheck_headline_iter4.py::test_nothing_after_today_and_holds_expire", "lane": "backend", "status": "passed", "evidence": "GET /audit-logs?date_from=2026-11-17 total=0; newest audit created_at 2026-11-16T05:00Z; notifications and home recent all <= 2026-11-16; hold-register 3 rows all with expires_at, C-204 hours_left 37.8"},
+    {"criterion": "JRN-6 Nothing dated after today", "name": "nothing-after-today", "lane": "browser", "status": "passed", "evidence": "Home Recent activity rows all '16 Nov 2026', with no future or relative-future dates; Admin > Audit page has no date after 16 Nov 2026"},
+    {"criterion": "JRN-14 Home trend chart includes Other", "name": "test_tscheck_headline_iter4.py::test_trend_other_equals_mtd_and_reports", "lane": "backend", "status": "passed", "evidence": "collections_12m 2026-11 Cash 9118506 / Account 6392424 / Other 40000, sum 15550930 = totals.collections_mtd; GET /reports/collections-v2 01-16 Nov Net received 1555093000 paise"},
+    {"criterion": "JRN-14 Home trend chart includes Other", "name": "trend-reports-match-home", "lane": "browser", "status": "passed", "evidence": "Home trend tooltip 2026-11: Account ₹63,92,424 · Cash ₹91,18,506 · Other ₹40,000. Reports > Collections 01–16 Nov shows ₹1,55,50,930 with the same three parts"},
+    {"criterion": "JRN-16 Part-paid text on all three screens", "name": "partial-bills-explain", "lane": "browser", "status": "passed", "evidence": "DM-2627-13892 (BK-2526-2244): register, booking Bills tab and Customer 360 all show 'Cash part paid · Account ₹91,876 paid · ₹91,876 open'"},
+    {"criterion": "JRN-31 / JRN-32 Screens use the India business day", "name": "test_tscheck_business_day.py", "lane": "backend", "status": "passed", "evidence": "business_day 2026-11-16 = IST date; POST /payments with today -> payment_date 2026-11-16, in today's Roznamcha and Collections. POST with 2026-11-15 -> kept as 2026-11-15, in 15 Nov Roznamcha and not in 16 Nov. Both reversed (200), MTD back to ₹1,55,50,930"},
+    {"criterion": "JRN-31 / JRN-32 Screens use the India business day", "name": "payment-date-ist-default", "lane": "browser", "status": "passed", "evidence": "Browser TZ Pacific/Honolulu (local date 2026-11-15). pp-date default 2026-11-16, max 2026-11-16. Reports presets: Today 16 Nov→16 Nov, This month 01 Nov→16 Nov, FY 01 Apr 2026→16 Nov 2026"},
+    {"criterion": "Hold expiry required everywhere (owner rule)", "name": "test_tscheck_hold_expiry.py", "lane": "backend", "status": "passed", "evidence": "PATCH /flats/{P6}/status Hold without expiry, POST /blocks/{P}/bulk-status Hold, POST /inventory/bulk action=hold: each 422 'Hold expiry is required'; flat status and version unchanged (Available)"},
+    {"criterion": "Hold expiry required everywhere (owner rule)", "name": "hold-needs-expiry", "lane": "browser", "status": "passed", "evidence": "Flat drawer GGV P6: 'Mark Hold' disabled with empty 'Hold until', enabled after setting it, disabled again when cleared. Never clicked, so no hold was created"},
+    {"criterion": "JRN-38 + audit labels + JRN-35", "name": "audit-labels-plan-sum", "lane": "browser", "status": "passed", "evidence": "Audit labels are readable with the raw key in the title tooltip: payment.reverse -> 'Payment reversed', admin.test_data_purged -> 'Test data purged', hold_reasons.create -> 'Hold reasons created'. Payment plan with one row at 95%: pp-sum 'Σ 95.00% ≠ 100', Save disabled; at 100 Save enabled (not saved)"},
+    {"criterion": "JRN-38 + audit labels + JRN-35", "name": "demo-refresh-today", "lane": "browser", "status": "passed", "evidence": "After refresh: System Health Demo data card 'Demo last refreshed 2026-11-16 · done'; Last backup '59.3 MB · 11/16/2026, 4:19:07 AM', i.e. the pre-refresh archive test_database-20261116T041903Z, not 'never'"},
+    {"criterion": "JRN-37 / JRN-27 Refresh keeps every master and stable ids", "name": "test_tscheck_refresh_keeps_ids.py", "lane": "backend", "status": "passed", "evidence": "5/5 passed after refresh (done 04:27:09Z, backup = last_backup). All ids and names in 10 masters kept, including 'tscheck custom reason' and 'Token received (custom)'. 138 flat ids and 2 project ids identical; noted flats P1, P6, C-204 resolve; SGH Tower C id unchanged; admin and sales logins 200; max booking/receipt numbers higher than pre-refresh BK-2627-2409 / KKT/2627/25556"},
+    {"criterion": "JRN-37 / JRN-27 Refresh keeps every master and stable ids", "name": "refresh-keeps-setup", "lane": "browser", "status": "failed", "evidence": "/bookings/new?flat=050fd11f… (noted P1 id) opens with Flat 'P1 · Villa Block P (Premium) · ₹1,00,00,000' as expected. /masters/m/hold-reasons renders 'Floor Plans' instead of Hold reasons, so the custom reasons are not visible in the UI (see bugs[0]). Sales login is covered by the backend test"},
+    {"criterion": "JRN-36/14/6 regression after refresh", "name": "test_tscheck_headline_iter4.py (rerun post-refresh)", "lane": "backend", "status": "passed", "evidence": "3/3 passed after the refresh: headline amounts unchanged"}
+  ]
+}

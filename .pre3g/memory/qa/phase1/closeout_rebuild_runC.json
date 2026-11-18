@@ -1,0 +1,138 @@
+{
+ "counters": {
+  "6adf98dd23be344d65e4f774": 56,
+  "6adf98dd23be344d65e4f78d": 1016,
+  "6adf98dd23be344d65e4f7ab": 1180,
+  "6adf98dd23be344d65e4f7c3": 1139,
+  "6adf98dd23be344d65e4f7cd": 4571,
+  "6adf98dd23be344d65e4f944": 7144,
+  "6adf98de23be344d65e4fac9": 1166,
+  "6adf98e323be344d65e5149f": 2,
+  "6adf990623be344d65e5d8e7": 34,
+  "6adf990d23be344d65e60013": 12175,
+  "6adf990f23be344d65e60a39": 6972,
+  "6adf991223be344d65e61597": 640,
+  "6adf991223be344d65e615e5": 6561,
+  "6adf991223be344d65e61624": 1951,
+  "6adf991b23be344d65e643ee": 4589,
+  "6adf996023be344d65e76d73": 544,
+  "6adf9f6623be344d65e814bb": 973
+ },
+ "snap": {
+  "bookings": {
+   "Active": 78,
+   "Cancelled": 2
+  },
+  "demands": {
+   "Cancelled": [
+    5,
+    185848000
+   ],
+   "Open": [
+    65,
+    3415814000
+   ],
+   "Paid": [
+    514,
+    34751574000
+   ],
+   "Partially Paid": [
+    2,
+    117462000
+   ]
+  },
+  "flat_prices": 88877050000,
+  "flats": {
+   "Available": 56,
+   "Blocked": 1,
+   "Booked": 78,
+   "Hold": 3
+  },
+  "leads": {
+   "Contacted": 8,
+   "Converted": 78,
+   "Lost": 9,
+   "Negotiation": 6,
+   "New": 8,
+   "Site Visit Done": 3,
+   "Site Visit Scheduled": 8
+  },
+  "outstanding": 7693431500,
+  "payments": {
+   "Bounced": [
+    2,
+    39032000
+   ],
+   "Cleared": [
+    1088,
+    34990585100
+   ],
+   "Pending": [
+    1,
+    4000000
+   ],
+   "Reversed": [
+    1,
+    1500000
+   ]
+  },
+  "plans": [
+   "CLP home loan (45 days to pay)",
+   "Down Payment 10:85:5",
+   "Down Payment 10:85:5 (Tower B)",
+   "Flexi 10:40:50",
+   "Flexi 10:40:50 (Tower B)",
+   "Lump sum (100% on booking)",
+   "Standard CLP",
+   "Villa CLP"
+  ],
+  "projects": [
+   "GGV",
+   "SGH"
+  ],
+  "refunds": {
+   "Forfeited": [
+    1,
+    0
+   ],
+   "Paid": [
+    2,
+    41815800
+   ]
+  },
+  "roles": [
+   "Accounts",
+   "Admin",
+   "Employee",
+   "Marketing",
+   "Project Admin",
+   "Sales",
+   "Super Admin"
+  ],
+  "story": "2026-11-15",
+  "towers": [
+   "Tower A",
+   "Tower B",
+   "Tower C",
+   "Villa Block P (Premium)",
+   "Villa Block V"
+  ],
+  "users": [
+   "abhishek@billpe.com",
+   "accounts@kkt.in",
+   "admin@kkt.in",
+   "employee@kkt.in",
+   "marketing@kkt.in",
+   "projectadmin@kkt.in",
+   "sales2@kkt.in",
+   "sales@kkt.in",
+   "support@kkt.in"
+  ],
+  "visits": {
+   "Cancelled": 1,
+   "Completed": 83,
+   "Confirmed": 1,
+   "No-show": 2
+  }
+ }
+}

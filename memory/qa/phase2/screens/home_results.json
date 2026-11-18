@@ -1,0 +1,258 @@
+[
+ {
+  "role": "owner",
+  "theme": "light",
+  "width": 1440,
+  "first_content_ms": 1389,
+  "all_widgets_ms": 1391,
+  "h_overflow_px": 0,
+  "widgets": [
+   "widget-money_today",
+   "widget-due_vs_received",
+   "widget-ageing",
+   "widget-call_today",
+   "widget-inflow_30",
+   "widget-next_milestone",
+   "widget-inventory",
+   "widget-flat_status",
+   "widget-construction",
+   "widget-pipeline",
+   "widget-attention"
+  ]
+ },
+ {
+  "role": "owner",
+  "theme": "light",
+  "width": 390,
+  "first_content_ms": 1390,
+  "all_widgets_ms": 1391,
+  "h_overflow_px": 0,
+  "widgets": [
+   "widget-money_today",
+   "widget-due_vs_received",
+   "widget-ageing",
+   "widget-call_today",
+   "widget-inflow_30",
+   "widget-next_milestone",
+   "widget-inventory",
+   "widget-flat_status",
+   "widget-construction",
+   "widget-pipeline",
+   "widget-attention"
+  ]
+ },
+ {
+  "role": "owner",
+  "theme": "night",
+  "width": 1440,
+  "first_content_ms": 1389,
+  "all_widgets_ms": 1390,
+  "h_overflow_px": 0,
+  "widgets": [
+   "widget-money_today",
+   "widget-due_vs_received",
+   "widget-ageing",
+   "widget-call_today",
+   "widget-inflow_30",
+   "widget-next_milestone",
+   "widget-inventory",
+   "widget-flat_status",
+   "widget-construction",
+   "widget-pipeline",
+   "widget-attention"
+  ]
+ },
+ {
+  "role": "owner",
+  "theme": "night",
+  "width": 390,
+  "first_content_ms": 1394,
+  "all_widgets_ms": 1395,
+  "h_overflow_px": 0,
+  "widgets": [
+   "widget-money_today",
+   "widget-due_vs_received",
+   "widget-ageing",
+   "widget-call_today",
+   "widget-inflow_30",
+   "widget-next_milestone",
+   "widget-inventory",
+   "widget-flat_status",
+   "widget-construction",
+   "widget-pipeline",
+   "widget-attention"
+  ]
+ },
+ {
+  "role": "accounts",
+  "theme": "light",
+  "width": 1440,
+  "first_content_ms": 1392,
+  "all_widgets_ms": 1393,
+  "h_overflow_px": 0,
+  "widgets": [
+   "widget-money_today",
+   "widget-due_vs_received",
+   "widget-ageing",
+   "widget-call_today",
+   "widget-inflow_30",
+   "widget-attention"
+  ]
+ },
+ {
+  "role": "accounts",
+  "theme": "light",
+  "width": 390,
+  "first_content_ms": 1389,
+  "all_widgets_ms": 1390,
+  "h_overflow_px": 0,
+  "widgets": [
+   "widget-money_today",
+   "widget-due_vs_received",
+   "widget-ageing",
+   "widget-call_today",
+   "widget-inflow_30",
+   "widget-attention"
+  ]
+ },
+ {
+  "role": "accounts",
+  "theme": "night",
+  "width": 1440,
+  "first_content_ms": 1391,
+  "all_widgets_ms": 1392,
+  "h_overflow_px": 0,
+  "widgets": [
+   "widget-money_today",
+   "widget-due_vs_received",
+   "widget-ageing",
+   "widget-call_today",
+   "widget-inflow_30",
+   "widget-attention"
+  ]
+ },
+ {
+  "role": "accounts",
+  "theme": "night",
+  "width": 390,
+  "first_content_ms": 1392,
+  "all_widgets_ms": 1393,
+  "h_overflow_px": 0,
+  "widgets": [
+   "widget-money_today",
+   "widget-due_vs_received",
+   "widget-ageing",
+   "widget-call_today",
+   "widget-inflow_30",
+   "widget-attention"
+  ]
+ },
+ {
+  "role": "sales",
+  "theme": "light",
+  "width": 1440,
+  "first_content_ms": 1372,
+  "all_widgets_ms": 1374,
+  "h_overflow_px": 0,
+  "widgets": [
+   "widget-call_today",
+   "widget-pipeline",
+   "widget-inventory",
+   "widget-flat_status"
+  ]
+ },
+ {
+  "role": "sales",
+  "theme": "light",
+  "width": 390,
+  "first_content_ms": 1386,
+  "all_widgets_ms": 1388,
+  "h_overflow_px": 0,
+  "widgets": [
+   "widget-call_today",
+   "widget-pipeline",
+   "widget-inventory",
+   "widget-flat_status"
+  ]
+ },
+ {
+  "role": "sales",
+  "theme": "night",
+  "width": 1440,
+  "first_content_ms": 1394,
+  "all_widgets_ms": 1395,
+  "h_overflow_px": 0,
+  "widgets": [
+   "widget-call_today",
+   "widget-pipeline",
+   "widget-inventory",
+   "widget-flat_status"
+  ]
+ },
+ {
+  "role": "sales",
+  "theme": "night",
+  "width": 390,
+  "first_content_ms": 1384,
+  "all_widgets_ms": 1386,
+  "h_overflow_px": 0,
+  "widgets": [
+   "widget-call_today",
+   "widget-pipeline",
+   "widget-inventory",
+   "widget-flat_status"
+  ]
+ },
+ {
+  "role": "siteengineer",
+  "theme": "light",
+  "width": 1440,
+  "first_content_ms": 1390,
+  "all_widgets_ms": 1392,
+  "h_overflow_px": 0,
+  "widgets": [
+   "widget-next_milestone",
+   "widget-construction",
+   "widget-flat_status"
+  ]
+ },
+ {
+  "role": "siteengineer",
+  "theme": "light",
+  "width": 390,
+  "first_content_ms": 1389,
+  "all_widgets_ms": 1391,
+  "h_overflow_px": 0,
+  "widgets": [
+   "widget-next_milestone",
+   "widget-construction",
+   "widget-flat_status"
+  ]
+ },
+ {
+  "role": "siteengineer",
+  "theme": "night",
+  "width": 1440,
+  "first_content_ms": 1390,
+  "all_widgets_ms": 1392,
+  "h_overflow_px": 0,
+  "widgets": [
+   "widget-next_milestone",
+   "widget-construction",
+   "widget-flat_status"
+  ]
+ },
+ {
+  "role": "siteengineer",
+  "theme": "night",
+  "width": 390,
+  "first_content_ms": 1388,
+  "all_widgets_ms": 1389,
+  "h_overflow_px": 0,
+  "widgets": [
+   "widget-next_milestone",
+   "widget-construction",
+   "widget-flat_status"
+  ]
+ }
+]

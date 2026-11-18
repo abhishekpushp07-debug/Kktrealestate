@@ -1,0 +1,34 @@
+{
+  "summary": "Independent verification of KKT ERP Phase 2 (financial core). Created /app/backend/tests/test_phase_2.py (12 tests, all PASS, ~13s). Covers: owner example ledger BK-2526-0001 (10 PAYMENT rows exact cash_due/account_due/total_due tuples match spec; booking Completed; flat P1 Sold); CSV ledger returns text/csv with 10 PAYMENT lines; concurrent-booking → one 201 one 409 FLAT_NOT_AVAILABLE; cash+account != total → 422; payments require Idempotency-Key (400 IDEMPOTENCY_KEY_REQUIRED), bucket cap 409 BUCKET_EXCEEDS_AGREED with explanatory detail mentioning 'agreed' + 'cannot accept'; Sales 403 on agreement revisions, Admin 200; after revision same payment 201 + idempotency replay returns identical body + header Idempotent-Replayed: true and payments count==1; cheque Pending→excluded, /clear→counted, /bounce→never counted, /reverse→REVERSAL ledger row + receipt cancelled=true + amount_in_words 'Rupees ... Only'; milestones out-of-order 409, forward complete raises demands, undo immediately 200, undo-after-payment 409 UNDO_BLOCKED_BY_PAYMENTS, demand-letter has amount_in_words and bank; KYC: sales sees pan=null + pan_masked XXXXX####? + aadhaar_masked 'XXXX XXXX ####', sales ?reveal=true → 403, accounts ?reveal=true → full 10-char pan, audit log entity contains customer.kyc_reveal; documents multipart upload 201 w/ storage_key, sensitive doc 403 sales / 200 accounts bytes, list contains, DELETE soft-delete; roznamcha 2025-12-03 cash_received=800000 closing=opening+800000 by_mode Cash present; 2025-11-05 bank_deposits=500000; leads board 7 columns, create lead, Lost without reason→422, with reason→200, follow-up (next_follow_up_at)→200, convert→customer with same phone; perf GET /projects and /blocks median <300ms over 5 calls; cleanup cancels booking.\n\nFrontend (Playwright, viewport 1920x1080, demo-super-admin login): /dashboard shows collections-widget; /bookings bookings-table loads; search 'BK-2526-0001' + click row → /bookings/{id} booking-detail; booking-tab-ledger → ledger-table with rows 1,11,22 present and 14 '(advance)' labels; booking-tab-demands → demands-table; /customers customers-table, open row, customer-tab-kyc + kyc-reveal-btn clickable; /leads leads-board with 25 lead-card-* items; /bookings/new wizard-steps + wiz-project(SGH) + wiz-block(Tower A) + wiz-next → wiz-grid; /payments payments-table + payments-tab-cheques; /roznamcha rozn-date 2025-12-03 → rozn-closing shows ₹13,00,000 matching opening 5L + cash 8L. 0 console errors across the whole run.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase_2.py",
+    "/app/test_reports/pytest/phase_2.xml",
+    "/app/backend/tests/test_ledger_example.py",
+    "/app/backend/tests/smoke_phase2.py"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "routers/milestones.py UndoIn requires reason min_length=3 — demand-letter UI should enforce a minimum (otherwise user sees cryptic 422). Confirm wizard reason input validates ≥3 chars.",
+    "Payment endpoint rejects future payment_date with 'payment_date cannot be in the future' (422) — frontend should disable future dates on the picker to avoid a round-trip 422 (confirm BookingDetail / PaymentModal use max=today).",
+    "Milestone complete endpoint rejects completed_on earlier than the previous milestone with 422 VALIDATION_ERROR but returns code 'VALIDATION_ERROR' rather than a specific code (e.g. MILESTONE_DATE_BEFORE_PREVIOUS). Minor DX — frontend has to parse detail string.",
+    "/api/projects latency is bursty (1 call out of 5 hit ~1.4s, others ~120-170ms). Median <300ms so OK, but p95 is high. Investigate cold-start/caching on /projects aggregate (list of blocks + unit counts).",
+    "Rate limit on /auth/login (10/min/IP) interferes when both backend tests and frontend tests run in close succession on the same egress IP — not a bug but worth noting in operator docs.",
+    "Login rate-limit + idempotency store are still in-memory (carried from iter 1/2) — won't survive multi-worker scaling."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_phase_2.py"
+  ],
+  "success_rate": {"backend": "100% (12/12 phase2 + ledger-example + phase1.5 regression unaffected)", "frontend": "100% of phase 2 UI flows verified; 0 console errors"},
+  "test_credentials": "Unchanged. All seeded users password Kkt@12345. See /app/memory/test_credentials.md.",
+  "seed_data_creation": "test_phase_2.py creates one booking (Tower B B-7xx, cancelled at end of run), one revision on that booking, one cleared cheque + one bounced + one reversed on same booking, one milestone completion on Tower B (next_seq advanced by 1 — not reverted because final undo is intentionally blocked by payment per the test, cannot roll back), one small cash payment, two leads (TEST_Lead marked Lost; TEST_Convert converted to a customer with phone 9876543211), one soft-deleted document on a customer. All *_bookings cancelled; flats returned Available via cancel. Note: Tower B milestone #5 (3rd Slab) is now Completed with completed_on≈2027-03-15 as a side-effect of the undo-blocked assertion (expected and documented).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Regression file: /app/backend/tests/test_phase_2.py (run with `python -m pytest tests/test_phase_2.py -n 0 -v`). It MUST run with -n 0 because tests share module-level state (_created_bookings). Tower A is already at 85% (next=Possession) so new tests should prefer Tower B/C for milestone flows. Login rate limit 10/min/IP — token cache in test file reuses tokens. Payment-date validation rejects future dates; use today() for new cash payments. Milestones completed_on must be >= previous milestone's completed_on (string compare on ISO date). UndoIn.reason min_length=3. Lead follow-up body shape is {note, next_follow_up_at (ISO datetime)}, not {due_date}. Roznamcha by_mode is a dict keyed by mode name, not a list. Frontend bookings-table is paginated newest-first; BK-2526-0001 is on page 2 — use the search box to filter before clicking.",
+  "rca of the issue": "No functional defects found. Four test-authoring bugs encountered and fixed: (1) concurrency used accounts@kkt.in which lacks booking.create (switched to admin + sales); (2) UndoIn.reason min_length=3 (sent 't' → 422, fixed to 'test undo'); (3) payment_date='2027-02-02' rejected as future — fixed to use today(); (4) milestone completed_on must be >= previous completed_on (Tower B seq4 was already 2027-02-01, so used last_done+10/+20 days)."
+}

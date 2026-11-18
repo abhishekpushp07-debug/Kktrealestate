@@ -1,0 +1,755 @@
+import asyncio
+from datetime import date as Date
+from typing import Literal
+
+from fastapi import APIRouter, Depends, Request, Response
+from pydantic import Field, model_validator
+
+from crypto import decrypt_field, mask
+from db import db
+from deps import ensure_project_access, project_scope_filter, require, require_idempotency_key
+from models_out import PaymentsOut, PaymentsOutPage
+from services import clock
+from services.definitions import receipt_parts
+from services.ledger import CLEAR_IMMEDIATELY, bucket_paid, line_paid, rebuild
+from services.money import inr, present_money, to_paise
+from services.numbering import generate_number
+from services.pdf_builders import receipt_data
+from uow import unit_of_work
+from utils import (
+    ApiError,
+    ListParams,
+    StrictModel,
+    base_doc,
+    client_ip,
+    get_or_404,
+    now_iso,
+    paginate,
+    search_filter,
+    to_csv,
+    write_audit,
+)
+
+router = APIRouter(prefix="/payments", tags=["payments"])
+
+
+class Instrument(StrictModel):
+    number: str | None = None
+    date: Date | None = None
+    bank_name: str | None = None
+    branch: str | None = None
+
+
+class PaymentIn(StrictModel):
+    booking_id: str
+    against: Literal["FLAT_VALUE", "OTHER_CHARGE"] = "FLAT_VALUE"
+    payment_category: Literal["Cash", "Account"] | None = None
+    other_charge_line_id: str | None = None
+    amount: float = Field(gt=0)
+    payment_date: Date
+    payment_mode_id: str
+    instrument: Instrument | None = None
+    bank_account_id: str | None = None
+    remarks: str | None = Field(default=None, max_length=500)
+    allocation: Literal["auto", "manual"] = "manual"
+
+    @model_validator(mode="after")
+    def _rules(self):
+        if self.allocation == "auto":
+            return self
+        if self.against == "FLAT_VALUE" and not self.payment_category:
+            raise ValueError("payment_category (Cash/Account) is required for flat value payments")
+        if self.against == "OTHER_CHARGE" and not self.other_charge_line_id:
+            raise ValueError("other_charge_line_id is required for other-charge payments")
+        if self.payment_date > clock.today():
+            raise ValueError("payment_date cannot be in the future")
+        return self
+
+
+class ReasonIn(StrictModel):
+    reason: str = Field(min_length=3, max_length=500)
+
+
+def _cap_error(category: str, agreed: int, paid: int, amount: int):
+    return ApiError(
+        409,
+        f"{category} bucket agreed {inr(agreed)}; already received {inr(paid)}; cannot accept {inr(amount)}. Revise agreement first.",
+        "BUCKET_EXCEEDS_AGREED",
+        {
+            "category": category,
+            "agreed_paise": agreed,
+            "paid_paise": paid,
+            "amount_paise": amount,
+            "headroom_paise": agreed - paid,
+        },
+    )
+
+
+async def _check_cap(booking: dict, p: dict):
+    """Soft pre-check (fast, friendly error). The atomic guard is `reserve_cap`."""
+    if booking["status"] != "Active":
+        raise ApiError(409, f"Booking is {booking['status']}; payments are not accepted", "BOOKING_NOT_ACTIVE")
+    if p["against"] == "FLAT_VALUE":
+        cat = p["payment_category"]
+        agreed = booking["cash_agreed_paise"] if cat == "Cash" else booking["account_agreed_paise"]
+        paid = await bucket_paid(booking["id"], cat)
+        if paid + p["amount_paise"] > agreed:
+            raise _cap_error(cat, agreed, paid, p["amount_paise"])
+    else:
+        line = next((l for l in booking.get("other_charges") or [] if l["line_id"] == p["other_charge_line_id"]), None)
+        if not line:
+            raise ApiError(404, "Other charge line not found on booking", "NOT_FOUND")
+        paid = await line_paid(booking["id"], line["line_id"])
+        if paid + p["amount_paise"] > line["total_paise"]:
+            raise ApiError(
+                409,
+                f"{line['name']}: total {inr(line['total_paise'])}; already received {inr(paid)}; cannot accept {inr(p['amount_paise'])}.",
+                "CHARGE_EXCEEDS_TOTAL",
+            )
+
+
+async def reserve_cap(booking: dict, p: dict) -> dict:
+    """Atomic bucket cap: a guarded conditional update on the booking's paid counters (summary.* / other_charges.$.paid_paise)
+    increments the counter only while `paid + amount <= agreed`. Two concurrent posts can never both pass. Returns the inverse
+    update (compensation) to apply if the payment insert fails."""
+    amt = p["amount_paise"]
+    if p["against"] == "FLAT_VALUE":
+        cat = p["payment_category"]
+        agreed = booking["cash_agreed_paise"] if cat == "Cash" else booking["account_agreed_paise"]
+        field = "summary.cash_paid_paise" if cat == "Cash" else "summary.account_paid_paise"
+        inc = {field: amt, "summary.paid_paise": amt}
+        res = await db.bookings.update_one(
+            {"id": booking["id"], "status": "Active", field: {"$lte": agreed - amt}}, {"$inc": inc}
+        )
+        if not res.matched_count:
+            fresh = await db.bookings.find_one({"id": booking["id"]}, {"_id": 0, "status": 1, "summary": 1})
+            if not fresh or fresh["status"] != "Active":
+                raise ApiError(409, "Booking is not active; payments are not accepted", "BOOKING_NOT_ACTIVE")
+            raise _cap_error(cat, agreed, (fresh.get("summary") or {}).get(field.split(".")[1], 0), amt)
+        return {"$inc": {k: -v for k, v in inc.items()}}
+    line = next((l for l in booking.get("other_charges") or [] if l["line_id"] == p["other_charge_line_id"]), None)
+    if not line:
+        raise ApiError(404, "Other charge line not found on booking", "NOT_FOUND")
+    res = await db.bookings.update_one(
+        {
+            "id": booking["id"],
+            "status": "Active",
+            "other_charges": {
+                "$elemMatch": {"line_id": line["line_id"], "paid_paise": {"$lte": line["total_paise"] - amt}}
+            },
+        },
+        {"$inc": {"other_charges.$.paid_paise": amt}},
+    )
+    if not res.matched_count:
+        raise ApiError(
+            409,
+            (
+                f"{line['name']}: total {inr(line['total_paise'])}; already received {inr(await line_paid(booking['id'], line['line_id']))}; "
+                f"cannot accept "
+                f"{inr(amt)}."
+            ),
+            "CHARGE_EXCEEDS_TOTAL",
+        )
+    return {"$inc": {"other_charges.$[l].paid_paise": -amt}, "_af": [{"l.line_id": line["line_id"]}]}
+
+
+async def _reserve_split(booking: dict, p: dict) -> dict:
+    """S3.1: cap guard for a split receipt — each bucket part is reserved atomically; line parts are checked against line totals."""
+    from services.allocation import bucket_parts
+
+    parts = bucket_parts(p["allocations"])
+    for cat in ("Cash", "Account"):
+        agreed = booking["cash_agreed_paise"] if cat == "Cash" else booking["account_agreed_paise"]
+        if parts[cat] and await bucket_paid(booking["id"], cat) + parts[cat] > agreed:
+            raise _cap_error(cat, agreed, await bucket_paid(booking["id"], cat), parts[cat])
+    for lid, amt in parts["lines"].items():
+        ln = next((l for l in booking.get("other_charges") or [] if l["line_id"] == lid), None)
+        if ln and await line_paid(booking["id"], lid) + amt > ln["total_paise"]:
+            raise ApiError(
+                409, f"{ln['name']}: total {inr(ln['total_paise'])}; cannot accept {inr(amt)}.", "CHARGE_EXCEEDS_TOTAL"
+            )
+    inc = {
+        "summary.paid_paise": parts["Cash"] + parts["Account"],
+        **({"summary.cash_paid_paise": parts["Cash"]} if parts["Cash"] else {}),
+        **({"summary.account_paid_paise": parts["Account"]} if parts["Account"] else {}),
+    }
+    res = await db.bookings.update_one(
+        {
+            "id": booking["id"],
+            "status": "Active",
+            # 3G: the cap is enforced by the write itself (a concurrent receipt can never push a bucket over agreed)
+            **(
+                {"summary.cash_paid_paise": {"$not": {"$gt": booking["cash_agreed_paise"] - parts["Cash"]}}}
+                if parts["Cash"]
+                else {}
+            ),
+            **(
+                {"summary.account_paid_paise": {"$not": {"$gt": booking["account_agreed_paise"] - parts["Account"]}}}
+                if parts["Account"]
+                else {}
+            ),
+        },
+        {"$inc": inc},
+    )
+    if not res.matched_count:
+        fresh = await db.bookings.find_one({"id": booking["id"]}, {"_id": 0, "status": 1})
+        if fresh and fresh["status"] == "Active":
+            cat = "Cash" if parts["Cash"] else "Account"
+            agreed = booking["cash_agreed_paise"] if cat == "Cash" else booking["account_agreed_paise"]
+            raise _cap_error(cat, agreed, await bucket_paid(booking["id"], cat), parts[cat])
+        raise ApiError(409, "Booking is not active; payments are not accepted", "BOOKING_NOT_ACTIVE")
+    return {"$inc": {k: -v for k, v in inc.items()}}
+
+
+class AllocationPreviewIn(StrictModel):
+    booking_id: str
+    amount: float = Field(gt=0)
+    payment_mode_id: str
+
+
+@router.post("/allocation-preview")
+async def allocation_preview(body: AllocationPreviewIn, user: dict = Depends(require("finance.payment.create"))):
+    """S3.1: what an `allocation: auto` receipt would be applied to — the dialog shows exactly this."""
+    from services import allocation as ALLOC
+
+    booking = await get_or_404(db.bookings, body.booking_id, "Booking", {"company_id": user["company_id"]})
+    ensure_project_access(user, booking["project_id"])
+    mode = await get_or_404(db.payment_modes, body.payment_mode_id, "Payment mode", {"is_active": True})
+    return present_money(
+        await ALLOC.plan(booking, to_paise(body.amount), "Cash" if mode["code"] == "CASH" else "Account")
+    )
+
+
+async def _compensate(booking_id: str, comp: dict):
+    af = comp.pop("_af", None)
+    await db.bookings.update_one({"id": booking_id}, comp, **({"array_filters": af} if af else {}))
+
+
+def _zero_fill(totals: dict, status: str | None) -> dict:
+    """Every status the caller filtered on is present, with 0 when none match (a 0-count drill reads 0, not empty)."""
+    zero = {"count": 0, "amount_paise": 0, "amount": 0.0}
+    return {**{st: dict(zero) for st in (status.split(",") if status else [])}, **totals}
+
+
+async def _payment_totals(q: dict) -> dict:
+    """Phase J5 hot path #1: status totals over the whole scope are O(matched rows) → cached 30 s per query shape
+    (invalidated naturally; the list itself is live).
+    """
+    import hashlib
+    import json
+
+    from services import ttlcache
+
+    async def compute():
+        agg = await db.payments.aggregate(
+            [{"$match": q}, {"$group": {"_id": "$status", "n": {"$sum": 1}, "s": {"$sum": "$amount_paise"}}}],
+            maxTimeMS=20000,
+        ).to_list(None)
+        return present_money({a["_id"]: {"count": a["n"], "amount_paise": a["s"]} for a in agg})
+
+    unfiltered = set(q) <= {
+        "company_id",
+        "project_id",
+        "voided",
+    }  # whole-scope totals change slowly → 5 min; filtered views 30 s
+    return await ttlcache.cached(
+        f"paytot:{hashlib.sha1(json.dumps(q, sort_keys=True, default=str).encode()).hexdigest()}",
+        300 if unfiltered else 30,
+        compute,
+    )
+
+
+@router.get("/demands")
+async def list_open_demands(
+    params: ListParams = Depends(),
+    status: str | None = None,
+    project_id: str | None = None,
+    block_id: str | None = None,
+    user: dict = Depends(require("finance.demand.view")),
+):
+    q = {
+        "company_id": user["company_id"],
+        **project_scope_filter(user),
+        "voided": {"$ne": True},
+        **search_filter(params.search, ["customer_name", "demand_number", "booking_number"]),
+    }
+    if status:
+        q["status"] = {"$in": status.split(",")}
+    if project_id:
+        q["project_id"] = project_id
+    if block_id:
+        q["block_id"] = block_id
+    res = await paginate(
+        db.demands,
+        q,
+        params,
+        params.sort_spec(["due_date", "demand_date", "total_demand_paise", "customer_name"], "due_date"),
+    )
+    res["items"] = present_money(res["items"])
+    return res
+
+
+@router.get("/summary")
+async def payments_summary(
+    params: ListParams = Depends(),
+    project_id: str | None = None,
+    block_id: str | None = None,
+    booking_id: str | None = None,
+    customer_id: str | None = None,
+    status: str | None = None,
+    payment_category: str | None = None,
+    payment_mode_id: str | None = None,
+    date_from: Date | None = None,
+    date_to: Date | None = None,
+    unreplaced: bool = False,
+    user: dict = Depends(require("finance.payment.view")),
+):
+    """Filter-wide totals by status (same filters as the list) for the totals footer."""
+    return await list_payments(
+        params,
+        project_id,
+        block_id,
+        booking_id,
+        customer_id,
+        status,
+        payment_category,
+        payment_mode_id,
+        date_from,
+        date_to,
+        user,
+        summary_only=True,
+        unreplaced=unreplaced,
+    )
+
+
+@router.get("", response_model=PaymentsOutPage, response_model_exclude_unset=True)
+async def list_payments(
+    params: ListParams = Depends(),
+    project_id: str | None = None,
+    block_id: str | None = None,
+    booking_id: str | None = None,
+    customer_id: str | None = None,
+    status: str | None = None,
+    payment_category: str | None = None,
+    payment_mode_id: str | None = None,
+    date_from: Date | None = None,
+    date_to: Date | None = None,
+    user: dict = Depends(require("finance.payment.view")),
+    summary_only: bool = False,
+    unreplaced: bool = False,
+):
+    q = {
+        "company_id": user["company_id"],
+        **project_scope_filter(user),
+        **search_filter(
+            params.search, ["receipt_number", "customer_name", "booking_number", "flat_number", "instrument.number"]
+        ),
+    }
+    for k, v in (
+        ("project_id", project_id),
+        ("block_id", block_id),
+        ("booking_id", booking_id),
+        ("customer_id", customer_id),
+        ("payment_category", payment_category),
+        ("payment_mode_id", payment_mode_id),
+    ):
+        if v:
+            q[k] = v
+    if status:
+        q["status"] = {"$in": status.split(",")}
+    if date_from or date_to:
+        q["payment_date"] = {
+            **({"$gte": date_from.isoformat()} if date_from else {}),
+            **({"$lte": date_to.isoformat()} if date_to else {}),
+        }
+    if unreplaced:  # Home "Needs attention": bounced receipts with no later replacement (services.home_defs)
+        from services.home_filters import unreplaced_bounced_ids
+
+        q["id"] = {"$in": await unreplaced_bounced_ids(q)}
+    if summary_only:
+        return _zero_fill(await _payment_totals(q), status)
+    res, totals = await asyncio.gather(
+        paginate(
+            db.payments,
+            q,
+            params,
+            params.sort_spec(
+                ["payment_date", "receipt_number", "amount_paise", "status", "created_at"], "-payment_date"
+            ),
+        ),
+        _payment_totals(q),
+    )
+    res["totals"] = _zero_fill(totals, status)
+    from services.includes import expand
+
+    res["items"] = present_money(await expand(res["items"], params.include, "payments"))
+    if res.pop("_csv", False):
+        return Response(
+            to_csv(
+                [{**i, "instrument_number": (i.get("instrument") or {}).get("number")} for i in res["items"]],
+                [
+                    "receipt_number",
+                    "payment_date",
+                    "customer_name",
+                    "booking_number",
+                    "flat_number",
+                    "against",
+                    "payment_category",
+                    "payment_mode_name",
+                    "instrument_number",
+                    "amount",
+                    "status",
+                ],
+            ),
+            media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=payments.csv"},
+        )
+    return res
+
+
+@router.post("", status_code=201)
+async def post_payment(
+    body: PaymentIn,
+    request: Request,
+    user: dict = Depends(require("finance.payment.create")),
+    _k: None = Depends(require_idempotency_key),
+):
+    from services.booking_lock import booking_lock
+
+    async with booking_lock(body.booking_id):  # 3G: one writer per booking across replicas (cap, cancel, ledger)
+        return await _post_payment(body, request, user)
+
+
+async def _post_payment(body: PaymentIn, request: Request, user: dict):
+    booking = await get_or_404(db.bookings, body.booking_id, "Booking", {"company_id": user["company_id"]})
+    ensure_project_access(user, booking["project_id"])
+    prior = await db.payments.find_one({"idempotency_key": request.headers.get("idempotency-key")}, {"_id": 0})
+    if prior and prior["booking_id"] == booking["id"]:
+        # 3G crash recovery: the first attempt stored the receipt but stopped before finishing (ledger, audit) —
+        # the retry with the same key finishes it and answers with the original receipt, never a second one
+        await rebuild(booking["id"])
+        if not await db.audit_logs.find_one({"action": "payment.post", "entity_id": prior["id"]}, {"_id": 1}):
+            await write_audit(
+                user,
+                "payment.post",
+                "payment",
+                prior["id"],
+                after={
+                    "receipt_number": prior["receipt_number"],
+                    "amount_paise": prior["amount_paise"],
+                    "recovered": True,
+                },
+                ip=client_ip(request),
+            )
+        out = present_money(await db.payments.find_one({"id": prior["id"]}, {"_id": 0}))
+        out["warnings"] = []
+        return out
+    if body.payment_date.isoformat() < booking["booking_date"]:
+        raise ApiError(422, "payment_date cannot be before booking_date", "VALIDATION_ERROR")
+    mode = await get_or_404(db.payment_modes, body.payment_mode_id, "Payment mode", {"is_active": True})
+    if mode.get("requires_reference") and not (body.instrument and body.instrument.number):
+        raise ApiError(422, f"{mode['name']} requires instrument/reference number", "VALIDATION_ERROR")
+    bank = None
+    if mode["code"] != "CASH":
+        if not body.bank_account_id:
+            raise ApiError(
+                422, "bank_account_id (company account credited) is required for non-cash modes", "VALIDATION_ERROR"
+            )
+        bank = await get_or_404(db.bank_accounts, body.bank_account_id, "Bank account", {"is_active": True})
+    status = "Cleared" if mode["code"] in CLEAR_IMMEDIATELY else "Pending"
+    company = await db.companies.find_one({"id": user["company_id"]}, {"_id": 0})
+    ts = now_iso()
+    inst = body.instrument.model_dump() if body.instrument else None
+    if inst and isinstance(inst.get("date"), Date):
+        inst["date"] = inst["date"].isoformat()
+    line = (
+        next((l for l in booking.get("other_charges") or [] if l["line_id"] == body.other_charge_line_id), None)
+        if body.against == "OTHER_CHARGE"
+        else None
+    )
+    auto = None
+    if body.allocation == "auto":
+        from services import allocation as ALLOC
+
+        auto = await ALLOC.plan(booking, to_paise(body.amount), "Cash" if mode["code"] == "CASH" else "Account")
+        body.against, body.payment_category, body.other_charge_line_id, line = "FLAT_VALUE", auto["bucket"], None, None
+    p = {
+        **base_doc(user, user["company_id"]),
+        "receipt_number": await generate_number("receipt", company, body.payment_date, 5),
+        "booking_id": booking["id"],
+        "booking_number": booking["booking_number"],
+        "customer_id": booking["customer_id"],
+        "customer_name": booking["customer_name"],
+        "project_id": booking["project_id"],
+        "project_code": booking.get("project_code"),
+        "block_id": booking["block_id"],
+        "block_code": booking.get("block_code"),
+        "flat_id": booking["flat_id"],
+        "flat_number": booking["flat_snapshot"]["flat_number"],
+        "against": body.against,
+        "payment_category": body.payment_category if body.against == "FLAT_VALUE" else None,
+        "other_charge_line_id": body.other_charge_line_id if body.against == "OTHER_CHARGE" else None,
+        "other_charge_name": line["name"] if line else None,
+        "amount_paise": to_paise(body.amount),
+        "payment_date": body.payment_date.isoformat(),
+        "payment_mode_id": mode["id"],
+        "payment_mode_code": mode["code"],
+        "payment_mode_name": mode["name"],
+        "instrument": inst,
+        "bank_account_id": bank["id"] if bank else None,
+        "bank_account_name": f"{bank['bank_name']} {mask(decrypt_field(bank.get('account_number_enc')))}"
+        if bank
+        else None,
+        "remarks": body.remarks,
+        "allocation": body.allocation,
+        "allocations": auto["allocations"] if auto else None,
+        "received_by": user["id"],
+        "received_by_name": user["name"],
+        "status": status,
+        "cleared_at": ts if status == "Cleared" else None,
+        "bounced_at": None,
+        "reversal": None,
+        "idempotency_key": request.headers.get("idempotency-key"),
+        "posted_at": ts,
+    }
+    if auto:
+        comp = await _reserve_split(booking, p) if status == "Cleared" else None
+    else:
+        await _check_cap(booking, p)
+        comp = await reserve_cap(booking, p) if status == "Cleared" else None
+    try:
+        await db.payments.insert_one(p)
+    except Exception:
+        if comp:
+            await _compensate(booking["id"], comp)
+        raise
+    p.pop("_id", None)
+    await rebuild(booking["id"])
+    await write_audit(
+        user,
+        "payment.post",
+        "payment",
+        p["id"],
+        after={
+            **{
+                k: p[k]
+                for k in (
+                    "id",
+                    "receipt_number",
+                    "amount_paise",
+                    "payment_category",
+                    "against",
+                    "status",
+                    "payment_mode_name",
+                )
+            },
+            "allocation": p["allocation"],
+            "allocations": [{"name": a["name"], "amount_paise": a["amount_paise"]} for a in p.get("allocations") or []],
+        },
+        ip=client_ip(request),
+    )
+    await write_audit(
+        user,
+        "payment.post",
+        "booking",
+        booking["id"],
+        after={
+            "receipt_number": p["receipt_number"],
+            "amount_paise": p["amount_paise"],
+            "category": p["payment_category"],
+            "status": status,
+        },
+        ip=client_ip(request),
+    )
+    out = present_money(p)
+    out["warnings"] = await _headroom_warnings(booking, p)
+    return out
+
+
+async def _headroom_warnings(booking: dict, p: dict) -> list[dict]:
+    """Phase K: cap rule unchanged (blocks only when CLEARED would exceed). Warn when cleared + PENDING instruments would exceed the agreed bucket."""
+    if p["against"] != "FLAT_VALUE":
+        return []
+    cat = p["payment_category"]
+    agreed = booking["cash_agreed_paise"] if cat == "Cash" else booking["account_agreed_paise"]
+    cleared = await bucket_paid(booking["id"], cat)
+    pend = await db.payments.aggregate(
+        [
+            {
+                "$match": {
+                    "booking_id": booking["id"],
+                    "against": "FLAT_VALUE",
+                    "payment_category": cat,
+                    "status": "Pending",
+                }
+            },
+            {"$group": {"_id": None, "amt": {"$sum": "$amount_paise"}}},
+        ]
+    ).to_list(1)
+    pending = pend[0]["amt"] if pend else 0
+    if cleared + pending > agreed:
+        return [
+            {
+                "code": "PENDING_WOULD_EXCEED_CAP",
+                "category": cat,
+                "agreed_paise": agreed,
+                "cleared_paise": cleared,
+                "pending_paise": pending,
+                "excess_paise": cleared + pending - agreed,
+                "message": (
+                    f"{cat}: cleared {inr(cleared)} + pending instruments {inr(pending)} exceed the agreed {inr(agreed)} by "
+                    f"{inr(cleared + pending - agreed)}. "
+                    f"A pending "
+                    f"cheque will be "
+                    f"blocked at "
+                    f"clearance "
+                    f"unless the "
+                    f"agreement "
+                    f"is revised."
+                ),
+            }
+        ]
+    return []
+
+
+@router.get("/cheques-in-hand")
+async def cheques_in_hand(user: dict = Depends(require("finance.payment.view"))):
+    """Count and amount are over every pending cheque (REQ-211: no silent cap); the list shows the oldest 500."""
+    q = {"company_id": user["company_id"], "status": "Pending", **project_scope_filter(user)}
+    items = await db.payments.find(q, {"_id": 0}).sort("payment_date", 1).to_list(500)
+    agg = await db.payments.aggregate(
+        [{"$match": q}, {"$group": {"_id": None, "n": {"$sum": 1}, "amt": {"$sum": "$amount_paise"}}}]
+    ).to_list(1)
+    n, amt = (agg[0]["n"], agg[0]["amt"]) if agg else (0, 0)
+    return present_money({"items": items, "total": n, "amount_paise": amt, "shown": len(items)})
+
+
+@router.get("/{payment_id}", response_model=PaymentsOut, response_model_exclude_unset=True)
+async def get_payment(payment_id: str, user: dict = Depends(require("finance.payment.view"))):
+    p = await get_or_404(db.payments, payment_id, "Payment", {"company_id": user["company_id"]})
+    ensure_project_access(user, p["project_id"])
+    return present_money(p)
+
+
+@router.get("/{payment_id}/receipt")
+async def receipt(payment_id: str, user: dict = Depends(require("finance.receipt.print"))):
+    return await receipt_data(payment_id, user)
+
+
+@router.post("/{payment_id}/clear")
+async def clear_payment(payment_id: str, request: Request, user: dict = Depends(require("finance.cheque.clear"))):
+    p = await get_or_404(db.payments, payment_id, "Payment", {"company_id": user["company_id"]})
+    if p["status"] != "Pending":
+        raise ApiError(409, f"Payment is {p['status']}", "NOT_PENDING")
+    booking = await get_or_404(db.bookings, p["booking_id"], "Booking")
+    await _check_cap(booking, p)
+    comp = await reserve_cap(booking, p)
+    ts = now_iso()
+    res = await db.payments.update_one(
+        {"id": payment_id, "status": "Pending"},
+        {
+            "$set": {
+                "status": "Cleared",
+                "cleared_at": ts,
+                "cleared_by": user["id"],
+                "posted_at": ts,
+                "updated_at": ts,
+            },
+            "$inc": {"version": 1},
+        },
+    )
+    if not res.matched_count:
+        await _compensate(booking["id"], comp)
+        raise ApiError(409, "Payment is no longer pending", "NOT_PENDING")
+    await rebuild(p["booking_id"])
+    await write_audit(
+        user,
+        "payment.clear",
+        "payment",
+        payment_id,
+        before={"status": "Pending"},
+        after={"status": "Cleared", "receipt_number": p["receipt_number"]},
+        ip=client_ip(request),
+    )
+    return present_money(await db.payments.find_one({"id": payment_id}, {"_id": 0}))
+
+
+@router.post("/{payment_id}/bounce")
+async def bounce_payment(
+    payment_id: str, body: ReasonIn, request: Request, user: dict = Depends(require("finance.cheque.bounce"))
+):
+    p = await get_or_404(db.payments, payment_id, "Payment", {"company_id": user["company_id"]})
+    if p["status"] != "Pending":
+        raise ApiError(409, f"Payment is {p['status']}; only pending instruments can bounce", "NOT_PENDING")
+    ts = now_iso()
+    await db.payments.update_one(
+        {"id": payment_id},
+        {
+            "$set": {"status": "Bounced", "bounced_at": ts, "bounce_reason": body.reason, "updated_at": ts},
+            "$inc": {"version": 1},
+        },
+    )
+    from services.money_ops import raise_bounce_charge
+
+    charge = await raise_bounce_charge(p, user)
+    await rebuild(p["booking_id"])
+    await write_audit(
+        user,
+        "payment.bounce",
+        "payment",
+        payment_id,
+        before={"status": "Pending"},
+        after={
+            "status": "Bounced",
+            "reason": body.reason,
+            "receipt_number": p.get("receipt_number"),
+            "customer_name": p.get("customer_name"),
+            "bounce_charge_paise": (charge or {}).get("total_paise"),
+        },
+        ip=client_ip(request),
+    )
+    return present_money({**(await db.payments.find_one({"id": payment_id}, {"_id": 0})), "bounce_charge": charge})
+
+
+@router.post("/{payment_id}/reverse")
+async def reverse_payment(
+    payment_id: str, body: ReasonIn, request: Request, user: dict = Depends(require("finance.payment.reverse"))
+):
+    p = await get_or_404(db.payments, payment_id, "Payment", {"company_id": user["company_id"]})
+    if p["status"] != "Cleared":
+        raise ApiError(409, f"Only cleared payments can be reversed (status {p['status']})", "NOT_CLEARED")
+    ts = now_iso()
+    rev = {"reason": body.reason, "at": ts, "by": user["id"], "by_name": user["name"]}
+    async with unit_of_work() as uow:
+        await db.payments.update_one(
+            {"id": payment_id, "status": "Cleared"},
+            {
+                "$set": {"status": "Reversed", "reversal": rev, "receipt_cancelled": True, "updated_at": ts},
+                "$inc": {"version": 1},
+            },
+            **uow.kw(),
+        )
+        parts = receipt_parts(p)
+        if parts["Cash"] or parts["Account"]:
+            inc = {"summary.cash_paid_paise": -parts["Cash"], "summary.account_paid_paise": -parts["Account"]}
+            inc["summary.paid_paise"] = inc["summary.cash_paid_paise"] + inc["summary.account_paid_paise"]
+            await db.bookings.update_one({"id": p["booking_id"]}, {"$inc": inc}, **uow.kw())
+    await rebuild(p["booking_id"])
+    await write_audit(
+        user,
+        "payment.reverse",
+        "payment",
+        payment_id,
+        before={"status": "Cleared"},
+        after={"status": "Reversed", **rev, "receipt_number": p["receipt_number"]},
+        ip=client_ip(request),
+    )
+    await write_audit(
+        user,
+        "payment.reverse",
+        "booking",
+        p["booking_id"],
+        after={"receipt_number": p["receipt_number"], "amount_paise": -p["amount_paise"], "reason": body.reason},
+        ip=client_ip(request),
+    )
+    return present_money(await db.payments.find_one({"id": payment_id}, {"_id": 0}))

@@ -1,0 +1,151 @@
+{
+ "vus": 3,
+ "duration_s": 31,
+ "requests": 150,
+ "rps": 4.9,
+ "stopped": null,
+ "errors": {},
+ "assertions": {
+  "lead_created:ok": 12,
+  "lead_converted:ok": 12,
+  "booking_created:ok": 11,
+  "booking_total_matches_preview:ok": 11,
+  "payment_posted:ok": 11,
+  "c360_shows_booking:FAIL": 11,
+  "ledger_received_equals_payment:ok": 11,
+  "ledger_bill_raised_positive:ok": 11,
+  "inventory_flat_booked:ok": 11,
+  "receipt_pdf:ok": 11,
+  "demand_register:ok": 11,
+  "project_statement:ok": 11,
+  "stage_demands_equal_active_bookings:ok": 3,
+  "documents_register:ok": 3,
+  "integrity_ok_after_stage:ok": 1
+ },
+ "failed_assertions": [
+  {
+   "assertion": "c360_shows_booking",
+   "detail": "booking missing in Customer 360"
+  },
+  {
+   "assertion": "c360_shows_booking",
+   "detail": "booking missing in Customer 360"
+  },
+  {
+   "assertion": "c360_shows_booking",
+   "detail": "booking missing in Customer 360"
+  },
+  {
+   "assertion": "c360_shows_booking",
+   "detail": "booking missing in Customer 360"
+  },
+  {
+   "assertion": "c360_shows_booking",
+   "detail": "booking missing in Customer 360"
+  },
+  {
+   "assertion": "c360_shows_booking",
+   "detail": "booking missing in Customer 360"
+  },
+  {
+   "assertion": "c360_shows_booking",
+   "detail": "booking missing in Customer 360"
+  },
+  {
+   "assertion": "c360_shows_booking",
+   "detail": "booking missing in Customer 360"
+  },
+  {
+   "assertion": "c360_shows_booking",
+   "detail": "booking missing in Customer 360"
+  },
+  {
+   "assertion": "c360_shows_booking",
+   "detail": "booking missing in Customer 360"
+  },
+  {
+   "assertion": "c360_shows_booking",
+   "detail": "booking missing in Customer 360"
+  }
+ ],
+ "groups": {
+  "bookings": {
+   "n": 14,
+   "p50": 194.7,
+   "p95": 343.8,
+   "p99": 343.8
+  },
+  "breakdown": {
+   "n": 11,
+   "p50": 13.0,
+   "p95": 17.6,
+   "p99": 17.6
+  },
+  "construction": {
+   "n": 6,
+   "p50": 48.0,
+   "p95": 226.8,
+   "p99": 226.8
+  },
+  "customers": {
+   "n": 23,
+   "p50": 17.9,
+   "p95": 28.0,
+   "p99": 31.0
+  },
+  "demand_register": {
+   "n": 11,
+   "p50": 5.0,
+   "p95": 8.3,
+   "p99": 8.3
+  },
+  "documents": {
+   "n": 3,
+   "p50": 5.4,
+   "p95": 5.9,
+   "p99": 5.9
+  },
+  "flats": {
+   "n": 11,
+   "p50": 7.9,
+   "p95": 8.8,
+   "p99": 8.8
+  },
+  "leads": {
+   "n": 24,
+   "p50": 31.9,
+   "p95": 43.5,
+   "p99": 44.4
+  },
+  "ledger": {
+   "n": 11,
+   "p50": 4.8,
+   "p95": 5.6,
+   "p99": 5.6
+  },
+  "login": {
+   "n": 3,
+   "p50": 236.1,
+   "p95": 236.7,
+   "p99": 236.7
+  },
+  "payments": {
+   "n": 11,
+   "p50": 123.1,
+   "p95": 143.6,
+   "p99": 143.6
+  },
+  "project_statement": {
+   "n": 11,
+   "p50": 10.5,
+   "p95": 13.2,
+   "p99": 13.2
+  },
+  "receipt_pdf": {
+   "n": 11,
+   "p50": 5.6,
+   "p95": 8.9,
+   "p99": 8.9
+  }
+ }
+}

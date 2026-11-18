@@ -1,0 +1,13 @@
+{
+ "stages": [
+  {
+   "vus": 3,
+   "assertions": {
+    "lead_created:ok": 3,
+    "lead_converted:ok": 3,
+    "integrity_ok_after_stage:ok": 1
+   },
+   "failed_assertions": []
+  }
+ ]
+}

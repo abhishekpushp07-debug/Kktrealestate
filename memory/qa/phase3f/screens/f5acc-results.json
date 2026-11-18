@@ -1,0 +1,50 @@
+[
+ {
+  "theme": "light",
+  "width": 1440,
+  "screen": "stacking-plan",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 1440,
+  "screen": "inventory-status",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 390,
+  "screen": "stacking-plan",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 390,
+  "screen": "inventory-status",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 1440,
+  "screen": "stacking-plan",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 1440,
+  "screen": "inventory-status",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 390,
+  "screen": "stacking-plan",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 390,
+  "screen": "inventory-status",
+  "h_overflow_px": 0
+ }
+]

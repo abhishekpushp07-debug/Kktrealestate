@@ -1,0 +1,1389 @@
+{
+ "counters": {
+  "6adf98dd23be344d65e4f774": 85,
+  "6adf98dd23be344d65e4f78d": 1668,
+  "6adf98dd23be344d65e4f7ab": 1880,
+  "6adf98dd23be344d65e4f7c3": 1825,
+  "6adf98dd23be344d65e4f7cd": 7305,
+  "6adf98dd23be344d65e4f944": 11628,
+  "6adf98de23be344d65e4fac9": 1918,
+  "6adf98e323be344d65e5149f": 6,
+  "6adf990623be344d65e5d8e7": 56,
+  "6adf990d23be344d65e60013": 19934,
+  "6adf990f23be344d65e60a39": 11069,
+  "6adf991223be344d65e61597": 1011,
+  "6adf991223be344d65e615e5": 6827,
+  "6adf991223be344d65e61624": 2217,
+  "6adf991b23be344d65e643ee": 5186,
+  "6adf996023be344d65e76d73": 733,
+  "6adf9f6623be344d65e814bb": 973
+ },
+ "snap": {
+  "block_ids": [
+   "0d220380-bdd3-4202-9769-7a5db753b75a",
+   "21dca443-0913-4d8f-923f-c23959081b49",
+   "439da97b-a56e-4425-adf6-fa4ac195b8f2",
+   "5d2087ec-b20a-4abb-ae11-3a1bf447f158",
+   "cabe48b7-d5fe-40ed-ae75-0ab01d693877"
+  ],
+  "booked_flats": [
+   [
+    "0607fb1f-ba26-4d4a-add4-cd392b323e3a",
+    "Active",
+    null
+   ],
+   [
+    "06ecce0b-39d9-4c79-8ddb-248204adf884",
+    "Active",
+    null
+   ],
+   [
+    "0e3b5fd5-a998-4cb5-b779-34564ce9ada5",
+    "Active",
+    null
+   ],
+   [
+    "10238073-8ca6-4d80-ab91-f6591e0ffb46",
+    "Active",
+    null
+   ],
+   [
+    "11b5cc55-95ec-4866-84bd-3a6b17675c32",
+    "Active",
+    null
+   ],
+   [
+    "13d70999-14f8-40df-a1ac-4b0d5c29e4ff",
+    "Active",
+    null
+   ],
+   [
+    "13de4e0b-b00e-4dfb-812e-eeb0359e8636",
+    "Active",
+    null
+   ],
+   [
+    "161675dd-dd81-4814-9551-b9d50a758b1f",
+    "Active",
+    null
+   ],
+   [
+    "1b0115d1-349b-4046-ad1b-16a777a8f728",
+    "Active",
+    null
+   ],
+   [
+    "1e8f52fa-b157-46f8-a6fe-6ea2cdb63e57",
+    "Active",
+    null
+   ],
+   [
+    "1ec1cda4-2c1a-418f-9a00-3659efbef0dd",
+    "Active",
+    null
+   ],
+   [
+    "22a3dd9a-de83-4c93-9b8b-5a4ad028ac49",
+    "Active",
+    null
+   ],
+   [
+    "2a3c9acd-5047-4345-b165-96abcdd8f3ec",
+    "Active",
+    null
+   ],
+   [
+    "2e17ee22-f20a-49a9-ab53-b41ddb405e23",
+    "Active",
+    null
+   ],
+   [
+    "30a5e618-a971-41ee-afb6-2f331c476c04",
+    "Active",
+    null
+   ],
+   [
+    "32101bf6-863c-4857-9a15-602bd514fbba",
+    "Active",
+    null
+   ],
+   [
+    "343193db-79c9-4a62-9c0d-e13e83bfd228",
+    "Active",
+    null
+   ],
+   [
+    "3809c089-e393-43c5-ae80-5192ea1a5670",
+    "Active",
+    null
+   ],
+   [
+    "3caee18c-74e1-404e-aa56-408288ac4e66",
+    "Active",
+    null
+   ],
+   [
+    "42232bc7-fdbc-451a-919f-9b974a4f8500",
+    "Active",
+    null
+   ],
+   [
+    "43f818c2-5ad1-4d49-9049-3fa0f5c6f0e9",
+    "Active",
+    null
+   ],
+   [
+    "454afecb-298c-4458-bd81-ea7d7d25dccd",
+    "Active",
+    null
+   ],
+   [
+    "48558fb7-678f-41b0-8384-e6840ce43add",
+    "Active",
+    null
+   ],
+   [
+    "49e4b858-5bb7-4a5b-aa05-f7e0c1ba69c1",
+    "Active",
+    null
+   ],
+   [
+    "4bbc2a16-7a5c-4caa-9b08-a38072bb9b1c",
+    "Active",
+    null
+   ],
+   [
+    "4cdfcc42-5264-4d76-aa31-1ea97dcbb072",
+    "Active",
+    null
+   ],
+   [
+    "4df79cff-749a-4c9f-92a0-eb54f110f0d7",
+    "Active",
+    null
+   ],
+   [
+    "5c226ad3-219e-469d-91ff-056eaad5df11",
+    "Active",
+    null
+   ],
+   [
+    "5d753462-83e7-487b-a65e-746d3cc9c3f4",
+    "Active",
+    null
+   ],
+   [
+    "5e26f525-166d-42ea-8acf-11565e9a079d",
+    "Active",
+    null
+   ],
+   [
+    "61a60740-0e04-4f58-ba32-16312af0fe05",
+    "Active",
+    null
+   ],
+   [
+    "653dfdfc-065d-4a1e-822a-0b8629d54457",
+    "Cancelled",
+    null
+   ],
+   [
+    "6806599b-340e-48ab-b8bc-452577a4628d",
+    "Active",
+    null
+   ],
+   [
+    "6a89b263-d3f6-4c84-b33a-ba14c1ccee8f",
+    "Active",
+    null
+   ],
+   [
+    "6a89b263-d3f6-4c84-b33a-ba14c1ccee8f",
+    "Cancelled",
+    null
+   ],
+   [
+    "6ca79ca1-3156-4589-a365-a82236622741",
+    "Active",
+    null
+   ],
+   [
+    "6cd54e55-37c8-4456-97cc-f624bd1a4b52",
+    "Active",
+    null
+   ],
+   [
+    "7025b063-9ca4-4305-83e1-4d4d6874bd82",
+    "Active",
+    null
+   ],
+   [
+    "72da2327-0bbe-4ed4-9c1f-f71b0038bc34",
+    "Active",
+    null
+   ],
+   [
+    "766a4b90-ae55-4137-a58c-7fe6533d433a",
+    "Active",
+    null
+   ],
+   [
+    "77569bfa-d04d-4fff-9ab9-f5065b386109",
+    "Active",
+    null
+   ],
+   [
+    "8404a474-2f55-4d06-b03b-365adc1c59f2",
+    "Active",
+    null
+   ],
+   [
+    "8bd055a6-f811-4686-a093-de11cf09c550",
+    "Active",
+    null
+   ],
+   [
+    "8e018ce8-bff4-4645-aab5-d73c28718948",
+    "Active",
+    null
+   ],
+   [
+    "8f06116c-5fbf-4002-8614-930ffffdb163",
+    "Active",
+    null
+   ],
+   [
+    "9581ea6f-2495-46b2-843d-9be2e565546f",
+    "Active",
+    null
+   ],
+   [
+    "95f1f221-1c0d-4a6c-97b8-e67458a9e6ff",
+    "Active",
+    null
+   ],
+   [
+    "96a4948e-045e-46cd-863d-4c5eb4460820",
+    "Active",
+    null
+   ],
+   [
+    "98c8b53f-af44-495b-a73a-a0b7c1540753",
+    "Active",
+    null
+   ],
+   [
+    "9d2bc2d2-e4c1-4cf3-b601-cdd1e46314ce",
+    "Active",
+    null
+   ],
+   [
+    "a29cdd40-0f37-4de4-8faf-46f73b5f9797",
+    "Active",
+    null
+   ],
+   [
+    "b5efba89-b89c-4234-b1bf-7f79613851eb",
+    "Active",
+    null
+   ],
+   [
+    "b6926963-4457-4feb-a0e0-b6705cdc5f29",
+    "Active",
+    null
+   ],
+   [
+    "b84c17c6-ad10-4184-b157-a22761937ad9",
+    "Active",
+    null
+   ],
+   [
+    "b9c99ae0-22de-4881-9223-a816ce8de94a",
+    "Active",
+    null
+   ],
+   [
+    "baa56f4d-b214-49ae-acbb-81c20411879d",
+    "Active",
+    null
+   ],
+   [
+    "bda3d185-0cf7-440e-9181-2fede56957f9",
+    "Active",
+    null
+   ],
+   [
+    "c1777b54-f3b7-4047-a72c-181fb5b06f87",
+    "Active",
+    null
+   ],
+   [
+    "c1865e93-fb87-4bff-a1a9-87fd59ac559f",
+    "Active",
+    null
+   ],
+   [
+    "c30446ab-8e0a-4faa-a45e-4bb90f43419b",
+    "Active",
+    null
+   ],
+   [
+    "c7ae2970-c399-443c-a0e8-6f9070e2cf21",
+    "Active",
+    null
+   ],
+   [
+    "cd1da1be-9b14-4668-954c-bdf664999bf6",
+    "Active",
+    null
+   ],
+   [
+    "cdf977c5-2546-4278-a08f-c44f9a8c1e90",
+    "Active",
+    null
+   ],
+   [
+    "d1da2dd1-5939-4526-a351-f34b4a38b0b4",
+    "Active",
+    null
+   ],
+   [
+    "d4a1d46c-0c3e-488f-8dee-48a4b8b64a8c",
+    "Active",
+    null
+   ],
+   [
+    "d641b267-16d6-4ee1-ac7a-087907e5d7fc",
+    "Active",
+    null
+   ],
+   [
+    "d958386b-2912-48d7-83c0-535c520bf876",
+    "Active",
+    null
+   ],
+   [
+    "da7ea659-a3ee-41aa-9a60-b4e65baf95e0",
+    "Active",
+    null
+   ],
+   [
+    "daadd7b6-d530-45d5-9e49-8906476d947c",
+    "Active",
+    null
+   ],
+   [
+    "dcb79826-4240-4f15-adc7-70abba29ec9d",
+    "Active",
+    null
+   ],
+   [
+    "df670603-b189-4cfe-9982-2ec905d23d53",
+    "Active",
+    null
+   ],
+   [
+    "e2da5a4d-d8c0-4719-9daf-889a88a949a9",
+    "Active",
+    null
+   ],
+   [
+    "e51ac3c2-2ed0-466b-bada-42ec450b703f",
+    "Active",
+    null
+   ],
+   [
+    "e8b4686e-203a-4a37-bd62-027c497bebaa",
+    "Active",
+    null
+   ],
+   [
+    "ea9ca3cb-d5ab-4b9a-8877-4148237d4ca7",
+    "Active",
+    null
+   ],
+   [
+    "f1d72700-474f-4a80-bccf-8eb9872b2e41",
+    "Active",
+    null
+   ],
+   [
+    "f355916f-d49e-49f0-b8f3-659a1e91027f",
+    "Active",
+    null
+   ],
+   [
+    "f4f9c23c-20a9-429a-818b-3c16f0fba7c0",
+    "Active",
+    null
+   ],
+   [
+    "fa5de756-70ea-462f-b848-439f4fa0556c",
+    "Active",
+    null
+   ],
+   [
+    "fb06d9f2-184d-4b14-9698-3b5f4e90775f",
+    "Active",
+    null
+   ]
+  ],
+  "bookings": {
+   "Active": 78,
+   "Cancelled": 2
+  },
+  "demands": {
+   "Cancelled": [
+    5,
+    187952000
+   ],
+   "Open": [
+    63,
+    3094609000
+   ],
+   "Paid": [
+    514,
+    34293871300
+   ],
+   "Partially Paid": [
+    4,
+    204513000
+   ]
+  },
+  "flat_prices": 88812280000,
+  "flat_state": {
+   "006f2dd3-d029-482b-bbf2-a26c4682fc35": [
+    "C-302",
+    "Available",
+    4635.0,
+    672080000
+   ],
+   "04ee6e35-cf09-4475-a180-5a130a6c6eef": [
+    "A-502",
+    "Available",
+    4550.0,
+    659750000
+   ],
+   "050fd11f-4826-468f-8bc2-b87941fa030a": [
+    "P1",
+    "Available",
+    null,
+    1000000000
+   ],
+   "0607fb1f-ba26-4d4a-add4-cd392b323e3a": [
+    "C-102",
+    "Booked",
+    4450.0,
+    645250000
+   ],
+   "06ecce0b-39d9-4c79-8ddb-248204adf884": [
+    "A-803",
+    "Booked",
+    4825.0,
+    506620000
+   ],
+   "0d043a3c-72b9-416e-96a3-a9d7278b0e0a": [
+    "C-1603",
+    "Available",
+    4575.0,
+    480380000
+   ],
+   "0d93b7cd-04ef-479c-8d68-492ec898c752": [
+    "B-503",
+    "Available",
+    4500.0,
+    504000000
+   ],
+   "0e3b5fd5-a998-4cb5-b779-34564ce9ada5": [
+    "A-202",
+    "Booked",
+    4475.0,
+    648880000
+   ],
+   "0f2a8829-c24d-462a-8d39-b444b216c465": [
+    "P6",
+    "Available",
+    null,
+    1000000000
+   ],
+   "10238073-8ca6-4d80-ab91-f6591e0ffb46": [
+    "C-601",
+    "Booked",
+    4675.0,
+    677880000
+   ],
+   "11b5cc55-95ec-4866-84bd-3a6b17675c32": [
+    "C-1403",
+    "Booked",
+    4525.0,
+    475120000
+   ],
+   "13d70999-14f8-40df-a1ac-4b0d5c29e4ff": [
+    "C-1204",
+    "Booked",
+    4575.0,
+    480380000
+   ],
+   "13de4e0b-b00e-4dfb-812e-eeb0359e8636": [
+    "B-704",
+    "Booked",
+    4650.0,
+    520800000
+   ],
+   "1519b783-43b8-4ce1-877b-41d0dcc2c196": [
+    "B-802",
+    "Available",
+    4400.0,
+    712800000
+   ],
+   "161675dd-dd81-4814-9551-b9d50a758b1f": [
+    "A-704",
+    "Booked",
+    4600.0,
+    483000000
+   ],
+   "1a6a24be-7494-4c66-8587-d7501df26c7d": [
+    "P4",
+    "Available",
+    null,
+    1000000000
+   ],
+   "1b0115d1-349b-4046-ad1b-16a777a8f728": [
+    "C-104",
+    "Booked",
+    4300.0,
+    451500000
+   ],
+   "1e8f52fa-b157-46f8-a6fe-6ea2cdb63e57": [
+    "C-1503",
+    "Booked",
+    4550.0,
+    477750000
+   ],
+   "1ec1cda4-2c1a-418f-9a00-3659efbef0dd": [
+    "C-1401",
+    "Booked",
+    4875.0,
+    706880000
+   ],
+   "1f130da9-47c8-4a2c-8834-f21001504aa4": [
+    "C-1103",
+    "Available",
+    4450.0,
+    467250000
+   ],
+   "2049d4a1-80ef-4d79-aa04-bbdcef9d362a": [
+    "C-902",
+    "Available",
+    4650.0,
+    674250000
+   ],
+   "22a3dd9a-de83-4c93-9b8b-5a4ad028ac49": [
+    "C-504",
+    "Booked",
+    4400.0,
+    462000000
+   ],
+   "2974fd00-e519-4944-922e-0206f69bd8e1": [
+    "C-1604",
+    "Available",
+    4675.0,
+    490880000
+   ],
+   "2a3c9acd-5047-4345-b165-96abcdd8f3ec": [
+    "A-403",
+    "Booked",
+    4425.0,
+    464620000
+   ],
+   "2e17ee22-f20a-49a9-ab53-b41ddb405e23": [
+    "B-401",
+    "Booked",
+    4675.0,
+    757350000
+   ],
+   "2eaea62e-25fc-4fc9-9c07-89c2f0849624": [
+    "P5",
+    "Available",
+    null,
+    1000000000
+   ],
+   "30123d8b-2bf9-40a0-af63-c00c82ff7849": [
+    "B-202",
+    "Blocked",
+    4525.0,
+    733050000
+   ],
+   "30a5e618-a971-41ee-afb6-2f331c476c04": [
+    "C-603",
+    "Booked",
+    4325.0,
+    454120000
+   ],
+   "318a35e4-6b60-4202-bda1-58b3e80b9ec7": [
+    "B-204",
+    "Available",
+    4525.0,
+    506800000
+   ],
+   "32101bf6-863c-4857-9a15-602bd514fbba": [
+    "A-301",
+    "Booked",
+    4600.0,
+    667000000
+   ],
+   "32db33d5-9b45-40b4-973d-ffba4c65f44d": [
+    "A-702",
+    "Available",
+    4600.0,
+    667000000
+   ],
+   "33dcfff3-ad19-406f-b4ae-113b1e63486d": [
+    "C-204",
+    "Hold",
+    4454.75,
+    467750000
+   ],
+   "343193db-79c9-4a62-9c0d-e13e83bfd228": [
+    "C-503",
+    "Booked",
+    4300.0,
+    451500000
+   ],
+   "3809c089-e393-43c5-ae80-5192ea1a5670": [
+    "V1",
+    "Booked",
+    null,
+    1000000000
+   ],
+   "3a434340-3309-4439-8772-d99bf85e0605": [
+    "A-304",
+    "Available",
+    4200.0,
+    441000000
+   ],
+   "3caee18c-74e1-404e-aa56-408288ac4e66": [
+    "C-1203",
+    "Booked",
+    4475.0,
+    469880000
+   ],
+   "3d5b5ba4-a1dc-4cb2-aa32-3f284497e044": [
+    "C-1004",
+    "Available",
+    4525.0,
+    475125000
+   ],
+   "3e06e879-1b77-4e61-9e76-10b723981324": [
+    "A-603",
+    "Available",
+    4775.0,
+    501380000
+   ],
+   "42232bc7-fdbc-451a-919f-9b974a4f8500": [
+    "V7",
+    "Booked",
+    null,
+    1065000000
+   ],
+   "43b1361a-8718-410d-801b-22ae70bd0188": [
+    "B-102",
+    "Hold",
+    4500.0,
+    729000000
+   ],
+   "43f818c2-5ad1-4d49-9049-3fa0f5c6f0e9": [
+    "A-104",
+    "Booked",
+    4450.0,
+    467250000
+   ],
+   "454afecb-298c-4458-bd81-ea7d7d25dccd": [
+    "B-402",
+    "Booked",
+    4575.0,
+    741150000
+   ],
+   "48558fb7-678f-41b0-8384-e6840ce43add": [
+    "C-1003",
+    "Booked",
+    4425.0,
+    464620000
+   ],
+   "49e4b858-5bb7-4a5b-aa05-f7e0c1ba69c1": [
+    "V6",
+    "Booked",
+    null,
+    1000000000
+   ],
+   "4bbc2a16-7a5c-4caa-9b08-a38072bb9b1c": [
+    "C-301",
+    "Booked",
+    4600.0,
+    667000000
+   ],
+   "4cdfcc42-5264-4d76-aa31-1ea97dcbb072": [
+    "A-802",
+    "Booked",
+    4625.0,
+    670620000
+   ],
+   "4df79cff-749a-4c9f-92a0-eb54f110f0d7": [
+    "C-201",
+    "Booked",
+    4575.0,
+    663380000
+   ],
+   "51c718f0-7947-420b-8a58-9c36106988e7": [
+    "C-804",
+    "Available",
+    4475.0,
+    469880000
+   ],
+   "5bc84388-0872-4120-a2dd-8fea1f550cd6": [
+    "B-702",
+    "Available",
+    4650.0,
+    753300000
+   ],
+   "5c226ad3-219e-469d-91ff-056eaad5df11": [
+    "B-604",
+    "Booked",
+    4625.0,
+    518000000
+   ],
+   "5d753462-83e7-487b-a65e-746d3cc9c3f4": [
+    "A-102",
+    "Booked",
+    4450.0,
+    645250000
+   ],
+   "5e26f525-166d-42ea-8acf-11565e9a079d": [
+    "A-504",
+    "Booked",
+    4550.0,
+    477750000
+   ],
+   "5f37d345-80fe-4488-a7c0-32c0535f44ec": [
+    "B-103",
+    "Hold",
+    4400.0,
+    492800000
+   ],
+   "61a60740-0e04-4f58-ba32-16312af0fe05": [
+    "A-801",
+    "Booked",
+    4200.0,
+    609000000
+   ],
+   "653dfdfc-065d-4a1e-822a-0b8629d54457": [
+    "C-403",
+    "Available",
+    4275.0,
+    448880000
+   ],
+   "67057735-808f-4d3b-ba4d-cc12e870d758": [
+    "C-1001",
+    "Available",
+    4775.0,
+    692380000
+   ],
+   "675fb648-cbaf-4920-a0da-c5ed553e23be": [
+    "A-302",
+    "Available",
+    4500.0,
+    652500000
+   ],
+   "6806599b-340e-48ab-b8bc-452577a4628d": [
+    "C-401",
+    "Booked",
+    4625.0,
+    670620000
+   ],
+   "6a89b263-d3f6-4c84-b33a-ba14c1ccee8f": [
+    "A-204",
+    "Booked",
+    4475.0,
+    469880000
+   ],
+   "6ca79ca1-3156-4589-a365-a82236622741": [
+    "A-201",
+    "Booked",
+    4575.0,
+    663375000
+   ],
+   "6cd54e55-37c8-4456-97cc-f624bd1a4b52": [
+    "C-903",
+    "Booked",
+    4400.0,
+    462000000
+   ],
+   "701706e6-227f-4cc8-afe0-62c931031dfa": [
+    "B-601",
+    "Available",
+    4725.0,
+    765450000
+   ],
+   "7025b063-9ca4-4305-83e1-4d4d6874bd82": [
+    "C-404",
+    "Booked",
+    4375.0,
+    459380000
+   ],
+   "71c2f89f-03a3-47e1-8c4f-1ee9404191b3": [
+    "B-502",
+    "Available",
+    4600.0,
+    745200000
+   ],
+   "72da2327-0bbe-4ed4-9c1f-f71b0038bc34": [
+    "B-304",
+    "Booked",
+    4550.0,
+    509600000
+   ],
+   "74d459fd-f13a-4957-abdf-a28a7fde2327": [
+    "P3",
+    "Available",
+    null,
+    1000000000
+   ],
+   "766a4b90-ae55-4137-a58c-7fe6533d433a": [
+    "V11",
+    "Booked",
+    null,
+    1065000000
+   ],
+   "77569bfa-d04d-4fff-9ab9-f5065b386109": [
+    "A-404",
+    "Booked",
+    4525.0,
+    475120000
+   ],
+   "7a2196e4-ecf9-4f00-8db9-56afa8c8d005": [
+    "A-602",
+    "Available",
+    4575.0,
+    663380000
+   ],
+   "7d0f9565-15fc-4654-bcf4-2864ab94dac8": [
+    "B-404",
+    "Available",
+    4575.0,
+    512400000
+   ],
+   "7d39f5d3-246d-4f3d-b14c-126a5e9cd4a2": [
+    "A-402",
+    "Available",
+    4525.0,
+    656120000
+   ],
+   "7ed0bf5a-7e95-4bc3-ad57-b105e24c50c5": [
+    "B-801",
+    "Available",
+    4775.0,
+    773550000
+   ],
+   "8326b359-e7b7-436f-b58c-597568c5ee00": [
+    "C-1104",
+    "Available",
+    4550.0,
+    477750000
+   ],
+   "8404a474-2f55-4d06-b03b-365adc1c59f2": [
+    "V12",
+    "Booked",
+    null,
+    1065000000
+   ],
+   "8462529f-ed4a-4e56-b4bb-729ca6fce860": [
+    "P2",
+    "Available",
+    null,
+    1000000000
+   ],
+   "88f3fc5b-0c65-433b-a4dc-304f3162b343": [
+    "C-1002",
+    "Available",
+    4675.0,
+    677880000
+   ],
+   "8bd055a6-f811-4686-a093-de11cf09c550": [
+    "V3",
+    "Booked",
+    3800.0,
+    912000000
+   ],
+   "8e018ce8-bff4-4645-aab5-d73c28718948": [
+    "B-101",
+    "Booked",
+    4600.0,
+    745200000
+   ],
+   "8f06116c-5fbf-4002-8614-930ffffdb163": [
+    "B-504",
+    "Booked",
+    4600.0,
+    515200000
+   ],
+   "8f55f13d-e394-4f00-9d5c-276fb76f0138": [
+    "A-103",
+    "Available",
+    4350.0,
+    456750000
+   ],
+   "906e9b1f-df35-4179-976a-9e25dc256798": [
+    "A-501",
+    "Available",
+    4650.0,
+    674250000
+   ],
+   "9581ea6f-2495-46b2-843d-9be2e565546f": [
+    "B-303",
+    "Booked",
+    4450.0,
+    498400000
+   ],
+   "95f1f221-1c0d-4a6c-97b8-e67458a9e6ff": [
+    "V4",
+    "Booked",
+    null,
+    1065000000
+   ],
+   "967bb5cf-37f9-4e24-b776-26e890a5c8d7": [
+    "C-801",
+    "Available",
+    4725.0,
+    685120000
+   ],
+   "96a4948e-045e-46cd-863d-4c5eb4460820": [
+    "A-804",
+    "Booked",
+    4625.0,
+    485620000
+   ],
+   "98c8b53f-af44-495b-a73a-a0b7c1540753": [
+    "C-901",
+    "Booked",
+    4750.0,
+    688750000
+   ],
+   "9d2bc2d2-e4c1-4cf3-b601-cdd1e46314ce": [
+    "C-101",
+    "Booked",
+    4550.0,
+    659750000
+   ],
+   "a29cdd40-0f37-4de4-8faf-46f73b5f9797": [
+    "C-1504",
+    "Booked",
+    4650.0,
+    488250000
+   ],
+   "a9b03cbe-8c54-4cfd-9467-d6255bb5438f": [
+    "B-803",
+    "Available",
+    4575.0,
+    512400000
+   ],
+   "ad9e56a8-b825-4307-a5c1-c6c754941e0c": [
+    "C-1501",
+    "Available",
+    4900.0,
+    710500000
+   ],
+   "b1624f77-e1b6-4712-b098-a165bcd99a3b": [
+    "B-501",
+    "Available",
+    4700.0,
+    761400000
+   ],
+   "b442bc33-3fda-4470-aca5-bbbe37187349": [
+    "C-604",
+    "Available",
+    4425.0,
+    464620000
+   ],
+   "b4c74269-9311-4c2a-8bf8-2bb36fd8dea7": [
+    "C-1404",
+    "Available",
+    4625.0,
+    485620000
+   ],
+   "b5efba89-b89c-4234-b1bf-7f79613851eb": [
+    "B-602",
+    "Booked",
+    4625.0,
+    749250000
+   ],
+   "b6926963-4457-4feb-a0e0-b6705cdc5f29": [
+    "V10",
+    "Booked",
+    null,
+    1065000000
+   ],
+   "b84c17c6-ad10-4184-b157-a22761937ad9": [
+    "C-602",
+    "Booked",
+    4575.0,
+    663380000
+   ],
+   "b9c99ae0-22de-4881-9223-a816ce8de94a": [
+    "A-401",
+    "Booked",
+    4625.0,
+    670620000
+   ],
+   "baa56f4d-b214-49ae-acbb-81c20411879d": [
+    "C-203",
+    "Booked",
+    4225.0,
+    443620000
+   ],
+   "bda3d185-0cf7-440e-9181-2fede56957f9": [
+    "B-403",
+    "Booked",
+    4475.0,
+    501200000
+   ],
+   "c1777b54-f3b7-4047-a72c-181fb5b06f87": [
+    "A-604",
+    "Booked",
+    4575.0,
+    480380000
+   ],
+   "c1865e93-fb87-4bff-a1a9-87fd59ac559f": [
+    "B-203",
+    "Booked",
+    4400.0,
+    492800000
+   ],
+   "c30446ab-8e0a-4faa-a45e-4bb90f43419b": [
+    "C-802",
+    "Booked",
+    4625.0,
+    670620000
+   ],
+   "c7ae2970-c399-443c-a0e8-6f9070e2cf21": [
+    "A-303",
+    "Booked",
+    4400.0,
+    462000000
+   ],
+   "cc9f334e-6ec8-4479-b9a4-b1396c8acf61": [
+    "A-203",
+    "Available",
+    4375.0,
+    459380000
+   ],
+   "cd1da1be-9b14-4668-954c-bdf664999bf6": [
+    "B-804",
+    "Booked",
+    4675.0,
+    523600000
+   ],
+   "cdf977c5-2546-4278-a08f-c44f9a8c1e90": [
+    "A-503",
+    "Booked",
+    4450.0,
+    467250000
+   ],
+   "cee76130-bea0-4949-a8db-672e82f66f6f": [
+    "B-603",
+    "Available",
+    4525.0,
+    506800000
+   ],
+   "d1da2dd1-5939-4526-a351-f34b4a38b0b4": [
+    "C-304",
+    "Booked",
+    4350.0,
+    456750000
+   ],
+   "d1f6b496-1ab5-4789-af1c-00753f9cd772": [
+    "C-501",
+    "Available",
+    4650.0,
+    674250000
+   ],
+   "d4a1d46c-0c3e-488f-8dee-48a4b8b64a8c": [
+    "V5",
+    "Booked",
+    null,
+    1065000000
+   ],
+   "d641b267-16d6-4ee1-ac7a-087907e5d7fc": [
+    "C-202",
+    "Booked",
+    4475.0,
+    648880000
+   ],
+   "d7413d6b-c7b3-44c7-bf84-8a7f9afd0ab8": [
+    "C-1202",
+    "Available",
+    4725.0,
+    685120000
+   ],
+   "d8b8a52b-70de-46a1-ad51-01a97e08fffe": [
+    "A-701",
+    "Available",
+    4700.0,
+    681500000
+   ],
+   "d958386b-2912-48d7-83c0-535c520bf876": [
+    "C-1502",
+    "Booked",
+    4800.0,
+    696000000
+   ],
+   "da7ea659-a3ee-41aa-9a60-b4e65baf95e0": [
+    "C-103",
+    "Booked",
+    4200.0,
+    441000000
+   ],
+   "daadd7b6-d530-45d5-9e49-8906476d947c": [
+    "V2",
+    "Booked",
+    null,
+    1065000000
+   ],
+   "dcb79826-4240-4f15-adc7-70abba29ec9d": [
+    "C-1201",
+    "Booked",
+    4825.0,
+    699620000
+   ],
+   "df670603-b189-4cfe-9982-2ec905d23d53": [
+    "C-303",
+    "Booked",
+    4250.0,
+    446250000
+   ],
+   "e225f858-a815-48fb-bcbb-1b289837c56e": [
+    "C-502",
+    "Available",
+    4550.0,
+    659750000
+   ],
+   "e2da5a4d-d8c0-4719-9daf-889a88a949a9": [
+    "B-302",
+    "Booked",
+    4550.0,
+    737100000
+   ],
+   "e4a36301-46bb-42f9-9b41-03ceb95038bf": [
+    "C-1601",
+    "Available",
+    4925.0,
+    714120000
+   ],
+   "e51ac3c2-2ed0-466b-bada-42ec450b703f": [
+    "B-703",
+    "Booked",
+    4550.0,
+    509600000
+   ],
+   "e7ebecde-4abc-405d-bbba-f467c4ee7162": [
+    "B-301",
+    "Available",
+    4650.0,
+    753300000
+   ],
+   "e7ef0d64-d906-41f1-8115-3e756b1b0c11": [
+    "B-701",
+    "Available",
+    4750.0,
+    769500000
+   ],
+   "e8b4686e-203a-4a37-bd62-027c497bebaa": [
+    "C-803",
+    "Booked",
+    4375.0,
+    459380000
+   ],
+   "ea9ca3cb-d5ab-4b9a-8877-4148237d4ca7": [
+    "A-601",
+    "Booked",
+    4675.0,
+    677880000
+   ],
+   "eaf1dfc6-fa8d-4ce8-b0fe-aab507bdb16c": [
+    "A-101",
+    "Available",
+    4200.0,
+    609000000
+   ],
+   "f1d72700-474f-4a80-bccf-8eb9872b2e41": [
+    "V9",
+    "Booked",
+    null,
+    1065000000
+   ],
+   "f355916f-d49e-49f0-b8f3-659a1e91027f": [
+    "A-703",
+    "Booked",
+    4800.0,
+    504000000
+   ],
+   "f3d4c3ea-e90b-4622-ab3b-58b3c212a930": [
+    "C-1402",
+    "Available",
+    4775.0,
+    692380000
+   ],
+   "f4f9c23c-20a9-429a-818b-3c16f0fba7c0": [
+    "B-104",
+    "Booked",
+    4500.0,
+    504000000
+   ],
+   "f7c9d009-8bc1-4998-8f2d-ae51b0e3d2d4": [
+    "C-402",
+    "Available",
+    4660.75,
+    675810000
+   ],
+   "f8b41d45-0a18-4902-9489-ee44c3e84ee5": [
+    "C-1602",
+    "Available",
+    4825.0,
+    699620000
+   ],
+   "fa5de756-70ea-462f-b848-439f4fa0556c": [
+    "B-201",
+    "Booked",
+    4625.0,
+    749250000
+   ],
+   "fae3cd2d-1831-4da1-be4e-5b8ea3333b6e": [
+    "C-1102",
+    "Available",
+    4700.0,
+    681500000
+   ],
+   "fb06d9f2-184d-4b14-9698-3b5f4e90775f": [
+    "V8",
+    "Booked",
+    null,
+    1065000000
+   ],
+   "fb9cd580-3b0c-4c18-b640-64e34e509ca1": [
+    "C-1101",
+    "Available",
+    4800.0,
+    696000000
+   ],
+   "fd1dfc0e-dbfe-4a55-82a7-4fe628b18d6f": [
+    "C-904",
+    "Available",
+    4500.0,
+    472500000
+   ]
+  },
+  "flats": {
+   "Available": 56,
+   "Blocked": 1,
+   "Booked": 78,
+   "Hold": 3
+  },
+  "hold_reasons": [
+   "Customer interest",
+   "Legal/documentation",
+   "Management",
+   "Pricing review",
+   "Token promised",
+   "Token received (custom)"
+  ],
+  "leads": {
+   "Contacted": 8,
+   "Converted": 78,
+   "Lost": 9,
+   "Negotiation": 6,
+   "New": 9,
+   "Site Visit Done": 3,
+   "Site Visit Scheduled": 7
+  },
+  "outstanding": 7427999400,
+  "payments": {
+   "Bounced": [
+    2,
+    36536000
+   ],
+   "Cleared": [
+    1088,
+    34545340200
+   ],
+   "Pending": [
+    1,
+    4000000
+   ],
+   "Reversed": [
+    1,
+    1500000
+   ]
+  },
+  "plans": [
+   "CLP home loan (45 days to pay)",
+   "Down Payment 10:85:5",
+   "Down Payment 10:85:5 (Tower B)",
+   "Flexi 10:40:50",
+   "Flexi 10:40:50 (Tower B)",
+   "Lump sum (100% on booking)",
+   "Standard CLP",
+   "Villa CLP"
+  ],
+  "project_ids": [
+   "2c3129d0-ec03-43e1-b25b-521e174e0755",
+   "8e4ef80c-0ce8-4fe6-8c46-7b552afe0d8a"
+  ],
+  "projects": [
+   "GGV",
+   "SGH"
+  ],
+  "refunds": {
+   "Forfeited": [
+    1,
+    0
+   ],
+   "Paid": [
+    2,
+    42289200
+   ]
+  },
+  "roles": [
+   "Accounts",
+   "Admin",
+   "Employee",
+   "Marketing",
+   "Project Admin",
+   "Sales",
+   "Super Admin"
+  ],
+  "story": "2026-11-16",
+  "towers": [
+   "Tower A",
+   "Tower B",
+   "Tower C",
+   "Villa Block P (Premium)",
+   "Villa Block V"
+  ],
+  "users": [
+   "abhishek@billpe.com",
+   "accounts@kkt.in",
+   "admin@kkt.in",
+   "employee@kkt.in",
+   "marketing@kkt.in",
+   "projectadmin@kkt.in",
+   "sales2@kkt.in",
+   "sales@kkt.in",
+   "support@kkt.in"
+  ],
+  "visits": {
+   "Cancelled": 1,
+   "Completed": 83,
+   "Confirmed": 1,
+   "No-show": 2
+  }
+ }
+}

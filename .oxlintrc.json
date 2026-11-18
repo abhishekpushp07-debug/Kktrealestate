@@ -1,0 +1,3 @@
+{
+  "ignorePatterns": ["frontend/build/**", "site/build/**", "frontend/deploy-assets/**", "mobile/dist/**", "**/node_modules/**"]
+}

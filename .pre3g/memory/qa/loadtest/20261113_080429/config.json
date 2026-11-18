@@ -1,0 +1,13 @@
+{
+ "ts": "20261113_080429",
+ "base": "http://127.0.0.1:8033",
+ "project": "LOADTEST-20261113_080429",
+ "project_id": "7639ddd2-9c34-46a7-83db-115930714375",
+ "flats": 400,
+ "stages": [
+  3
+ ],
+ "stage_min": 0.5,
+ "build": "d7a22e0",
+ "generator": "preview pod (shared CPU)"
+}

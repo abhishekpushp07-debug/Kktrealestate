@@ -1,0 +1,17 @@
+(trapped) error reading bcrypt version
+Traceback (most recent call last):
+  File "/root/.venv/lib/python3.11/site-packages/passlib/handlers/bcrypt.py", line 620, in _load_backend_mixin
+    version = _bcrypt.__about__.__version__
+              ^^^^^^^^^^^^^^^^^
+AttributeError: module 'bcrypt' has no attribute '__about__'
+index audit_logs.id skipped: An existing index has the same name as the requested index. When index names are not specified, they are auto generated 
+[startup] indexes ensured in 0.10s
+UoW mode: ordered-writes+compensation
+KKT backend serving after 0.12s (uow=ordered-writes+compensation); background startup tasks running
+{"request_id": "9b87feb18e484e5a", "method": "GET", "path": "/api/health", "status": 200, "duration_ms": 3.1, "user_id": null}
+Object storage initialized
+{"request_id": "52da28310a6941cd", "method": "POST", "path": "/api/auth/login", "status": 200, "duration_ms": 286.3, "user_id": null}
+{"request_id": "a4665b02e146496a", "method": "POST", "path": "/api/admin/hard-purge", "status": 200, "duration_ms": 62.0, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+[startup] system_roles ok in 0.14s
+[startup] owner_bootstrap ok in 0.00s
+[startup] seed_phase7 ok in 0.00s

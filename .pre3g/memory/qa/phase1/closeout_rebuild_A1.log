@@ -1,0 +1,10 @@
+start 16:54:36
+{"ok":true,"reseeded":["construction_stages","payment_plans","payment_plan_assignments","portal_accounts","portal_refresh_tokens","service_requests","service_categories","notices","construction_photos","notifications","projects","blocks","flats","rate_cards","parking_slots","customers","leads","book
+16:55:14 {"status":"running","as_of":"2026-11-15","log":"/tmp/story_reseed.log"}
+16:55:35 {"status":"running","as_of":"2026-11-15","log":"/tmp/story_reseed.log"}
+16:55:55 {"status":"running","as_of":"2026-11-15","log":"/tmp/story_reseed.log"}
+16:56:15 {"status":"running","as_of":"2026-11-15","log":"/tmp/story_reseed.log"}
+16:56:35 {"status":"running","as_of":"2026-11-15","log":"/tmp/story_reseed.log"}
+16:56:56 {"status":"running","as_of":"2026-11-15","log":"/tmp/story_reseed.log"}
+16:57:16 {"status":"running","as_of":"2026-11-15","log":"/tmp/story_reseed.log"}
+16:57:36 {"status":"idle"}

@@ -1,0 +1,12 @@
+# Phase 1 Step 8 preview checks 2026-11-14 DB (backend/.env)
+
+## Integrity report
+{"ok": true}
+
+## Purge scan (dry run)
+{"dry_run": true, "counts": {}, "numbers": {"bookings": [], "receipts": [], "customers": [], "bills": 0}}
+
+## Home vs trends vs collections-v2 (this month, paise)
+home   {'Cash': 638998800, 'Account': 479311200, 'Other': 4000000, 'total': 1122310000}
+trends {'Cash': 638998800, 'Account': 479311200, 'Other': 4000000, 'total': 1122310000} source: monthly_buckets
+coll-v2 totals {'cash_paise': 638998800, 'account_paise': 479311200, 'other_paise': 4000000, 'reversal_paise': 0, 'total_paise': 1122310000, 'pending_paise': 4000000}

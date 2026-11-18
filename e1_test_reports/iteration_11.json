@@ -1,0 +1,25 @@
+{
+ "iteration": 11, "mode": "retest", "phase": "3",
+ "passed": 12, "failed": 0, "retest_needed": false,
+ "bugs": [],
+ "action_items": [
+  {"type":"note","severity":"low","detail":"The QA project 'QA Photo Retest' (code QAPR) was created through the API for the photos journey. Its id is b04e10ac-eb06-4aba-a737-2d5cc448d6d1 and it now has 8 test photos. It shows up in the Home 'All projects' filter and in the report project filters, so purge it when you're done. The project 'Ye' was not touched."},
+  {"type":"note","severity":"low","detail":"Shalini Thakur's card status (customers list, 'all' view) is 'DUE TODAY', but her customer page and booking say 'Overdue since 05 Apr 2026'. EliteCustomerCard returns 'Due today' when state is 'due' and next is not a dated bill, because other-charges overdue is not counted in overdue_paise. The status is inside the allowed set, but it disagrees with Next due."},
+  {"type":"note","severity":"low","detail":"EliteCustomerCard.jsx has an 'All clear' fallback that is outside the allowed status set (OVERDUE/DUE TODAY/DUE ON/ADVANCE HELD/NEXT). The 'all clear' segment holds 1 customer. The status-set check only scanned the default needs-attention list (12 cards, all OVERDUE N DAYS). The member-card check saw DUE ON / DUE TODAY / OVERDUE across all 80."},
+  {"type":"note","severity":"low","detail":"Outstanding hub caption 'outstanding till today · ₹5.98 Cr overdue' does not end with a period word. Cosmetic."}
+ ],
+ "checks": [
+  {"criterion":"Regression backend reports reconcile","name":"test_tscheck_phase3_reports_reconcile.py","lane":"backend","status":"passed","evidence":"4 passed in 0.77s"},
+  {"criterion":"JRN-79 + JRN-89 Project photos then Save","name":"p3-project-banners-photos","lane":"browser","status":"passed","evidence":"On QAPR: non-image refused 'Photo must be an image under 15 MB' (422). Added 2 photos, moved one left, starred it, then Save: dialog closed and hero showed the new cover without reload. Second round closed with Escape: hero updated without reload. Projects banner for QAPR shows the new cover. 409 responses: []. 'QA Photo Test' is not on /projects."},
+  {"criterion":"JRN-91 Reports at 390 open at top","name":"p3-reports-hub-tiles","lane":"browser","status":"passed","evidence":"At 390 the hub was scrolled to 800, then Outstanding was tapped: scrollY at open 0, '‹ all reports' visible, report-sheet visible"},
+  {"criterion":"Shalini Thakur due display (BK-2627-2661)","name":"p3-shalini-due-display","lane":"browser","status":"passed","evidence":"Next due: Other charges · Maintenance (advance) · GST... · BK-2627-2661 · Overdue since 05 Apr 2026 · ₹6,35,936. In Record payment, picking Cheque shows hint 'Open now ₹6,35,936 · settled oldest first' and pp-amount=6,35,936. Not submitted."},
+  {"criterion":"Customer card status set","name":"p3-customer-card-status-set","lane":"browser","status":"passed","evidence":"12 of 12 cards: {OVERDUE N DAYS:12}, none outside the set, no DUE NOW. Member-card check (all 80) saw statuses DUE ON N NOV / DUE TODAY / OVERDUE N DAYS."},
+  {"criterion":"Lists wording and counts","name":"p3-lists-wording-counts","lane":"browser","status":"passed","evidence":"Home '1 follow-up due'. Leads '104 leads in pipeline · 1 follow-up due · 1 visit today', the counts match and the only primary button is 'New lead'. Project Statement caption '...· today'. Master title 'bank accounts.', summary '1 entry · used across...', one 'New bank account'. Receipts Bounced + nomatch search shows 'No receipts match these filters' + Clear filters. Sales Home shows 'as shown to sales'."},
+  {"criterion":"Regression JRN-93 Home","name":"p3-home-silver-hero-widgets","lane":"browser","status":"passed","evidence":"Group pills equal clickables (5/4/3/4). Sales sees '79 of 186 · as shown to sales'."},
+  {"criterion":"Regression JRN-81/90 customer + member card","name":"p3-customer-cards-member-card","lane":"browser","status":"passed","evidence":"Member card front and back render, QR present, statuses in the allowed set"},
+  {"criterion":"Regression JRN-83 booking page","name":"p3-booking-page-hero-plan","lane":"browser","status":"passed","evidence":"Hero, money strip, plan timeline and '(est.)' all render"},
+  {"criterion":"Regression JRN-88 report sheet","name":"p3-report-sheet-explains-total","lane":"browser","status":"passed","evidence":"Outstanding ₹7.43 Cr with the equation line. Collections has the 'Carried from before' line. Bridge line present."},
+  {"criterion":"Regression JRN-92 lists/forms","name":"p3-lists-forms-one-product","lane":"browser","status":"passed","evidence":"No native date inputs. One-product headers. Record payment fields as expected."},
+  {"criterion":"Regression JRN-87/84 Night+Day","name":"p3-night-day-consistency","lane":"browser","status":"passed","evidence":"PROBLEMS [] at 1440/390 in both themes, and the theme is remembered after logging back in"}
+ ]
+}

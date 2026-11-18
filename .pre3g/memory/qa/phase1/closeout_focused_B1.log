@@ -1,0 +1,130 @@
+bringing up nodes...
+bringing up nodes...
+
+.......................F.............FF....                              [100%]
+=================================== FAILURES ===================================
+_____________________ test_story_has_a_next_billing_stage ______________________
+[gw1] linux -- Python 3.11.18 /root/.venv/bin/python
+
+base_url = 'http://127.0.0.1:8021'
+admin_headers = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxZTM4MDUwNi0zYmI3LTQ0ZWItOTVkNS02ODQxNmRjZjN...iYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzk0NzYyMTU2LCJleHAiOjE3OTQ3NjMwNTZ9.2-tDbxon72zWL1CtkEfPxgWDkxEo9LLrgSWrZW7dd68'}
+
+    def test_story_has_a_next_billing_stage(base_url, admin_headers):
+        """REQ-48: some tower's next pending stage shows bookings affected + expected bill ₹ in the real preview."""
+        import requests
+    
+        res = _snapshot_result()
+        assert not res["next_stage"], res["next_stage"]
+        hits = []
+        for s in res["next_stages"]:
+            r = requests.get(
+                f"{base_url}/api/blocks/{s['block_id']}/stages/{s['stage_id']}/preview", headers=admin_headers, timeout=30
+            )
+            assert r.status_code == 200, r.text[:200]
+            body = r.json()
+            if body.get("rows") and sum(x["total_paise"] for x in body["rows"]) > 0:
+                hits.append(s["tower"])
+>       assert hits, res["next_stages"]
+E       AssertionError: [{'block_id': '10c47500-94bf-4ad5-ad40-b288395b51db', 'tower': 'Tower B', 'stage_id': '8d2d6c00-d137-4593-8fcd-b7bc0ed...f9f-a43822034fb8', 'tower': 'Tower C', 'stage_id': '8d2d6c00-d137-4593-8fcd-b7bc0edd2f27', 'stage': 'Plastering', ...}]
+E       assert []
+
+tests/test_story_logic.py:66: AssertionError
+________________________ test_backend_ruff_format_clean ________________________
+[gw0] linux -- Python 3.11.18 /root/.venv/bin/python
+
+    def test_backend_ruff_format_clean():
+        r = _run([sys.executable, "-m", "ruff", "format", "--check", "."], BACKEND)
+>       assert r.returncode == 0, r.stdout[-2000:]
+E       AssertionError: unformatted: File would be reformatted
+E           --> tests/test_kkt_erp.py:11:118
+E            |
+E         10 |
+E            - BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://kkt-builder-ledger--9g1vkntz.preview.emergentagent.com").rstrip("/")
+E         11 + BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://kkt-builder-ledger--9g1vkntz.preview.emergentagent.com").rstrip(
+E         12 +     "/"
+E         13 + )
+E         14 | API = f"{BASE_URL}/api"
+E            |
+E         
+E         unformatted: File would be reformatted
+E           --> tests/test_phase_11b.py:10:118
+E            |
+E         9  |
+E            - BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://kkt-builder-ledger--9g1vkntz.preview.emergentagent.com").rstrip("/")
+E         10 + BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://kkt-builder-ledger--9g1vkntz.preview.emergentagent.com").rstrip(
+E         11 +     "/"
+E         12 + )
+E         13 | API = f"{BASE_URL}/api"
+E            |
+E         
+E         unformatted: File would be reformatted
+E           --> tests/test_phase_1_5.py:15:118
+E            |
+E         14 |
+E            - BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://kkt-builder-ledger--9g1vkntz.preview.emergentagent.com").rstrip("/")
+E         15 + BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://kkt-builder-ledger--9g1vkntz.preview.emergentagent.com").rstrip(
+E         16 +     "/"
+E         17 + )
+E         18 | API = f"{BASE_URL}/api"
+E            |
+E         
+E         unformatted: File would be reformatted
+E           --> tests/test_phase_8b.py:10:118
+E            |
+E         9  |
+E            - BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://kkt-builder-ledger--9g1vkntz.preview.emergentagent.com").rstrip("/")
+E         10 + BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://kkt-builder-ledger--9g1vkntz.preview.emergentagent.com").rstrip(
+E         11 +     "/"
+E         12 + )
+E         13 |
+E            |
+E         
+E         unformatted: File would be reformatted
+E           --> tests/test_phase_c_refocus.py:26:118
+E            |
+E         25 |
+E            - BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://kkt-builder-ledger--9g1vkntz.preview.emergentagent.com").rstrip("/")
+E         26 + BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://kkt-builder-ledger--9g1vkntz.preview.emergentagent.com").rstrip(
+E         27 +     "/"
+E         28 + )
+E         29 | ADMIN_EMAIL = "admin@kkt.in"
+E            |
+E         
+E         5 files would be reformatted, 275 files already formatted
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/root/.venv/bin/python', '-m', 'ruff', 'format', '--check', '.'], returncode=1, stdout='unform... )\n29 | ADMIN_EMAIL = "admin@kkt.in"\n   |\n\n5 files would be reformatted, 275 files already formatted\n', stderr='').returncode
+
+tests/test_format_gate.py:26: AssertionError
+_________________________ test_backend_imports_sorted __________________________
+[gw0] linux -- Python 3.11.18 /root/.venv/bin/python
+
+    def test_backend_imports_sorted():
+        r = _run([sys.executable, "-m", "ruff", "check", "--select", "I", "--output-format", "concise", "."], BACKEND)
+>       assert r.returncode == 0, r.stdout[-2000:]
+E       AssertionError: server.py:14:1: I001 [*] Import block is un-sorted or un-formatted
+E         tests/conftest.py:79:5: I001 [*] Import block is un-sorted or un-formatted
+E         Found 2 errors.
+E         [*] 2 fixable with `--fix`.
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/root/.venv/bin/python', '-m', 'ruff', 'check', '--select', 'I', '--output-format', 'concise',...y:79:5: I001 [*] Import block is un-sorted or un-formatted\nFound 2 errors.\n[*] 2 fixable with `--fix`.\n', stderr='').returncode
+
+tests/test_format_gate.py:31: AssertionError
+=============================== warnings summary ===============================
+../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
+../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
+  /root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12: PendingDeprecationWarning: Please use `import python_multipart` instead.
+    import multipart
+
+../../root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854
+../../root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854
+  /root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854: DeprecationWarning: 'crypt' is deprecated and slated for removal in Python 3.13
+    from crypt import crypt as _crypt
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_story_logic.py::test_story_has_a_next_billing_stage - Asser...
+FAILED tests/test_format_gate.py::test_backend_ruff_format_clean - AssertionE...
+FAILED tests/test_format_gate.py::test_backend_imports_sorted - AssertionErro...
+3 failed, 40 passed, 4 warnings in 19.11s

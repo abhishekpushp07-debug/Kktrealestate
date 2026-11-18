@@ -1,0 +1,11 @@
+dumped /tmp/eq_old.json 41 bookings
+dumped /tmp/eq_new.json 41 bookings
+DIFF reports · /api/reports/outstanding-v2?{"group_by": "block"}
+DIFF reports · /api/reports/outstanding-v2?{"group_by": "customer"}
+DIFF reports · /api/reports/outstanding-v2?{}
+IDENTICAL stage
+IDENTICAL bookings
+IDENTICAL audits
+DIFF reports_after_write · /api/reports/outstanding-v2
+DIFF EXIT 1
+DONE

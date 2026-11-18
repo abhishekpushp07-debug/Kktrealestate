@@ -1,0 +1,31 @@
+{
+  "summary": "Frontend-only retest of the 7 findings from iteration 43 plus 2 next-step spot checks. Run on the preview prod build as admin, sales and siteengineer, at 1440 and 390 px, in Light and Night. All 7 items pass. (1) On phones the tfoot totals row on /reports/outstanding-v2 and /reports/collections-v2 is now display:block and position:static, every cell is labelled, and it is readable in both themes. The /demands total row is static and labelled. /payments, /roznamcha and /documents render no tfoot, and nothing sticky sits over the cards. (2) /bookings/<id>?pay=1 opens Post payment once and the param is removed. Neither a reload nor Back reopens it. (3) After a refund was paid, 'Print refund letter' opened Documents › Generate with Ganesh Green Villas, Villa Block P and BK-2627-2466 selected, Cancellation / Refund letter active, and the preview frame loaded. (4) After a wizard save, sales gets only 'Print allotment letter'. The access-denied page reads 'Your role does not include this page. Ask an admin if you need it.' with no permission code. The site engineer's bill-letter gate was checked in code only, not live. (5) At 390, /users 'Invite user' sits at 14–139 px. /roznamcha, /settings, /settings/catalogues, /masters/company (Channel order) and a service request detail have nothing past the right edge, and there is 0 px sideways scroll. (6) The Reports hub Money group shows Overdue → Outstanding & Ageing, and each step line sits under its group name. (7) The wizard cost sheet shows 'from project setup', and 'Maintenance (advance)' fits at 1440. Spot checks: lead → Book site visit opened the visit dialog with the name and phone filled, and payment → Print / share receipt appeared.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Phone totals card (stack-table tfoot)", "issues": ["Square corners of the tfoot or td background show behind the rounded totals card: dark in Light, light in Night. Fix: set tfoot and its cells to background: transparent at max-width 767px."]},
+      {"screen": "/reports/outstanding-v2 at 390", "issues": ["The stacked cards sit inside an overflow:auto box with max-height 506 px (scrollHeight about 29,000), so phone users get a nested scroll. Consider dropping the max-height on phones."]},
+      {"screen": "/demands at 390", "issues": ["The colSpan footnote row is labelled with the first column header 'Day ▸ Project ▸ Tower', because stackLabels maps labels by child index. Skip labels on cells with colSpan > 1."]},
+      {"screen": "Wizard value breakdown at 1440", "issues": ["The GST and Total amounts in the Agreement value row touch each other ('₹5,00,000₹1,05,00,000'), so the columns need a small gap."]}
+    ]
+  },
+  "test_report_links": ["/app/memory/qa/phase3/agent_smokes/ui_3_3_it44.md", "/app/memory/qa/phase3/agent_smokes/smoke_3_3_it44_setup.py", "/app/memory/qa/phase3/agent_smokes/smoke_3_3_it44_ids.py", "/app/memory/qa/phase3/agent_smokes/smoke_3_3_it44_cleanup.py"],
+  "action_items": [
+    "Optional, cosmetic: make the phone tfoot or td background transparent so no square corners show behind the totals card.",
+    "Optional: remove the inner max-height scroll on report tables at phone widths.",
+    "Optional: in stackLabels.js, don't set data-label on colSpan cells."
+  ],
+  "critical_code_review_comments": [
+    "stackLabels.js maps headers by child index, which is wrong for colSpan cells in tfoot and footnote rows.",
+    "Documents.jsx fetches /bookings/{id} only when project_id is missing, which is fine. It fails silently (catch → nothing), so a booking the user can't read leaves the Who card blank with no message.",
+    "BookingDetail.jsx ?pay=1: the param is removed even when the user lacks finance.payment.create, so nothing opens and no hint is shown. That is acceptable, because the prompt is already gated."
+  ],
+  "updated_files": ["/app/memory/qa/phase3/agent_smokes/ui_3_3_it44.md", "/app/memory/qa/phase3/agent_smokes/smoke_3_3_it44_setup.py", "/app/memory/qa/phase3/agent_smokes/smoke_3_3_it44_ids.py", "/app/memory/qa/phase3/agent_smokes/smoke_3_3_it44_cleanup.py"],
+  "success_rate": {"backend": "n/a (frontend only, skipped)", "frontend": "100% of the retest items (7/7 pass; item 4's site-engineer part checked in code only) and 2/2 spot checks"},
+  "seed_data_creation": "TEST_ data only. Customer CUST-2627-7072 'TEST_T1 It44 Buyer' (43edb436-228f-41b9-b739-f9c07232c520). Booking BK-2627-2466 (ab1a4b6a-ca8e-4296-a93d-65749a543d97): receipt KKT/2627/26977 for ₹1,00,000 NEFT (UTR TEST_T1UTR44001), cancelled with deduction ₹1, refund paid (ref TEST_T1REF44001). Booking BK-2627-2467 (603a85cd-e35c-46ca-a755-1c871e446f9c): made by sales, no money, cancelled by the cleanup script. Lead 'TEST_T1 It44 Lead' (1e31441f-9d34-4bee-8d44-8f8b78b1ace2, 9688044001): no visit booked. GGV Villa P1 is Available again. Awaiting send went from 618 to 619, probably the auto cancellation letter. Project 'Ye' was not touched. The admin theme was restored to Light.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Log in once per browser_automation script through the UI (login-email-input, login-password-input), because login is rate limited. Next-step buttons are data-testid=next-step-<slug of label>. Get a free flat and customer with smoke_3_3_it44_setup.py (P1 Villa Block P). Refund dialog: refund-mode (native select NEFT_RTGS), refund-bank (index 1), refund-reference, refund-pay-submit. The site engineer's bill-letter gate was not exercised live, because completing a stage on SGH Tower B creates 16 bills and auto letters that stay after undo."
+}

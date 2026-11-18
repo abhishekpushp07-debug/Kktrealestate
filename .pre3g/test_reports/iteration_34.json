@@ -1,0 +1,39 @@
+{
+  "summary": "Phase 2 chunk 2A retest on PREVIEW (admin@kkt.in). Backend: 10/10 pytest checks pass (/app/tests/kkt2a/test_phase2a_chunk.py, run against the public URL). (1) Create booking on GGV Villa Block P (P1): 201 in 0.348 s round trip (server total 167.7 ms). Server-Timing includes bk_dues 73.3, bk_uow 26.4, bk_lead, bk_audit, bk_validate, bk_rebuild, bk_doc, bk_docs and ev_* spans. Reading the booking straight after shows summary.total_bill_raised_paise=105000000 and the ledger has 2 rows. The docgen register already held allotment, cost_sheet and demand on the first poll (0.1 s), and the journey lists the schedule too. (2) Home freshness: before the ₹2,500 Cash payment, paid_paise read X. The read made right after the 201 still showed X (delta 0). From 0.9 s on it showed X+250000, and it stayed at X+250000 on 13 repeated reads over 12 s, so there was no stale re-cache. After the reverse, Home was back to X within 2.1 s. (3) The booking journey lists payment.post, payment.reverse, demand.create, document.generated, booking.create and booking.cancel. GET /journey/{payment.post id} straight after the write returned with_before_after=9 and snapshot_available=true in 0.14 s. (4) The expire-sweep with a 4 s hold: the early sweep kept the flat on Hold, and after expiry the sweep (status OK) set it back to Available. (5) The after-commit drain returns {pending:0}, and both new endpoints return 403 for employee@kkt.in. (6) openapi.json returns 200. Frontend (Playwright): Home renders all widget totals with 0 page errors. The booking detail History tab lists Booking cancelled / Payment reversed / Payment · post / Document generated / Booking created / Demand created. The 'Where this entry went' panel (opened from the Audit log row → audit-open-journey) lists the payment entries; clicking Payment · post shows 16 surfaces with 9 before→after. Cleanup: payment reversed, booking BK-2627-2434 cancelled, P1 and P2 back to Available. The TEST_2A customer is left behind because there is no delete.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/journey/entity/booking/{id}", "issue": "Every payment action shows twice. payments.py writes one audit row with entity=payment and one with entity=booking for the same action, and the new $or query returns both. In the 'Where this entry went' panel 'Payment · post' and 'Payment reversed' each appear twice with the same timestamp. Dedupe them (prefer the payment-entity row, which carries the snapshot) or show only one."},
+      {"endpoint": "GET /api/dashboard/home", "issue": "Small read-your-write gap. A Home read made right after POST /payments returned 201 still showed the old paid_paise; it was correct about 0.9 s later. This is within the 5 s target, but the cache invalidation looks like it runs after the response is sent."},
+      {"endpoint": "GET /api/journey/entity/booking/{id}", "issue": "demand.create (created_at 07:50:30.637) sorts after booking.create (07:50:30.706), so the bill appears to come before the booking it belongs to. This is cosmetic."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "JourneyPanel / HistoryTimeline action labels", "issue": "The labels are inconsistent: 'Payment · post' and 'Document · generated' use the raw-action fallback, while 'Payment reversed' and 'Booking created' read naturally. Add friendly labels such as 'Payment posted' and 'Document generated'.", "selector": "[data-testid='journey-entry-payment.post']", "priority": "LOW"}
+    ],
+    "integration_issues": [
+      {"flow": "Booking detail → 'Where this entry went'", "issue": "JourneyButton (components/common/JourneyPanel.jsx) is exported but not imported anywhere. The booking page has only the History tab/button, which reads /audit-logs/entity and not the journey endpoint. The journey panel with payment entries is reachable only from Admin → Audit log → row → 'audit-open-journey'. If the booking page is meant to have the 'Where this entry went' button, it has to be added.", "affected_selectors": ["[data-testid='journey-btn-booking']"]}
+    ],
+    "design_issues": []
+  },
+  "critical_code_review_comments": [
+    "services/after_commit.py keeps deferred work (audit snapshots, auto documents, demand letters) only in memory as asyncio tasks. If the process crashes or hot-reloads after the response and before flush finishes, the booking never gets its allotment, cost sheet or demand PDFs, and nothing retries. Consider a durable outbox marker or a startup/periodic repair that regenerates missing auto docs and snapshots.",
+    "after_commit.drain(), and the /admin/ops/after-commit/drain endpoint, only see the current worker's tasks. With more than one uvicorn worker in production, {pending:0} does not mean the whole company is drained.",
+    "A single global lock runs every after-commit batch one at a time. Under a burst of bookings, document generation for later requests queues behind earlier ones; that is fine for correctness, but auto docs can lag well beyond 5 s at load.",
+    "journey(): the call await after_commit.drain(5) waits for ALL pending tasks in the process, not just the one entry, so on a busy server the journey read can block for up to 5 s."
+  ],
+  "test_report_links": ["/app/tests/kkt2a/test_phase2a_chunk.py", "/app/test_reports/pytest/phase2a_chunk.xml"],
+  "action_items": [
+    "Dedupe payment.* entries in /api/journey/entity/booking/{id} (both the payment-entity and booking-entity audit rows are returned)",
+    "Decide whether BookingDetail should have the 'Where this entry went' JourneyButton (it is currently unused); if so, wire it in next to HistoryButton",
+    "Optional: invalidate the Home read cache before the response is sent (inside the request) so a read right after a payment is already fresh",
+    "Optional: give the deferred after-commit work a durability or repair path"
+  ],
+  "updated_files": ["/app/tests/kkt2a/test_phase2a_chunk.py (new, outside /app/backend)"],
+  "success_rate": {"backend": "100% (10/10)", "frontend": "100% of requested checks (Home, booking History tab, journey panel); 1 integration note"},
+  "seed_data_creation": "Created and cleaned up on preview: customer 'TEST_2A f5f538' (left behind, no delete), booking BK-2627-2434 (id 43dec1db-392b-434b-adc9-a881860cad51) on GGV P1 (cancelled with deduction 0), receipt KKT/2627/26262 ₹2,500 Cash (reversed), and a 4 s hold on GGV P2 (expired and swept). P1 and P2 are Available.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run python -m pytest /app/tests/kkt2a/test_phase2a_chunk.py -p no:xdist -o addopts='' -s. It books the first Available GGV flat, posts a ₹2,500 Cash payment and reverses it, cancels the booking, and holds and sweeps the second GGV flat; everything cleans up except one TEST_2A customer. The app business_day comes from /api/dashboard/home. The journey panel UI is reached via /admin/audit-logs?record={bookingId} → click a row → audit-open-journey. The booking History tab uses /audit-logs/entity, not the journey endpoint."
+}

@@ -1,0 +1,548 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>KKT Elite — design reference (Night Elite default)</title>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* =========================================================
+   KKT ELITE DESIGN SYSTEM — reference for the builder
+   Font: Figtree only (free twin of CRED's Gilroy)
+   Night Elite = default. Pearl (light) = same structure.
+   ========================================================= */
+:root{
+  --canvas:#05070c; --surface:#0c1018; --surface2:#111724; --line:rgba(255,255,255,.07); --line2:rgba(255,255,255,.12);
+  --text:#eef1f6; --muted:#8a93a6; --faint:#5f6880; --silver:#c9d0dc;
+  --sapphire:#3d7bff; --sapphire2:#7aa6ff; --gold:#d4b477; --gold2:#b8955a; --travertine:#d9c7a8; --due:#ff7a59; --caps-orange:#ff8a4c; --advance:#5ed3a2; --amber:#f5b14c;
+  --r-xl:24px; --r-lg:18px; --r-md:14px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#000;font-family:Figtree,system-ui,sans-serif;color:var(--text);-webkit-font-smoothing:antialiased}
+.num{font-variant-numeric:tabular-nums}
+.frame{width:1440px;height:900px;display:flex;overflow:hidden;position:relative;margin-bottom:40px;
+  background:radial-gradient(900px 500px at 100% -10%,rgba(61,123,255,.13),transparent 60%),var(--canvas)}
+/* sidebar */
+.side{width:232px;padding:26px 18px;border-right:1px solid var(--line);flex:none}
+.logo{display:flex;align-items:center;gap:10px;margin:0 6px 30px}
+.logo svg{width:30px;height:30px}
+.logo img.lg{height:46px;width:auto;display:block}
+.day .logo img.lg{content:url(kkt_logo_day.png)}
+.logo b{font-weight:800;letter-spacing:.06em;font-size:17px}
+.logo small{display:block;font-size:9px;letter-spacing:.3em;color:var(--muted);font-weight:600}
+.grp{font-size:10.5px;letter-spacing:.24em;color:var(--faint);font-weight:600;margin:18px 10px 6px;text-transform:uppercase}
+.nav{display:block;padding:8px 10px;border-radius:10px;font-size:14.5px;color:#b9c1d1;font-weight:500}
+.nav.on{background:linear-gradient(90deg,rgba(61,123,255,.16),rgba(61,123,255,.02));color:#fff;box-shadow:inset 2px 0 0 var(--sapphire)}
+/* main */
+.main{flex:1;padding:26px 44px;overflow:hidden}
+.top{display:flex;align-items:center;gap:14px;margin-bottom:26px}
+.search{flex:1;max-width:520px;height:42px;border-radius:999px;border:1px solid var(--line2);background:rgba(255,255,255,.03);display:flex;align-items:center;padding:0 16px;color:var(--faint);font-size:14px;gap:10px}
+.kbd{margin-left:auto;font-size:11px;border:1px solid var(--line2);border-radius:6px;padding:2px 6px;color:var(--muted)}
+.newbtn{margin-left:auto;height:40px;padding:0 16px;border-radius:12px;background:#fff;color:#05070c;font-weight:700;font-size:14px;display:flex;align-items:center}
+.bell{width:40px;height:40px;border-radius:50%;border:1px solid var(--line2);display:grid;place-items:center;color:var(--muted)}
+.hello{font-size:38px;font-weight:800;letter-spacing:-.02em}
+.sub{font-size:16px;color:var(--muted);margin-top:4px}
+.sec{display:flex;justify-content:space-between;align-items:center;margin:28px 2px 12px}
+.sec h6{font-size:11.5px;letter-spacing:.24em;color:var(--muted);font-weight:600;text-transform:uppercase}
+.sec a{font-size:13.5px;color:#b9c1d1}
+/* ELITE hero */
+.elite{position:relative;border-radius:var(--r-xl);padding:24px 26px;overflow:hidden;border:1px solid rgba(122,166,255,.22);
+  background:repeating-linear-gradient(90deg,rgba(255,255,255,.016) 0 1px,transparent 1px 3px),
+  linear-gradient(115deg,#0a0e17 0%,#161e2d 34%,#262f40 48%,#141b29 60%,#0a0e17 100%)}
+.elite .glow{position:absolute;right:-80px;top:-80px;width:320px;height:320px;background:radial-gradient(circle,rgba(61,123,255,.28),transparent 65%)}
+.tagpill{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line2);border-radius:999px;padding:6px 12px;font-size:11px;letter-spacing:.22em;font-weight:700;text-transform:uppercase;color:#e7ecf5;background:rgba(0,0,0,.25)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--sapphire);box-shadow:0 0 10px var(--sapphire)}
+.capsblue{font-size:11.5px;letter-spacing:.24em;font-weight:700;color:var(--sapphire2);text-transform:uppercase}
+.capsr{font-size:11.5px;letter-spacing:.24em;font-weight:700;color:var(--muted);text-transform:uppercase}
+.stmt{font-size:46px;font-weight:800;letter-spacing:-.02em;margin-top:6px}
+.ring{width:112px;height:112px;border-radius:50%;display:grid;place-items:center;text-align:center;
+  background:conic-gradient(var(--sapphire) 0 45%,rgba(255,255,255,.08) 45% 100%);position:relative}
+.ring:before{content:"";position:absolute;inset:7px;border-radius:50%;background:#0f1522}
+.ring div{position:relative;font-weight:800;font-size:24px}.ring small{display:block;font-size:11px;color:var(--muted);font-weight:500}
+.stats{display:flex;border:1px solid var(--line2);border-radius:18px;margin-top:20px;background:rgba(0,0,0,.18)}
+.stats div{flex:1;padding:14px 18px;text-align:center;border-left:1px solid var(--line)}
+.stats div:first-child{border-left:0}
+.stats b{display:block;font-size:22px;font-weight:800}.stats span{font-size:12.5px;color:var(--muted)}
+.metaline{display:flex;justify-content:space-between;align-items:center;margin-top:16px;padding-top:14px;border-top:1px solid var(--line);color:#c0c8d6;font-size:14px}
+.opill{border:1px solid var(--line2);border-radius:999px;padding:6px 12px;font-size:11.5px;letter-spacing:.16em;font-weight:700;text-transform:uppercase}
+.cta{margin-top:16px;height:50px;border-radius:14px;background:linear-gradient(180deg,#4b86ff,#2f63e0);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;box-shadow:0 8px 30px rgba(61,123,255,.25)}
+/* tiles */
+.tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.tile{border:1px solid var(--line);background:var(--surface);border-radius:var(--r-lg);padding:16px 18px;display:flex;gap:14px;align-items:center}
+.ic{width:42px;height:42px;border-radius:50%;border:1px solid var(--line2);display:grid;place-items:center;color:#c9d3e6;flex:none;background:rgba(255,255,255,.02)}
+.tile small{display:block;font-size:10.5px;letter-spacing:.2em;color:var(--muted);font-weight:600;text-transform:uppercase}
+.tile b{font-size:18px;font-weight:700}
+/* quick actions */
+.qa{display:flex;gap:30px}
+.qa div{text-align:center;font-size:13px;color:#c3cad8;width:84px}
+.qa .ic{margin:0 auto 8px;width:52px;height:52px}
+/* bill rows */
+.two{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.list{border:1px solid var(--line);background:var(--surface);border-radius:var(--r-lg);overflow:hidden}
+.row{display:flex;align-items:center;gap:12px;padding:13px 16px;border-top:1px solid var(--line)}
+.row:first-child{border-top:0}
+.av{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#1b2742,#2b3b60);color:#b9cdf5;display:grid;place-items:center;font-weight:700;font-size:13px;flex:none}
+.rname{font-weight:600;font-size:15px}.rsub{font-size:12.5px;color:var(--muted);margin-top:2px}
+.rbtn{margin-left:auto;text-align:right}
+.wbtn{display:inline-block;background:#f3f5f9;color:#05070c;font-weight:700;font-size:13.5px;padding:9px 13px;border-radius:12px}
+.ocap{display:block;font-size:10px;letter-spacing:.18em;font-weight:700;color:var(--caps-orange);margin-top:6px;text-transform:uppercase}
+.gcap{display:block;font-size:10px;letter-spacing:.18em;font-weight:700;color:var(--muted);margin-top:6px;text-transform:uppercase}
+/* ageing bar */
+.age{border:1px solid var(--line);background:var(--surface);border-radius:var(--r-lg);padding:18px}
+.agebar{display:flex;height:10px;border-radius:999px;overflow:hidden;gap:3px}
+.agebar i{display:block}
+.agel{display:flex;margin-top:12px}
+.agel div{flex:1;font-size:12px;color:var(--muted)}.agel b{display:block;color:var(--text);font-size:15px;font-weight:700;margin-top:3px}
+/* chips */
+.chips{display:flex;gap:10px;flex-wrap:wrap}
+.chip{border:1px solid var(--line2);border-radius:999px;padding:9px 15px;font-size:13.5px;color:#c3cad8;font-weight:500}
+.chip.on{background:#f3f5f9;color:#05070c;border-color:#f3f5f9;font-weight:700}
+.chip em{font-style:normal;color:var(--faint);margin-left:6px}.chip.on em{color:#5b6476}
+/* customer card */
+.cgrid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.ccard{border:1px solid var(--line);background:var(--surface);border-radius:var(--r-lg);overflow:hidden}
+.ctop{display:flex;align-items:center;gap:12px;padding:16px 16px 12px}
+.cname{font-size:16.5px;font-weight:700}.cflat{font-size:12.5px;color:var(--muted);margin-top:3px}
+.bar{margin:0 16px;height:3px;background:rgba(255,255,255,.07);border-radius:3px}.bar i{display:block;height:3px;border-radius:3px;background:linear-gradient(90deg,#2f63d8,#7aa6ff)}
+.cmeta{display:flex;justify-content:space-between;padding:9px 16px 13px;font-size:12.5px;color:#a0a9bb}
+.cnext{border-top:1px solid var(--line);padding:11px 16px;font-size:13px;color:#cbd2de;display:flex;justify-content:space-between;background:rgba(255,255,255,.012)}
+.cnext b{color:var(--muted);font-weight:500}
+.apill{display:inline-block;border-radius:999px;padding:8px 12px;font-size:13px;font-weight:700;background:rgba(94,211,162,.12);color:var(--advance)}
+.okpill{display:inline-block;border-radius:999px;padding:8px 12px;font-size:13px;font-weight:700;background:rgba(255,255,255,.06);color:var(--silver)}
+/* project banner */
+.pban{position:relative;height:208px;border-radius:var(--r-xl);overflow:hidden;border:1px solid rgba(122,166,255,.18);margin-bottom:16px;background-color:#070b14;background-size:auto 150%;background-repeat:no-repeat;background-position:right 40%}
+.pban .shade{position:absolute;inset:0;background:linear-gradient(90deg,#070b14 0%,#070b14 64%,rgba(7,11,20,.55) 72%,rgba(7,11,20,0) 86%)}
+.pban .in{position:relative;padding:24px 26px;width:58%}
+.pst{font-size:36px;font-weight:800;letter-spacing:-.02em;margin:8px 0 4px}
+.psub{color:#b4bdcd;font-size:14px}
+.towers{display:flex;gap:22px;margin-top:14px}
+.towers div{width:120px;font-size:12px;color:#aab3c4}.towers i{display:block;height:3px;background:rgba(255,255,255,.1);border-radius:3px;margin-top:6px}.towers i b{display:block;height:3px;background:var(--sapphire);border-radius:3px}
+.pbtns{display:flex;gap:10px;margin-top:16px;align-items:center}
+.obtn{border:1px solid var(--line2);border-radius:999px;padding:7px 12px;font-size:12.5px;color:#cbd2de}
+/* member card */
+.member{width:420px;height:250px;border-radius:22px;padding:22px 24px;position:relative;overflow:hidden;border:1px solid rgba(160,180,220,.18);
+  background:repeating-linear-gradient(90deg,rgba(255,255,255,.02) 0 1px,transparent 1px 3px),linear-gradient(120deg,#0b0f18 0%,#1b2333 40%,#303a4d 52%,#171e2c 64%,#0b0f18 100%);box-shadow:0 30px 60px rgba(0,0,0,.5)}
+.member .ln{height:1px;background:linear-gradient(90deg,var(--sapphire),transparent);margin:16px 0 14px;width:70%}
+.member .mname{position:absolute;left:24px;bottom:26px;font-size:20px;letter-spacing:.2em;font-weight:600;text-transform:uppercase;color:#eef1f6}
+.member .mno{position:absolute;right:24px;bottom:22px;color:var(--sapphire2);font-weight:700;font-size:15px}
+.member .mno b{font-size:30px;font-weight:800}
+.ktiles{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;flex:1}
+.kt{border:1px solid var(--line);background:var(--surface);border-radius:var(--r-lg);padding:18px}
+.kt small{display:block;font-size:10.5px;letter-spacing:.2em;color:var(--muted);font-weight:600;text-transform:uppercase}
+.kt b{display:block;font-size:26px;font-weight:800;margin-top:8px}
+.stepper{display:flex;align-items:flex-start;border:1px solid var(--line);background:var(--surface);border-radius:var(--r-lg);padding:20px 22px}
+.st{flex:1;text-align:center;position:relative;font-size:12.5px;color:#aeb6c6}
+.st:before{content:"";position:absolute;top:13px;left:-50%;width:100%;height:2px;background:rgba(255,255,255,.08)}
+.st:first-child:before{display:none}
+.st.d:before,.st.h:before{background:var(--sapphire)}
+.st i{display:grid;place-items:center;width:28px;height:28px;border-radius:50%;margin:0 auto 8px;position:relative;border:2px solid rgba(255,255,255,.18);background:#0c1018;font-style:normal;font-size:13px;font-weight:800}
+.st.d i{background:var(--sapphire);border-color:var(--sapphire);color:#fff}
+.st.h i{border-color:var(--sapphire);background:conic-gradient(var(--sapphire) 0 50%,#0c1018 50% 100%)}
+.st small{display:block;color:var(--faint);font-size:11px;margin-top:2px}
+/* report sheet */
+.sheet{border-radius:var(--r-xl);overflow:hidden;border:1px solid rgba(122,166,255,.2)}
+.shead{padding:22px 26px 20px;background:repeating-linear-gradient(90deg,rgba(255,255,255,.016) 0 1px,transparent 1px 3px),linear-gradient(115deg,#0b1222,#14213d 45%,#0b1222)}
+.stitle{font-size:24px;font-weight:800}.ssub{color:#aab4c8;font-size:14px;margin-top:3px}
+.ff{display:grid;grid-template-columns:1fr 1fr 1.4fr auto auto;gap:12px;margin-top:18px}
+.fld{border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.04);border-radius:14px;padding:9px 14px}
+.fld small{display:block;font-size:10px;letter-spacing:.22em;color:var(--muted);font-weight:700;text-transform:uppercase}
+.fld b{font-size:17px;font-weight:700}
+.gt{margin:18px 0 0;border:1px solid var(--line2);border-radius:var(--r-lg);overflow:hidden;background:var(--surface)}
+.gth{padding:12px 18px;font-size:11.5px;letter-spacing:.24em;font-weight:700;color:var(--sapphire2);border-bottom:1px solid var(--line);display:flex;justify-content:space-between}
+.gtr{display:grid;grid-template-columns:1.6fr 1fr 1fr 1fr 1fr;padding:16px 18px;align-items:end}
+.gtr small{display:block;font-size:10px;letter-spacing:.2em;color:var(--muted);font-weight:600;text-transform:uppercase;margin-bottom:4px}
+.gtr b{font-size:20px;font-weight:800}
+.formula{padding:14px 18px;border-top:1px dashed var(--line2);font-size:13.5px;color:#b9c1d1;line-height:1.9}
+.formula strong{color:#fff}
+.tbl{margin-top:14px;border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden}
+.th,.tr{display:grid;grid-template-columns:40px 2fr 1fr 1fr 1fr 1fr;padding:11px 16px;font-size:13.5px}
+.th{font-size:10.5px;letter-spacing:.2em;font-weight:700;color:var(--muted);text-transform:uppercase;background:rgba(255,255,255,.03)}
+.tr{border-top:1px solid var(--line);color:#d5dbe6}.tr .r{text-align:right}.th .r{text-align:right}
+.legend{font-size:10.5px;letter-spacing:.2em;color:var(--faint);text-align:center;margin-top:14px;text-transform:uppercase}
+.exp{display:flex;gap:10px}
+.ebtn{border:1px solid var(--line2);border-radius:12px;padding:9px 14px;font-size:13.5px;font-weight:600;color:#dfe5ef}
+
+/* ---------- colour mix: champagne gold, used ONLY for premium moments ---------- */
+.lattice{position:absolute;inset:0;opacity:.10;pointer-events:none;
+  background:
+   repeating-linear-gradient(45deg,transparent 0 46px,var(--gold) 46px 47px),
+   repeating-linear-gradient(-45deg,transparent 0 46px,var(--gold) 46px 47px);
+  -webkit-mask-image:linear-gradient(90deg,transparent 35%,#000 75%);mask-image:linear-gradient(90deg,transparent 35%,#000 75%)}
+.diamond{position:absolute;right:170px;top:50%;width:64px;height:64px;transform:translateY(-50%) rotate(45deg);border:1.5px solid var(--gold);opacity:.55}
+.diamond:after{content:"";position:absolute;inset:9px;border:1px solid rgba(212,180,119,.45)}
+.capsgold{font-size:11.5px;letter-spacing:.26em;font-weight:700;color:var(--gold);text-transform:uppercase}
+.member .mno{color:var(--gold) !important}
+.member .ln{background:linear-gradient(90deg,var(--gold),transparent) !important}
+.ring{background:conic-gradient(var(--sapphire) 0 45%,rgba(255,255,255,.08) 45% 100%)}
+/* ---------- login ---------- */
+.login{width:1440px;height:900px;display:flex;margin-bottom:40px;background:#05070c;overflow:hidden}
+.lphoto{flex:1.25;background-size:cover;background-position:center;position:relative}
+.lphoto:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(5,7,12,0) 55%,#05070c 100%),linear-gradient(0deg,rgba(5,7,12,.75),transparent 40%)}
+.lcap{position:absolute;left:40px;bottom:36px;z-index:2}
+.lform{width:520px;padding:90px 64px;display:flex;flex-direction:column;justify-content:center}
+.lin{height:54px;border-radius:14px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.03);display:flex;align-items:center;padding:0 16px;color:#8a93a6;font-size:15px;margin-top:12px}
+.lbtn{height:54px;border-radius:14px;margin-top:20px;background:linear-gradient(180deg,#4b86ff,#2f63e0);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px}
+/* ---------- DAY mode (CRED-like white), Elite banners stay dark ---------- */
+.frame.day{background:#ffffff;color:#0b0f17}
+.day{--surface:#ffffff;--surface2:#f6f7f9;--line:#ececef;--line2:#e2e4e9;--text:#0b0f17;--muted:#6b7280;--faint:#9aa1ad;--silver:#4b5563;--due:#e5573a;--caps-orange:#e8742f;--advance:#159a6a}
+.day .side{border-right:1px solid #f0f1f4;background:#fff}
+.day .nav{color:#4b5563}.day .nav.on{background:#f3f5f9;color:#0b0f17;box-shadow:inset 2px 0 0 #0b0f17}
+.day .grp{color:#a0a7b4}
+.day .logo small{color:#6b7280}
+.day .search{background:#f6f7f9;border-color:#eceef2;color:#9aa1ad}
+.day .newbtn{background:#0b0f17;color:#fff}
+.day .bell{border-color:#e6e8ec}
+.day .tile,.day .list,.day .ccard,.day .age,.day .kt,.day .stepper{background:#fff;border-color:#eceef2;box-shadow:0 1px 2px rgba(16,24,40,.04),0 8px 24px rgba(16,24,40,.04)}
+.day .ic{border-color:#e4e7ec;color:#374151;background:#fff}
+.day .wbtn{background:#0b0f17;color:#fff}
+.day .chip{border-color:#e4e7ec;color:#374151}.day .chip.on{background:#0b0f17;color:#fff;border-color:#0b0f17}.day .chip.on em{color:#9aa1ad}
+.day .cnext{background:#fafbfc;color:#374151}
+.day .bar{background:#eef0f3}
+.day .row{border-color:#f0f1f4}
+.day .sec a{color:#4b5563}
+.day .rsub,.day .cflat,.day .cmeta{color:#6b7280}
+.day .av{background:linear-gradient(135deg,#e8eefc,#dbe5fb);color:#2f5bd3}
+.day .elite,.day .pban,.day .member,.day .sheet{--line:rgba(255,255,255,.07);--line2:rgba(255,255,255,.12);--muted:#8a93a6;--faint:#5f6880;--text:#eef1f6;color:#eef1f6}
+
+.mcard{width:440px;height:262px;border-radius:22px;position:relative;overflow:hidden;border:1px solid rgba(170,190,230,.16);flex:none;
+  background:repeating-linear-gradient(90deg,rgba(255,255,255,.022) 0 1px,transparent 1px 3px),
+  linear-gradient(118deg,#0b0d12 0%,#1a1d24 34%,#3a3f49 50%,#1b1f27 62%,#0c0e13 100%);box-shadow:0 30px 60px rgba(0,0,0,.55)}
+.mcard .mlogo{position:absolute;left:22px;top:20px;height:54px}
+.mcard .dia{position:absolute;right:6px;top:14px;width:150px;filter:drop-shadow(0 10px 30px rgba(120,160,255,.25))}
+.mcard .mproj{position:absolute;left:24px;top:108px;font-size:23px;letter-spacing:.3em;white-space:nowrap;font-weight:500;color:#e9edf3;text-transform:uppercase}
+.mcard .mcircle{position:absolute;left:24px;top:146px;display:flex;align-items:center;gap:10px;font-size:11.5px;letter-spacing:.34em;color:#6f9bff;font-weight:600;text-transform:uppercase}
+.mcard .mcircle:before{content:"";width:26px;height:1.5px;background:#3d7bff}
+.mcard .mrole{position:absolute;left:24px;bottom:50px;font-size:10px;letter-spacing:.34em;color:#aab3c3;text-transform:uppercase}
+.mcard .mname{position:absolute;left:24px;bottom:22px;font-size:19px;letter-spacing:.14em;font-weight:600;color:#f3f5f9;text-transform:uppercase}
+.mcard .mno{position:absolute;right:22px;bottom:18px;color:#6f9bff;font-weight:600;font-size:14px;font-variant-numeric:tabular-nums}
+.mcard .mno b{font-size:32px;font-weight:600;letter-spacing:.02em}
+.mback{padding:22px 24px}
+.mback .ttl{display:flex;align-items:center;gap:12px;font-size:11.5px;letter-spacing:.34em;color:#6f9bff;font-weight:600;text-transform:uppercase}
+.mback .ttl:after{content:"";width:60px;height:1.5px;background:#3d7bff}
+.mback ul{list-style:none;margin-top:14px}
+.mback li{font-size:14px;color:#dfe4ec;margin:7px 0;display:flex;gap:10px;align-items:center}
+.mback li:before{content:"";width:7px;height:7px;transform:rotate(45deg);background:#5b8cff;flex:none}
+.mback .qr{position:absolute;right:22px;top:20px;width:86px;height:86px;border:0;text-align:center;font-size:9px;letter-spacing:.24em;color:#b8c1d2;display:grid;place-items:center}
+.mback .qr:before{content:"";position:absolute;inset:0;border:1.5px solid #b8c1d2;clip-path:polygon(0 0,28% 0,28% 6%,6% 6%,6% 28%,0 28%,0 72%,6% 72%,6% 94%,28% 94%,28% 100%,72% 100%,72% 94%,94% 94%,94% 72%,100% 72%,100% 28%,94% 28%,94% 6%,72% 6%,72% 0,100% 0,100% 100%,0 100%)}
+.mback .rera{position:absolute;right:16px;top:112px;font-size:9.5px;letter-spacing:.24em;color:#b8c1d2;text-align:center;width:98px}
+.mback .co{position:absolute;left:24px;right:24px;bottom:16px;border-top:1.5px solid rgba(61,123,255,.6);padding-top:9px;display:flex;align-items:center;gap:10px}
+.mback .co img{height:26px}.mback .co div{font-size:10px;letter-spacing:.24em;color:#e3e7ee;text-transform:uppercase}.mback .co small{display:block;letter-spacing:.04em;text-transform:none;color:#8f98aa;font-size:10.5px;margin-top:2px}
+.flipnote{font-size:12px;color:var(--faint);margin-top:8px}
+/* customer list cards borrow the card language */
+.ccard.elite-c{background:repeating-linear-gradient(90deg,rgba(255,255,255,.012) 0 1px,transparent 1px 3px),linear-gradient(118deg,#0c0f15 0%,#141821 45%,#1d222c 55%,#0f1218 100%);border-color:rgba(170,190,230,.12)}
+.cline{display:flex;align-items:center;gap:9px;font-size:10.5px;letter-spacing:.3em;color:#6f9bff;font-weight:600;text-transform:uppercase;margin-bottom:6px}
+.cline:before{content:"";width:18px;height:1.5px;background:#3d7bff}
+.cno{color:#6f9bff;font-weight:600;font-size:13px;margin-left:auto;align-self:flex-start;font-variant-numeric:tabular-nums}.cno b{font-size:20px;font-weight:600}
+.day .ccard.elite-c{background:#fff;border-color:#eceef2}
+
+/* ---------- customer card · Jeelive structure, KKT Elite skin ---------- */
+.jgrid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.jcard{position:relative;border-radius:26px;padding:20px 22px 20px;overflow:hidden;border:1px solid rgba(160,185,235,.14);
+  background:repeating-linear-gradient(90deg,rgba(255,255,255,.014) 0 1px,transparent 1px 3px),
+  linear-gradient(125deg,#0a0e17 0%,#101a30 46%,#16264a 72%,#0d1424 100%)}
+.jcard.wine{border-color:rgba(255,140,120,.14);background:repeating-linear-gradient(90deg,rgba(255,255,255,.014) 0 1px,transparent 1px 3px),
+  linear-gradient(125deg,#0d0a0d 0%,#1d0f15 46%,#36131c 74%,#160c10 100%)}
+.jcard.calm{background:repeating-linear-gradient(90deg,rgba(255,255,255,.014) 0 1px,transparent 1px 3px),linear-gradient(125deg,#0b0d12 0%,#161a22 50%,#1e232d 75%,#0e1116 100%)}
+.jcard .jlat{position:absolute;right:0;top:0;width:55%;height:100%;opacity:.07;pointer-events:none;
+  background:repeating-linear-gradient(45deg,transparent 0 40px,#d4b477 40px 41px),repeating-linear-gradient(-45deg,transparent 0 40px,#d4b477 40px 41px);
+  -webkit-mask-image:linear-gradient(90deg,transparent,#000 70%);mask-image:linear-gradient(90deg,transparent,#000 70%)}
+.jtop{display:flex;justify-content:space-between;align-items:center;position:relative}
+.jtag{display:inline-flex;align-items:center;gap:9px;border:1px solid rgba(255,255,255,.14);border-radius:999px;padding:7px 13px;font-size:11px;letter-spacing:.24em;font-weight:700;color:#eef1f6;text-transform:uppercase;background:rgba(0,0,0,.2)}
+.jdot{width:7px;height:7px;border-radius:50%}
+.jno{font-size:11.5px;letter-spacing:.24em;font-weight:700;color:#aab4c8;text-transform:uppercase;font-variant-numeric:tabular-nums}
+.jmid{display:flex;justify-content:space-between;align-items:center;margin-top:18px;position:relative}
+.jcap{font-size:11.5px;letter-spacing:.26em;font-weight:700;text-transform:uppercase}
+.jname{font-size:30px;font-weight:800;letter-spacing:-.02em;margin-top:6px;color:#f6f7fb}
+.jring{width:96px;height:96px;border-radius:50%;display:grid;place-items:center;position:relative;flex:none}
+.jring:before{content:"";position:absolute;inset:6px;border-radius:50%;background:#0d1220}
+.jcard.wine .jring:before{background:#1a0e13}.jcard.calm .jring:before{background:#14171e}
+.jring div{position:relative;text-align:center;font-weight:800;font-size:21px;font-variant-numeric:tabular-nums}.jring small{display:block;font-size:10.5px;color:#9aa3b6;font-weight:500}
+.jstats{display:flex;margin-top:16px;border:1px solid rgba(255,255,255,.1);border-radius:18px;background:rgba(0,0,0,.22);position:relative}
+.jstats div{flex:1;text-align:center;padding:12px 8px;border-left:1px solid rgba(255,255,255,.08)}.jstats div:first-child{border-left:0}
+.jstats b{display:block;font-size:19px;font-weight:800;font-variant-numeric:tabular-nums}.jstats span{font-size:12px;color:#97a0b3}
+.jmeta{display:flex;justify-content:space-between;align-items:center;margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,.08);font-size:13.5px;color:#c2c9d6;position:relative}
+.jpill{border:1px solid rgba(255,255,255,.16);border-radius:999px;padding:6px 11px;font-size:10.5px;letter-spacing:.18em;font-weight:700;text-transform:uppercase}
+.jcta{position:relative;margin-top:14px;height:48px;border-radius:15px;display:flex;align-items:center;justify-content:center;gap:10px;font-weight:700;font-size:15.5px;font-variant-numeric:tabular-nums}
+.jcta.blue{background:linear-gradient(180deg,#4b86ff,#2f63e0);box-shadow:0 8px 26px rgba(61,123,255,.22)}
+.jcta.coral{background:linear-gradient(180deg,#f06a4f,#d24c35);box-shadow:0 8px 26px rgba(230,90,60,.22)}
+.jcta.ghost{border:1px solid rgba(255,255,255,.16);color:#dfe4ec}
+
+/* Part 1b (REQ-200…204): brushed-silver Money today + Home widgets — as shipped */
+.elite.metal{border-color:transparent;background:radial-gradient(120% 140% at 0% 0%,rgba(232,238,250,.2),rgba(232,238,250,.06) 30%,transparent 55%),radial-gradient(60% 80% at 100% 100%,rgba(200,210,230,.06),transparent 60%),repeating-linear-gradient(0deg,rgba(255,255,255,.018) 0 1px,transparent 1px 3px),linear-gradient(135deg,#1b2335,#151c2a 50%,#10161f);box-shadow:0 24px 60px -22px rgba(0,0,0,.75),inset 0 1px 0 rgba(255,255,255,.14)}
+.elite.metal:after{content:"";position:absolute;inset:0;border-radius:inherit;padding:1px;background:linear-gradient(135deg,rgba(236,241,250,.8),rgba(160,170,190,.25) 45%,rgba(255,255,255,.03));-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none}
+.elite.metal .diamond{border-color:#c9d0dc}.elite.metal .lattice{opacity:.07;background:repeating-linear-gradient(45deg,transparent 0 46px,#c9d0dc 46px 47px),repeating-linear-gradient(-45deg,transparent 0 46px,#c9d0dc 46px 47px)}
+.elite.metal .stats{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.14)}
+.cnt{display:inline-block;margin-left:10px;border:1px solid var(--line2,#252c39);border-radius:999px;padding:1px 8px;font-size:11px;letter-spacing:.04em}
+.wgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.w{display:flex;flex-direction:column;min-height:150px;padding:18px;border-radius:18px;border:1px solid var(--line,#1a202b);background:var(--card,#0c1018)}
+.frame.day .w{background:#fff;border-color:#ececef}
+.w .wt{display:flex;justify-content:space-between}.w .wi{width:36px;height:36px;border-radius:11px;background:rgba(61,123,255,.14);color:#5b8cff;display:grid;place-items:center}
+.w .tag{font-size:10px;letter-spacing:.2em;font-weight:700;color:#8a93a6;text-transform:uppercase}
+.w .fig{margin-top:14px;font-size:28px;font-weight:700}.w .lab{font-size:13.5px;color:#b9c1d1;margin-top:4px}.frame.day .w .lab{color:#374151}.w .cap{font-size:12.5px;color:#8a93a6;margin-top:2px}
+.w .ln{margin-top:auto;height:3px;border-radius:3px;background:#252c39;display:flex;gap:2px;overflow:hidden}.frame.day .w .ln{background:#e2e4e9}.w .ln i{display:block;height:3px}
+</style>
+</head>
+<body>
+
+<!-- ============ shared sidebar ============ -->
+<template id="sb"></template>
+
+
+<div class="login" id="login">
+  <div class="lphoto" style="background-image:url('https://customer-assets-4nw71qhi.emergentagent.net/job_kkt-homebase--9vc8be7x/artifacts/c7bf37c42f8eb629_IMG-20260822-WA0228%288%29.jpg')"><div class="lcap"><div class="capsgold">KKT Constructions · Patna</div><div style="font-size:40px;font-weight:800;letter-spacing:-.02em;margin-top:8px">homes built to be lived in.</div></div></div>
+  <div class="lform">
+    <div class="logo"><img class="lg" src="kkt_logo_night.png" alt="KKT Constructions" style="height:84px"></div>
+    <div style="font-size:34px;font-weight:800;letter-spacing:-.02em;margin-top:10px">welcome back.</div>
+    <div class="sub">sign in to your ERP</div>
+    <div class="lin">email</div><div class="lin">password</div>
+    <div class="lbtn">Sign in</div>
+    <div style="margin-top:18px;font-size:13px;color:#8a93a6">night · <span style="color:#5f6880">day</span></div>
+  </div>
+</div>
+
+<!-- FRAME 1: HOME -->
+<div class="frame" id="home">
+  <aside class="side">
+    <div class="logo"><img class="lg" src="kkt_logo_night.png" alt="KKT Constructions"></div>
+    <div class="grp">Overview</div><span class="nav on">Home</span>
+    <div class="grp">Sell</div><span class="nav">Projects</span><span class="nav">Customers</span><span class="nav">Bookings</span>
+    <div class="grp">Money</div><span class="nav">Payments</span>
+    <div class="grp">Build</div><span class="nav">Construction</span>
+    <div class="grp">Records</div><span class="nav">Documents</span><span class="nav">Reports</span>
+    <div class="grp">Setup</div><span class="nav">Masters</span><span class="nav">Admin</span>
+  </aside>
+  <main class="main">
+    <div class="top"><div class="search">⌕ &nbsp;search “customer, flat, booking no.”<span class="kbd">Ctrl K</span></div><div class="newbtn">+ New</div><div class="bell">◔</div></div>
+    <div class="hello">good evening, rajesh.</div>
+    <div class="sub">3 things need you today.</div>
+    <div class="sec"><h6>Money today</h6><a>view roznamcha ›</a></div>
+    <div class="elite metal">
+      <div class="glow"></div><div class="lattice"></div><div class="diamond"></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;position:relative"><span class="tagpill"><span class="dot"></span>Live · Today</span><span class="capsr">Mon · 16 Nov</span></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:18px;position:relative">
+        <div><div class="capsblue">Received today</div><div class="stmt num">₹4,07,504</div></div>
+        <div class="ring"><div class="num">45%<small>of month</small></div></div>
+      </div>
+      <div class="stats num" style="position:relative"><div><b>₹2.76 L</b><span>cash</span></div><div><b>₹91.9 K</b><span>account</span></div><div><b>₹40 K</b><span>other</span></div><div><b>1</b><span>cheque to clear</span></div></div>
+    </div>
+    <div class="sec"><h6>Money<span class="cnt">5</span></h6></div><div class="wgrid"><div class="w"><div class="wt"><span class="wi">◷</span><span class="tag">Nov 2026</span></div><div class="fig num">45%</div><div class="lab">recovered</div><div class="cap">₹1.56 Cr of ₹3.48 Cr due</div><div class="ln"><i style="width:45%;background:#3d7bff"></i></div></div><div class="w"><div class="wt"><span class="wi">₹</span><span class="tag">Live</span></div><div class="fig num">₹7.43 Cr</div><div class="lab">outstanding</div><div class="cap">₹5.98 Cr overdue</div><div class="ln"><i style="width:19%;background:#5f6880"></i><i style="width:6%;background:#737c92"></i><i style="width:7%;background:#8a93a6"></i><i style="width:8%;background:#a3abbb"></i><i style="width:60%;background:#ff7a59"></i></div></div><div class="w"><div class="wt"><span class="wi">!</span><span class="tag">Live</span></div><div class="fig num"><span style="color:#ff7a59">₹4.42 Cr</span></div><div class="lab">overdue 90+ days</div><div class="cap">70 bookings</div></div><div class="w"><div class="wt"><span class="wi">↗</span><span class="tag">Next 30 days</span></div><div class="fig num">₹1.34 Cr</div><div class="lab">coming in</div><div class="cap">bills ₹1.33 Cr · 92 wait for a stage</div></div></div><div class="sec"><h6>Today's work<span class="cnt">4</span></h6></div><div class="wgrid"><div class="w"><div class="wt"><span class="wi">☏</span><span class="tag">Today</span></div><div class="fig num">6</div><div class="lab">customers to call</div><div class="cap">first: Ritu Malhotra · ₹39.8 L</div></div><div class="w"><div class="wt"><span class="wi">◴</span><span class="tag">Today</span></div><div class="fig num">3</div><div class="lab">follow-ups due</div><div class="cap">0 site visits today</div></div><div class="w"><div class="wt"><span class="wi">▥</span><span class="tag">Stage pending</span></div><div class="fig num">₹3.95 Cr</div><div class="lab">ready to bill</div><div class="cap">Tower B + C · incl. GST</div></div><div class="w"><div class="wt"><span class="wi">!</span><span class="tag">Live</span></div><div class="fig num">5</div><div class="lab">need attention</div><div class="cap">1 hold expiring · 0 bounced · 4 part-paid</div></div></div>
+  </main>
+</div>
+
+<!-- FRAME 2: CUSTOMERS -->
+<div class="frame" id="customers">
+  <aside class="side">
+    <div class="logo"><img class="lg" src="kkt_logo_night.png" alt="KKT Constructions"></div>
+    <div class="grp">Overview</div><span class="nav">Home</span>
+    <div class="grp">Sell</div><span class="nav">Projects</span><span class="nav on">Customers</span><span class="nav">Bookings</span>
+    <div class="grp">Money</div><span class="nav">Payments</span>
+    <div class="grp">Build</div><span class="nav">Construction</span>
+    <div class="grp">Records</div><span class="nav">Documents</span><span class="nav">Reports</span>
+    <div class="grp">Setup</div><span class="nav">Masters</span><span class="nav">Admin</span>
+  </aside>
+  <main class="main">
+    <div class="top"><div class="search">⌕ &nbsp;search “name, phone, flat, booking no.”<span class="kbd">Ctrl K</span></div><div class="newbtn">+ New customer</div></div>
+    <div class="hello">customers.</div>
+    <div class="sub">78 relationships · ₹7.43 Cr to collect</div>
+    <div class="chips" style="margin-top:22px"><span class="chip on">needs attention<em>22</em></span><span class="chip">overdue 30+<em>18</em></span><span class="chip">all clear<em>41</em></span><span class="chip">advance<em>5</em></span><span class="chip">no booking yet<em>6</em></span><span class="chip">kyc pending<em>3</em></span><span class="chip">all<em>84</em></span></div>
+    <div class="sec"><h6>Needs attention (22)</h6><a>sort · highest due ›</a></div>
+    <div class="jgrid"><div class="jcard wine"><div class="jlat"></div>
+  <div class="jtop"><span class="jtag"><span class="jdot" style="background:#ff6a4d;box-shadow:0 0 10px #ff6a4d"></span>SGH · Tower C · 901</span><span class="jno">№ 026 / 120</span></div>
+  <div class="jmid"><div><div class="jcap" style="color:#ff8a6a">Overdue 45 days</div><div class="jname">Anjali Malhotra</div></div>
+    <div class="jring" style="background:conic-gradient(#ff7a59 0 68%,rgba(255,255,255,.09) 68% 100%)"><div>68%<small>received</small></div></div></div>
+  <div class="jstats"><div><b style="">₹69.2 L</b><span>billed</span></div><div><b style="">₹47.5 L</b><span>received</span></div><div><b style="color:#ff8f75">₹21.6 L</b><span>due</span></div></div>
+  <div class="jmeta"><span>standard CLP · stage 5 of 8 · brickwork</span><span class="jpill" style="color:#ffb39f">follow-up today</span></div>
+  <div class="jcta coral">Collect ₹21.6 L  ›</div></div><div class="jcard "><div class="jlat"></div>
+  <div class="jtop"><span class="jtag"><span class="jdot" style="background:#5b8cff;box-shadow:0 0 10px #5b8cff"></span>SGH · Tower C · 903</span><span class="jno">№ 031 / 120</span></div>
+  <div class="jmid"><div><div class="jcap" style="color:#7aa6ff">Due on 25 Nov</div><div class="jname">Vikram Singh</div></div>
+    <div class="jring" style="background:conic-gradient(#3d7bff 0 64%,rgba(255,255,255,.09) 64% 100%)"><div>64%<small>received</small></div></div></div>
+  <div class="jstats"><div><b style="">₹13.3 L</b><span>billed</span></div><div><b style="">₹8.5 L</b><span>received</span></div><div><b style="color:#ff8f75">₹4.8 L</b><span>due</span></div></div>
+  <div class="jmeta"><span>brickwork · cash part paid · account ₹2.1 L open</span><span class="jpill" style="color:#9fe3c4">kyc ✓</span></div>
+  <div class="jcta blue">Collect ₹4.8 L  ›</div></div><div class="jcard calm"><div class="jlat"></div>
+  <div class="jtop"><span class="jtag"><span class="jdot" style="background:#5ed3a2;box-shadow:0 0 10px #5ed3a2"></span>SGH · Tower A · 202</span><span class="jno">№ 007 / 120</span></div>
+  <div class="jmid"><div><div class="jcap" style="color:#7fe0b6">Advance held</div><div class="jname">Meera Gupta</div></div>
+    <div class="jring" style="background:conic-gradient(#5ed3a2 0 100%,rgba(255,255,255,.09) 100% 100%)"><div>100%<small>received</small></div></div></div>
+  <div class="jstats"><div><b style="">₹28.5 L</b><span>billed</span></div><div><b style="">₹29.5 L</b><span>received</span></div><div><b style="color:#7fe0b6">₹1.0 L</b><span>advance</span></div></div>
+  <div class="jmeta"><span>next · plastering ≈ ₹3.5 L · awaiting stage</span><span class="jpill" style="color:#9fe3c4">all clear</span></div>
+  <div class="jcta ghost">Open customer  ›</div></div><div class="jcard "><div class="jlat"></div>
+  <div class="jtop"><span class="jtag"><span class="jdot" style="background:#5b8cff;box-shadow:0 0 10px #5b8cff"></span>GGV · Block P · P-12</span><span class="jno">№ 004 / 18</span></div>
+  <div class="jmid"><div><div class="jcap" style="color:#7aa6ff">Next · finishing bill</div><div class="jname">Sanjay Patel</div></div>
+    <div class="jring" style="background:conic-gradient(#3d7bff 0 39%,rgba(255,255,255,.09) 39% 100%)"><div>39%<small>received</small></div></div></div>
+  <div class="jstats"><div><b style="">₹38.6 L</b><span>billed</span></div><div><b style="">₹15.2 L</b><span>received</span></div><div><b style="color:#ff8f75">₹23.4 L</b><span>due</span></div></div>
+  <div class="jmeta"><span>villa plan · stage 3 of 6 · roof slab</span><span class="jpill" style="color:#f5c07a">agreement pending</span></div>
+  <div class="jcta blue">Collect ₹23.4 L  ›</div></div></div>
+  </main>
+</div>
+
+<!-- FRAME 3: PROJECTS -->
+<div class="frame" id="projects">
+  <aside class="side">
+    <div class="logo"><img class="lg" src="kkt_logo_night.png" alt="KKT Constructions"></div>
+    <div class="grp">Overview</div><span class="nav">Home</span>
+    <div class="grp">Sell</div><span class="nav on">Projects</span><span class="nav">Customers</span><span class="nav">Bookings</span>
+    <div class="grp">Money</div><span class="nav">Payments</span>
+    <div class="grp">Build</div><span class="nav">Construction</span>
+    <div class="grp">Records</div><span class="nav">Documents</span><span class="nav">Reports</span>
+    <div class="grp">Setup</div><span class="nav">Masters</span><span class="nav">Admin</span>
+  </aside>
+  <main class="main">
+    <div class="top"><div class="search">⌕ &nbsp;search “project, tower, flat”<span class="kbd">Ctrl K</span></div><div class="newbtn">+ New project</div></div>
+    <div class="hello">projects.</div>
+    <div class="sub">3 projects · 78 of 186 units booked or sold · ₹7.43 Cr outstanding</div>
+    <div class="chips" style="margin-top:20px"><span class="chip on">all<em>3</em></span><span class="chip">planning<em>2</em></span><span class="chip">under construction<em>1</em></span></div>
+    <div class="sec"><h6>Your projects</h6><a>inventory ›</a></div>
+    <div class="pban num" style="background-image:url('https://customer-assets-4nw71qhi.emergentagent.net/job_kkt-homebase--9vc8be7x/artifacts/390bfd851d155de1_IMG-20260822-WA0229%284%29.jpg')"><div class="shade"></div>
+      <div class="in"><span class="capsgold">Shree Ganesh Heights · Patna</span> <span class="chip" style="font-size:11px;padding:1px 9px">under construction</span><div class="pst">66 of 120 <span style="font-size:17px;color:#b4bdcd;font-weight:600">booked or sold</span></div><div class="psub">₹21.96 Cr collected · <span style="color:var(--due)">₹6.67 Cr outstanding</span></div>
+        <div class="towers"><div>tower a · 73%<i><b style="width:73%"></b></i></div><div>tower b · 55%<i><b style="width:55%"></b></i></div><div>tower c · 67%<i><b style="width:67%"></b></i></div></div>
+        <div class="pbtns"><span class="wbtn">Open project</span><span class="obtn">next bill ₹1.44 Cr · plastering</span></div></div></div>
+    <div class="pban num" style="background-image:url('https://static.prod-images.emergentagent.com/jobs/92d6d96a-a00e-413a-a590-f4514ce97e2e/images/11ef1b15c98abc9ba524ad4d722bb5d98255e5f8cc25f69e8dad0ead9c23b51c.jpeg')"><div class="shade"></div>
+      <div class="in"><span class="capsgold">Ganesh Green Villas · Patna</span> <span class="chip" style="font-size:11px;padding:1px 9px">planning</span><div class="pst">12 of 18 <span style="font-size:17px;color:#b4bdcd;font-weight:600">booked or sold</span></div><div class="psub">₹8.45 Cr collected · <span style="color:var(--due)">₹0.76 Cr outstanding</span></div>
+        <div class="towers"><div>block p · 40%<i><b style="width:40%"></b></i></div><div>block q · 25%<i><b style="width:25%"></b></i></div></div>
+        <div class="pbtns"><span class="wbtn">Open project</span><span class="obtn">next bill ₹0.72 Cr · finishing</span></div></div></div>
+  </main>
+</div>
+
+<!-- FRAME 4: CUSTOMER PAGE -->
+<div class="frame" id="customer">
+  <aside class="side">
+    <div class="logo"><img class="lg" src="kkt_logo_night.png" alt="KKT Constructions"></div>
+    <div class="grp">Overview</div><span class="nav">Home</span>
+    <div class="grp">Sell</div><span class="nav">Projects</span><span class="nav on">Customers</span><span class="nav">Bookings</span>
+    <div class="grp">Money</div><span class="nav">Payments</span>
+    <div class="grp">Build</div><span class="nav">Construction</span>
+    <div class="grp">Records</div><span class="nav">Documents</span><span class="nav">Reports</span>
+    <div class="grp">Setup</div><span class="nav">Masters</span><span class="nav">Admin</span>
+  </aside>
+  <main class="main">
+    <div class="top"><div class="search">⌕ &nbsp;search<span class="kbd">Ctrl K</span></div><div class="newbtn">Record payment</div></div>
+    <div style="display:flex;gap:22px;align-items:stretch">
+      <div><div style="display:flex;gap:16px">
+      <div class="mcard"><img class="mlogo" src="kkt_logo_night.png"><img class="dia" src="elite_diamond.png">
+        <div class="mproj">Shree Ganesh</div><div class="mcircle">Tower C · Flat 901</div>
+        <div class="mrole">Homeowner · since Jul 2025</div><div class="mname">Anjali Malhotra</div><div class="mno">№ <b>026</b> / 120</div></div>
+      </div><div class="flipnote">tap the card to see its back ›</div></div>
+      <div style="flex:1;display:flex;flex-direction:column;gap:12px">
+        <div class="ktiles num"><div class="kt"><small>Billed</small><b>₹69.2 L</b></div><div class="kt"><small>Received</small><b>₹47.5 L</b></div><div class="kt"><small>Balance · due</small><b style="color:var(--due)">₹21.6 L</b></div></div>
+        <div style="font-size:13px;color:var(--muted)" class="num">cash ₹28.1 L · account ₹17.2 L · other ₹2.2 L · agreement ₹69.2 L</div>
+        <div class="qa"><div><div class="ic">₹</div>record payment</div><div><div class="ic">☏</div>call</div><div><div class="ic">✆</div>whatsapp</div><div><div class="ic">▤</div>statement</div><div><div class="ic">▢</div>documents</div><div><div class="ic">⋯</div>more</div></div>
+      </div>
+    </div>
+    <div class="sec"><h6>Bills to collect (2)</h6><a>all bills ›</a></div>
+    <div class="two num">
+      <div class="list"><div class="row"><div class="ic">▦</div><div><div class="rname">Brickwork bill</div><div class="rsub">cash part paid · account ₹2.1 L open</div></div><div class="rbtn"><span class="wbtn">Collect ₹2.1 L</span><span class="ocap">Overdue 6 days</span></div></div></div>
+      <div class="list"><div class="row"><div class="ic">▦</div><div><div class="rname">GST on agreement</div><div class="rsub">charge · billed 11 Apr 2025</div></div><div class="rbtn"><span class="wbtn">Collect ₹1.9 L</span><span class="ocap">Overdue 219 days</span></div></div></div>
+    </div>
+    <div class="sec"><h6>Payment plan · standard CLP</h6><a>open booking ›</a></div>
+    <div class="stepper">
+      <div class="st d"><i>✓</i>on booking<small>paid</small></div><div class="st d"><i>✓</i>plinth<small>paid</small></div><div class="st d"><i>✓</i>slab 1<small>paid</small></div><div class="st d"><i>✓</i>slab 2<small>paid</small></div><div class="st h"><i></i>brickwork<small>part paid</small></div><div class="st"><i></i>plastering<small>awaiting</small></div><div class="st"><i></i>flooring<small>—</small></div><div class="st"><i></i>possession<small>—</small></div>
+    </div>
+  </main>
+</div>
+
+
+<div class="frame" id="cardback" style="height:420px;align-items:center;justify-content:center;gap:40px">
+  <div class="mcard"><img class="mlogo" src="kkt_logo_night.png"><img class="dia" src="elite_diamond.png">
+    <div class="mproj">Shree Ganesh</div><div class="mcircle">Tower C · Flat 901</div>
+    <div class="mrole">Homeowner · since Jul 2025</div><div class="mname">Anjali Malhotra</div><div class="mno">№ <b>026</b> / 120</div></div>
+  <div class="mcard mback"><div class="ttl">Booking</div>
+    <ul><li>Booked 23 Jul 2025 · Standard CLP</li><li>1,450 sq ft · 3BHK · parking SB005</li><li>Agreement signed 12 Aug 2025</li><li>Relationship manager · Neha Sharma</li></ul>
+    <div class="qr">RERA<br>QR CODE</div><div class="rera">BIHAR RERA<br><span style="letter-spacing:.04em">BRERAP00123-2/45</span></div>
+    <div class="co"><img src="kkt_logo_night.png"><div>KKT Constructions Pvt. Ltd.<small>Near Omega Study Centre, Mirzapur, Darbhanga</small></div></div></div>
+</div>
+
+<!-- FRAME 5: REPORT -->
+<div class="frame" id="report">
+  <aside class="side">
+    <div class="logo"><img class="lg" src="kkt_logo_night.png" alt="KKT Constructions"></div>
+    <div class="grp">Overview</div><span class="nav">Home</span>
+    <div class="grp">Sell</div><span class="nav">Projects</span><span class="nav">Customers</span><span class="nav">Bookings</span>
+    <div class="grp">Money</div><span class="nav">Payments</span>
+    <div class="grp">Build</div><span class="nav">Construction</span>
+    <div class="grp">Records</div><span class="nav">Documents</span><span class="nav on">Reports</span>
+    <div class="grp">Setup</div><span class="nav">Masters</span><span class="nav">Admin</span>
+  </aside>
+  <main class="main" style="padding-top:22px">
+    <div class="sheet">
+      <div class="shead">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start"><div><span class="capsblue">Money · Balance</span><div class="stitle" style="margin-top:6px">Outstanding &amp; ageing</div><div class="ssub num">78 bookings · all projects · as of 17 Nov 2026</div></div><div class="exp"><span class="ebtn">Print</span><span class="ebtn">PDF</span><span class="ebtn">Excel</span></div></div>
+        <div class="ff num"><div class="fld"><small>As of</small><b>17 Nov 2026</b></div><div class="fld"><small>Search</small><b style="color:var(--faint);font-weight:500">customer, flat, booking…</b></div><div class="fld"><small>Project</small><b>All</b></div><div class="fld"><small>Band</small><b>All</b></div></div>
+      </div>
+    </div>
+    <div class="gt num">
+      <div class="gth"><span>GRAND TOTAL</span><span style="color:var(--muted)">ALL PROJECTS · ALL BANDS</span></div>
+      <div class="gtr"><div><small>Bill raised</small><b>₹41.81 Cr</b></div><div><small>Received</small><b>₹34.45 Cr</b></div><div><small>Advance held</small><b style="color:var(--advance)">₹7.3 L</b></div><div><small>Outstanding</small><b style="color:var(--due)">₹7.43 Cr</b></div><div><small>Overdue</small><b style="color:var(--due)">₹5.98 Cr</b></div></div>
+      <div class="formula">Bill raised ₹41.81 Cr − received ₹34.45 Cr = net ₹7.35 Cr (outstanding ₹7.43 Cr − advance held ₹7.3 L) · outstanding till 17 Nov 2026: overdue ₹5.98 Cr · not due ₹1.45 Cr<br><span style="color:var(--muted)">Period-based money reports (Collections) add: Carried from before 01 Apr 2026: ₹3.9 Cr net balance + bills raised in period ₹22.16 Cr − received in period ₹18.7 Cr = ₹7.35 Cr net balance at 17 Nov 2026</span></div>
+    </div>
+    <div class="tbl num">
+      <div class="th"><span>#</span><span>Customer · flat</span><span class="r">Billed</span><span class="r">Received</span><span class="r">Outstanding</span><span class="r">Age</span></div>
+      <div class="tr"><span>1</span><span>Rohit Kumar · SGH B-704</span><span class="r">₹58.40 L</span><span class="r">₹31.10 L</span><span class="r" style="color:var(--due)">₹27.30 L</span><span class="r">90+</span></div>
+      <div class="tr"><span>2</span><span>Sanjay Patel · GGV P-12</span><span class="r">₹38.60 L</span><span class="r">₹15.20 L</span><span class="r" style="color:var(--due)">₹23.40 L</span><span class="r">31–60</span></div>
+      <div class="tr"><span>3</span><span>Anjali Malhotra · SGH C-901</span><span class="r">₹69.20 L</span><span class="r">₹47.50 L</span><span class="r" style="color:var(--due)">₹21.70 L</span><span class="r">31–60</span></div>
+    </div>
+    <div class="legend">Outstanding = bill raised − received · advance shown separately · cancelled bookings excluded</div>
+  </main>
+</div>
+
+<!-- DAY MODE -->
+<div class="frame day" id="home_day">
+  <aside class="side">
+    <div class="logo"><img class="lg" src="kkt_logo_night.png" alt="KKT Constructions"></div>
+    <div class="grp">Overview</div><span class="nav on">Home</span>
+    <div class="grp">Sell</div><span class="nav">Projects</span><span class="nav">Customers</span><span class="nav">Bookings</span>
+    <div class="grp">Money</div><span class="nav">Payments</span>
+    <div class="grp">Build</div><span class="nav">Construction</span>
+    <div class="grp">Records</div><span class="nav">Documents</span><span class="nav">Reports</span>
+    <div class="grp">Setup</div><span class="nav">Masters</span><span class="nav">Admin</span>
+  </aside>
+  <main class="main">
+    <div class="top"><div class="search">⌕ &nbsp;search “customer, flat, booking no.”<span class="kbd">Ctrl K</span></div><div class="newbtn">+ New</div><div class="bell">◔</div></div>
+    <div class="hello">good evening, rajesh.</div>
+    <div class="sub">3 things need you today.</div>
+    <div class="sec"><h6>Money today</h6><a>view roznamcha ›</a></div>
+    <div class="elite metal">
+      <div class="glow"></div><div class="lattice"></div><div class="diamond"></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;position:relative"><span class="tagpill"><span class="dot"></span>Live · Today</span><span class="capsr">Mon · 16 Nov</span></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:18px;position:relative">
+        <div><div class="capsblue">Received today</div><div class="stmt num">₹4,07,504</div></div>
+        <div class="ring"><div class="num">45%<small>of month</small></div></div>
+      </div>
+      <div class="stats num" style="position:relative"><div><b>₹2.76 L</b><span>cash</span></div><div><b>₹91.9 K</b><span>account</span></div><div><b>₹40 K</b><span>other</span></div><div><b>1</b><span>cheque to clear</span></div></div>
+    </div>
+    <div class="sec"><h6>Money<span class="cnt">5</span></h6></div><div class="wgrid"><div class="w"><div class="wt"><span class="wi">◷</span><span class="tag">Nov 2026</span></div><div class="fig num">45%</div><div class="lab">recovered</div><div class="cap">₹1.56 Cr of ₹3.48 Cr due</div><div class="ln"><i style="width:45%;background:#3d7bff"></i></div></div><div class="w"><div class="wt"><span class="wi">₹</span><span class="tag">Live</span></div><div class="fig num">₹7.43 Cr</div><div class="lab">outstanding</div><div class="cap">₹5.98 Cr overdue</div><div class="ln"><i style="width:19%;background:#5f6880"></i><i style="width:6%;background:#737c92"></i><i style="width:7%;background:#8a93a6"></i><i style="width:8%;background:#a3abbb"></i><i style="width:60%;background:#ff7a59"></i></div></div><div class="w"><div class="wt"><span class="wi">!</span><span class="tag">Live</span></div><div class="fig num"><span style="color:#ff7a59">₹4.42 Cr</span></div><div class="lab">overdue 90+ days</div><div class="cap">70 bookings</div></div><div class="w"><div class="wt"><span class="wi">↗</span><span class="tag">Next 30 days</span></div><div class="fig num">₹1.34 Cr</div><div class="lab">coming in</div><div class="cap">bills ₹1.33 Cr · 92 wait for a stage</div></div></div><div class="sec"><h6>Today's work<span class="cnt">4</span></h6></div><div class="wgrid"><div class="w"><div class="wt"><span class="wi">☏</span><span class="tag">Today</span></div><div class="fig num">6</div><div class="lab">customers to call</div><div class="cap">first: Ritu Malhotra · ₹39.8 L</div></div><div class="w"><div class="wt"><span class="wi">◴</span><span class="tag">Today</span></div><div class="fig num">3</div><div class="lab">follow-ups due</div><div class="cap">0 site visits today</div></div><div class="w"><div class="wt"><span class="wi">▥</span><span class="tag">Stage pending</span></div><div class="fig num">₹3.95 Cr</div><div class="lab">ready to bill</div><div class="cap">Tower B + C · incl. GST</div></div><div class="w"><div class="wt"><span class="wi">!</span><span class="tag">Live</span></div><div class="fig num">5</div><div class="lab">need attention</div><div class="cap">1 hold expiring · 0 bounced · 4 part-paid</div></div></div>
+  </main>
+</div>
+
+<div class="frame day" id="customers_day">
+  <aside class="side">
+    <div class="logo"><img class="lg" src="kkt_logo_night.png" alt="KKT Constructions"></div>
+    <div class="grp">Overview</div><span class="nav">Home</span>
+    <div class="grp">Sell</div><span class="nav">Projects</span><span class="nav on">Customers</span><span class="nav">Bookings</span>
+    <div class="grp">Money</div><span class="nav">Payments</span>
+    <div class="grp">Build</div><span class="nav">Construction</span>
+    <div class="grp">Records</div><span class="nav">Documents</span><span class="nav">Reports</span>
+    <div class="grp">Setup</div><span class="nav">Masters</span><span class="nav">Admin</span>
+  </aside>
+  <main class="main">
+    <div class="top"><div class="search">⌕ &nbsp;search “name, phone, flat, booking no.”<span class="kbd">Ctrl K</span></div><div class="newbtn">+ New customer</div></div>
+    <div class="hello">customers.</div>
+    <div class="sub">78 relationships · ₹7.43 Cr to collect</div>
+    <div class="chips" style="margin-top:22px"><span class="chip on">needs attention<em>22</em></span><span class="chip">overdue 30+<em>18</em></span><span class="chip">all clear<em>41</em></span><span class="chip">advance<em>5</em></span><span class="chip">no booking yet<em>6</em></span><span class="chip">kyc pending<em>3</em></span><span class="chip">all<em>84</em></span></div>
+    <div class="sec"><h6>Needs attention (22)</h6><a>sort · highest due ›</a></div>
+    <div class="cgrid num">
+      <div class="ccard elite-c"><div class="ctop"><div class="av">AM</div><div><div class="cline">SGH · C-901 · 3BHK</div><div class="cname">Anjali Malhotra</div></div><div class="rbtn"><span class="wbtn">Collect ₹21.6 L</span></div></div>
+        <div class="bar"><i style="width:68%"></i></div><div class="cmeta"><span>received ₹47.5 L of ₹69.2 L billed</span><span class="ocap" style="margin:0">Overdue 45 days</span></div>
+        <div class="cnext"><span><b>next ·</b> plastering bill ≈ ₹6.5 L · awaiting stage</span><span>›</span></div></div>
+      <div class="ccard elite-c"><div class="ctop"><div class="av">SP</div><div><div class="cline">GGV · P-12 · Villa</div><div class="cname">Sanjay Patel</div></div><div class="rbtn"><span class="wbtn">Collect ₹23.4 L</span></div></div>
+        <div class="bar"><i style="width:39%"></i></div><div class="cmeta"><span>received ₹15.2 L of ₹38.6 L billed</span><span class="ocap" style="margin:0">Overdue 60 days</span></div>
+        <div class="cnext"><span><b>next ·</b> finishing bill ₹11.7 L · 15 Dec</span><span>›</span></div></div>
+      <div class="ccard elite-c"><div class="ctop"><div class="av">VS</div><div><div class="cline">SGH · C-903 · 3BHK</div><div class="cname">Vikram Singh</div></div><div class="rbtn"><span class="wbtn">Collect ₹4.8 L</span></div></div>
+        <div class="bar"><i style="width:64%"></i></div><div class="cmeta"><span>received ₹8.5 L of ₹13.3 L billed</span><span class="gcap" style="margin:0">Due on 25 Nov</span></div>
+        <div class="cnext"><span><b>next ·</b> brickwork · cash part paid · account ₹2.1 L open</span><span>›</span></div></div>
+      <div class="ccard elite-c"><div class="ctop"><div class="av">MG</div><div><div class="cline">SGH · A-202 · 2BHK</div><div class="cname">Meera Gupta</div></div><div class="rbtn"><span class="apill">advance ₹1.0 L</span></div></div>
+        <div class="bar"><i style="width:100%;background:linear-gradient(90deg,#2aa77a,#5ed3a2)"></i></div><div class="cmeta"><span>received ₹29.5 L of ₹28.5 L billed</span><span class="gcap" style="margin:0">Follow-up today</span></div>
+        <div class="cnext"><span><b>next ·</b> plastering bill ≈ ₹3.5 L · awaiting stage</span><span>›</span></div></div>
+    </div>
+  </main>
+</div>
+
+</body>
+</html>

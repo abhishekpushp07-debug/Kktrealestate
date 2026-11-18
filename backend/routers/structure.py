@@ -1,0 +1,449 @@
+"""Phase X.3 — Project Structure Builder: one composite read (tree + readiness) and single-flat add.
+Flat generation reuses services.flat_generation (same numbering, snapshots, pricing); duplicates → 409."""
+
+import asyncio
+from datetime import date, timedelta
+
+from fastapi import APIRouter, Depends, Request
+from pydantic import Field
+
+from db import db
+from deps import ensure_project_access, require
+from routers.construction import ensure_block_stages
+from routers.project_setup import _active_assignments
+from services import clock
+from services import inventory as inv
+from services.flat_generation import (
+    build_flat,
+    flat_number,
+    floor_labels,
+    load_flat_types,
+    resolve_positions,
+    unit_floors,
+)
+
+LEGACY_AREA_KEYS = ("carpet_sqft", "builtup_sqft", "super_builtup_sqft")
+
+
+def _strip_legacy(f: dict) -> dict:
+    for k in LEGACY_AREA_KEYS:
+        f.pop(k, None)
+    return f
+
+
+from services.money import present_money
+from utils import ApiError, StrictModel, client_ip, get_or_404, write_audit
+
+router = APIRouter(tags=["structure"])
+FLAT_FIELDS = {
+    "_id": 0,
+    "id": 1,
+    "block_id": 1,
+    "floor": 1,
+    "floor_label": 1,
+    "position": 1,
+    "flat_number": 1,
+    "flat_type_code": 1,
+    "flat_type_id": 1,
+    "status": 1,
+    "price_paise": 1,
+    "saleable_sqft": 1,
+    "pricing_status": 1,
+    "facing": 1,
+    "version": 1,
+    "display_state": 1,
+    "display_override": 1,
+    "allocation_category_code": 1,
+    "bookable": 1,
+    "booking_id": 1,
+}
+
+
+def _tower_checks(t: dict, pid: str) -> list[dict]:
+    out = []
+    if not t["floors_list"]:
+        out.append(
+            {
+                "code": "no_floors",
+                "label": "Tower has no floors",
+                "fix": {"label": "Add floors", "action": "add_floors", "block_id": t["id"]},
+            }
+        )
+    if t["units"]["total"] == 0:
+        out.append(
+            {
+                "code": "no_flats",
+                "label": "No flats generated",
+                "fix": {"label": "Add floors / flats", "action": "add_floors", "block_id": t["id"]},
+            }
+        )
+    if not t["stage_plan"]["total"]:
+        out.append(
+            {
+                "code": "no_stage_plan",
+                "label": "No stage plan",
+                "fix": {"label": "Pick stage plan", "to": f"/projects/{pid}?tab=plans"},
+            }
+        )
+    if not t["payment_plans"]:
+        out.append(
+            {
+                "code": "no_payment_plan",
+                "label": "No payment plan",
+                "fix": {"label": "Pick payment plan", "to": f"/projects/{pid}?tab=plans"},
+            }
+        )
+    if t.get("pending_pricing"):
+        out.append(
+            {
+                "code": "pending_pricing",
+                "label": f"{t['pending_pricing']} flat(s) without saleable area / price",
+                "fix": {"label": "Set area & price", "action": "open_tower", "block_id": t["id"]},
+            }
+        )
+    return out
+
+
+@router.get("/projects/{project_id}/structure")
+async def project_structure(project_id: str, user: dict = Depends(require("masters.project.view"))):
+    ensure_project_access(user, project_id)
+    p = await get_or_404(db.projects, project_id, "Project", {"company_id": user["company_id"]})
+    blocks, flats, assignments = await asyncio.gather(
+        db.blocks.find({"project_id": project_id, "is_active": True}, {"_id": 0}).sort("name", 1).to_list(200),
+        db.flats.find({"project_id": project_id, "is_active": True}, FLAT_FIELDS)
+        .sort([("floor", 1), ("position", 1)])
+        .to_list(20000),
+        _active_assignments(project_id),
+    )
+    real = inv.can_see_real(user)
+    by_block: dict[str, list] = {}
+    for f in flats:
+        shaped = inv.shape(f, user)
+        if shaped is not None:
+            by_block.setdefault(f["block_id"], []).append(shaped)
+    towers = []
+    for b in blocks:
+        stages = await ensure_block_stages(b)
+        fl = by_block.get(b["id"], [])
+        counts: dict[str, int] = {}
+        for f in fl:
+            counts[f["status"]] = counts.get(f["status"], 0) + 1
+        floors = {}
+        for f in fl:
+            floors.setdefault(
+                f["floor"], {"floor": f["floor"], "label": f.get("floor_label") or str(f["floor"]), "flats": []}
+            )["flats"].append(present_money(f))
+        plans = [
+            {"id": a["payment_plan_id"], "name": a["plan_name"], "scope": "tower" if a.get("block_id") else "project"}
+            for a in assignments
+            if a.get("block_id") in (b["id"], None)
+        ]
+        t = {
+            "id": b["id"],
+            "name": b["name"],
+            "code": b["code"],
+            "version": b.get("version"),
+            "floors": b.get("floors"),
+            "floor_start": b.get("floor_start", 1),
+            "numbering_pattern": b.get("numbering_pattern"),
+            "rate_per_sqft": b.get("rate_per_sqft"),
+            "floors_list": [floors[k] for k in sorted(floors)],
+            "unit_floors": unit_floors(b),
+            "all_floors": floor_labels(b),
+            "units": {"total": len(fl), "by_status": counts, "masked": not real},
+            "missing_price": sum(1 for f in fl if f.get("price_paise") is None),
+            "pending_pricing": sum(
+                1
+                for f in fl
+                if f.get("pricing_status") != "ready"
+                and (f.get("price_paise") is None or not (f.get("saleable_sqft") or f.get("super_builtup_sqft")))
+            ),
+            "stage_plan": {
+                "total": len(stages),
+                "completed": sum(1 for s in stages if s.get("status") == "Completed"),
+                "source": "tower" if b.get("construction_stage_sequence") else "project",
+            },
+            "payment_plans": plans,
+            "floor_templates": b.get("floor_templates") or {},
+            "floor_plans": b.get("floor_plans") or [],
+        }
+        t["checks"] = _tower_checks(t, project_id)
+        towers.append(t)
+    project_checks = (
+        []
+        if blocks
+        else [
+            {
+                "code": "no_towers",
+                "label": "Project has no towers",
+                "fix": {"label": "Add tower", "action": "add_tower"},
+            }
+        ]
+    )
+    ready = not project_checks and all(not t["checks"] for t in towers)
+    return {
+        "project": {k: p.get(k) for k in ("id", "name", "code", "status", "version")},
+        "towers": towers,
+        "readiness": {
+            "ready": ready,
+            "project_checks": project_checks,
+            "open_items": len(project_checks) + sum(len(t["checks"]) for t in towers),
+        },
+    }
+
+
+SALES_FIELDS = {
+    "_id": 0,
+    "id": 1,
+    "block_id": 1,
+    "status": 1,
+    "display_state": 1,
+    "display_override": 1,
+    "allocation_category_code": 1,
+    "bookable": 1,
+    "is_active": 1,
+}
+REAL_CATS = ("sold", "available", "hold", "landowner", "blocked")
+DISPLAY_CATS = ("sold", "available", "hold")
+
+
+def _real_cat(f: dict) -> str:
+    if f.get("allocation_category_code") == "LANDOWNER":
+        return "landowner"
+    if f.get("bookable") is False or f.get("status") == "Blocked":
+        return "blocked"
+    return {"Booked": "sold", "Sold": "sold", "Hold": "hold"}.get(f.get("status"), "available")
+
+
+@router.get("/projects/{project_id}/tower-sales")
+async def tower_sales(
+    project_id: str, view: str = "display", weeks: int = 12, user: dict = Depends(require("masters.project.view"))
+):
+    """Y.1 — one row per active tower: Sold / Available / Hold (+ Landowner / Blocked in the real view). `view=real` only for
+    users with inventory.real_status.view; everyone else gets display-status categories (held / show-as-sold count as Sold).
+    Z.3 — per-tower weekly sold series over `weeks` ISO weeks (real: active bookings by booking date; display: shaped by display rules)."""
+    ensure_project_access(user, project_id)
+    real = view == "real" and inv.can_see_real(user)
+    weeks = max(1, min(weeks, 52))
+    today = clock.today()
+    week_keys = [(today - timedelta(weeks=weeks - 1 - i)).isocalendar() for i in range(weeks)]
+    week_labels = [f"{y}-W{w:02d}" for y, w, _ in week_keys]
+    week_idx = {(y, w): i for i, (y, w, _) in enumerate(week_keys)}
+    start = (today - timedelta(weeks=weeks)).isoformat()
+    blocks, flats, bookings = await asyncio.gather(
+        db.blocks.find({"project_id": project_id, "is_active": True}, {"_id": 0, "id": 1, "name": 1, "code": 1})
+        .sort("name", 1)
+        .to_list(200),
+        db.flats.find(
+            {"project_id": project_id, "is_active": True}, {**SALES_FIELDS, "display_set_at": 1, "booking_id": 1}
+        ).to_list(20000),
+        db.bookings.find(
+            {"project_id": project_id, "status": {"$ne": "Cancelled"}, "booking_date": {"$gte": start}},
+            {"_id": 0, "id": 1, "flat_id": 1, "block_id": 1, "booking_date": 1},
+        ).to_list(50000),
+    )
+    cats = REAL_CATS if real else DISPLAY_CATS
+    per: dict[str, dict] = {
+        b["id"]: {
+            "block_id": b["id"],
+            "tower": b["name"],
+            "code": b["code"],
+            **{c: 0 for c in cats},
+            "series": [0] * weeks,
+        }
+        for b in blocks
+    }
+
+    def _wk(iso: str | None):
+        if not iso:
+            return None
+        y, w, _ = date.fromisoformat(iso[:10]).isocalendar()
+        return week_idx.get((y, w))
+
+    booked_week = {
+        b["flat_id"]: _wk(b["booking_date"]) for b in bookings
+    }  # transfers keep one booking doc → never double counted
+    for f in flats:
+        row = per.get(f["block_id"])
+        if row is None:
+            continue
+        cat = (
+            _real_cat(f) if real else inv.display_category(f)
+        )  # display path is viewer-independent: admin view=display == Sales payload
+        if cat is None:
+            continue
+        row[cat] += 1
+        if cat == "sold":
+            wk = (
+                booked_week.get(f["id"])
+                if (real or f.get("booking_id") or not f.get("display_override"))
+                else _wk(f.get("display_set_at"))
+            )  # show-as-sold override → week it was set; no date → not in series
+            if wk is not None:
+                row["series"][wk] += 1
+    rows = list(per.values())
+    for r in rows:
+        r["total"] = sum(r[c] for c in cats)
+        r["sold_pct"] = round(100 * r["sold"] / r["total"], 1) if r["total"] else 0
+        r["last4"] = sum(r["series"][-4:])
+    median = sorted(r["last4"] for r in rows if r["available"] > 0 or r["last4"] > 0)
+    med = median[len(median) // 2] if median else 0
+    for r in rows:
+        r["pace"] = (
+            "sold_out"
+            if r["available"] == 0 and r["last4"] == 0 and r["sold"] > 0
+            else "slow"
+            if r["last4"] == 0 and r["available"] > 0
+            else "fast"
+            if r["last4"] > med and r["last4"] > 0
+            else "steady"
+        )
+    total = {c: sum(r[c] for r in rows) for c in cats}
+    total["total"] = sum(total[c] for c in cats)
+    total["sold_pct"] = round(100 * total["sold"] / total["total"], 1) if total["total"] else 0
+    total["series"] = [sum(r["series"][i] for r in rows) for i in range(weeks)]
+    total["last4"] = sum(total["series"][-4:])
+    return {
+        "project_id": project_id,
+        "view": "real" if real else "display",
+        "can_toggle": inv.can_see_real(user),
+        "categories": list(cats),
+        "towers": rows,
+        "total": total,
+        "weeks": week_labels,
+        "pace_median_last4": med,
+    }
+
+
+class FloorsPreviewIn(StrictModel):
+    count: int = Field(ge=1, le=50)
+    floor_plan_template_id: str | None = None
+    flats_per_floor: int | None = Field(default=None, ge=1, le=50)
+    flat_type_id: str | None = None
+
+
+def _extended(block: dict, body: FloorsPreviewIn) -> tuple[dict, list[int]]:
+    old = floor_labels(block)
+    nb = {**block, "floors": block["floors"] + body.count}
+    new_labels = [f for f in floor_labels(nb) if f not in old]
+    plans = list(block.get("floor_plans") or [])
+    last = plans[-1] if plans else None
+    if body.flats_per_floor and body.flat_type_id:
+        plans.append(
+            {
+                "from_floor": new_labels[0],
+                "to_floor": new_labels[-1],
+                "floor_plan_template_id": None,
+                "positions": [
+                    {"position": i + 1, "flat_type_id": body.flat_type_id, "facing": None, "is_corner": False}
+                    for i in range(body.flats_per_floor)
+                ],
+            }
+        )
+    else:
+        tmpl = body.floor_plan_template_id or (last or {}).get("floor_plan_template_id")
+        if tmpl or (last and last.get("positions")):
+            plans.append(
+                {
+                    "from_floor": new_labels[0],
+                    "to_floor": new_labels[-1],
+                    "floor_plan_template_id": tmpl,
+                    "positions": None if tmpl else last["positions"],
+                }
+            )
+    nb["floor_plans"] = plans
+    return nb, new_labels
+
+
+@router.post("/blocks/{block_id}/floors/preview")
+async def floors_preview(block_id: str, body: FloorsPreviewIn, user: dict = Depends(require("masters.tower.edit"))):
+    """Dry run: which floors/flat numbers `POST /blocks/{id}/floors` would create (no writes)."""
+    block = await get_or_404(db.blocks, block_id, "Block", {"company_id": user["company_id"]})
+    ensure_project_access(user, block["project_id"])
+    nb, new_labels = _extended(block, body)
+    plan = await resolve_positions(nb)
+    seq, numbers = 0, []
+    for floor in sorted(plan):
+        for pos in sorted(plan[floor], key=lambda x: x["position"]):
+            seq += 1
+            if floor in new_labels:
+                numbers.append(flat_number(nb, floor, pos["position"], seq))
+    existing = {
+        f["flat_number"]
+        for f in await db.flats.find(
+            {"block_id": block_id, "flat_number": {"$in": numbers}}, {"_id": 0, "flat_number": 1}
+        ).to_list(None)
+    }
+    return {
+        "floors": new_labels,
+        "flat_numbers": numbers,
+        "count": len(numbers),
+        "duplicates": sorted(existing),
+        "floor_plans": nb["floor_plans"],
+    }
+
+
+class SingleFlatIn(StrictModel):
+    floor: int = Field(ge=0)
+    position: int = Field(ge=1, le=50)
+    flat_type_id: str
+    flat_number: str | None = Field(default=None, min_length=1, max_length=20)
+
+
+@router.post("/blocks/{block_id}/flats", status_code=201)
+async def add_single_flat(
+    block_id: str, body: SingleFlatIn, request: Request, user: dict = Depends(require("masters.flat.create"))
+):
+    block = await get_or_404(db.blocks, block_id, "Block", {"company_id": user["company_id"]})
+    ensure_project_access(user, block["project_id"])
+    if body.floor not in floor_labels(block):
+        raise ApiError(
+            422,
+            f"Floor {body.floor} is outside this tower ({block['floors']} floors from {block.get('floor_start', 1)})",
+            "FLOOR_OUT_OF_RANGE",
+        )
+    ft = (await load_flat_types([body.flat_type_id]))[body.flat_type_id]
+    doc = build_flat(block, ft, body.floor, body.position, 0, user)
+    if body.flat_number:
+        doc["flat_number"] = body.flat_number.strip()
+    dup = await db.flats.find_one(
+        {
+            "block_id": block_id,
+            "$or": [{"flat_number": doc["flat_number"]}, {"floor": body.floor, "position": body.position}],
+        },
+        {"_id": 0, "flat_number": 1, "floor": 1, "position": 1},
+    )
+    if dup:
+        what = (
+            f"flat number {dup['flat_number']}"
+            if dup["flat_number"] == doc["flat_number"]
+            else f"floor {body.floor} position {body.position} ({dup['flat_number']})"
+        )
+        raise ApiError(409, f"Duplicate: {what} already exists in this tower", "DUPLICATE_FLAT")
+    builder = await db.allocation_categories.find_one(
+        {"company_id": block["company_id"], "code": "BUILDER"}, {"_id": 0, "id": 1}
+    )
+    doc.update(
+        {
+            "allocation_category_id": builder["id"] if builder else None,
+            "allocation_category_code": "BUILDER",
+            "bookable": True,
+            "display_state": None,
+            "display_override": False,
+        }
+    )
+    await db.flats.insert_one(doc)
+    doc.pop("_id", None)
+    from services.counters import refresh_counts
+
+    await refresh_counts(block_id, block["project_id"])
+    await write_audit(
+        user,
+        "flat.create",
+        "flat",
+        doc["id"],
+        before=None,
+        after={"flat_number": doc["flat_number"], "floor": body.floor, "position": body.position, "block_id": block_id},
+        ip=client_ip(request),
+    )
+    return present_money(doc)

@@ -1,0 +1,43 @@
+{
+  "summary": "Phase 3F F2 (Customers segment on the v3 engine) tested against the public preview URL. Everything was read-only and no saved views were created. Backend: new public suite test_reports_v3_f2.py passes 29/29, and probe scripts checked the numbers further. Customer statement: the last balance of every booking equals bills − received − waived for all 82 customers (0 mismatches), and waiver and waiver-cancelled lines look right. Ageing: the 5 bands add up to Total due on every row and in the totals. Advance holders only lists rows with advance > 0. Call list sorts by days overdue, oldest first; Overdue + Due soon add up to all rows. KYC pending and include-complete filters work. Payment behaviour has one row per customer and row clicks open /customers/{id}. The directory has 82 rows, matching the Customers list. Cancelled rows satisfy refund paid + pending = payable; transferred rows show from → to. Exports, grouping, sorting, 422 validation, sales 403 (report and export) and accounts 200 all work. Frontend: the hub shows 10 Customers tiles, and service-sla opens /reports/service-sla. The statement shows the 'Pick a customer…' message, and picking a customer through rf-customer works. The table shows −₹ balances and As-of narrows the lines (49 → 13). On all 7 other reports, the breadcrumb shows the title and group by, the column chooser, header sort and the Excel download work. Project → tower cascade, Why call, Next due presets, Pending, Include complete and Behaviour filters work. Share link reproduces the view. At 390px the page shows cards and 'Filters · N'. Night theme is readable. 0 page errors. Main finding: the hub headlines for 3 tiles show the wrong figure.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/reports/v3 (hub tile headline)", "issue": "The headline is the first money key in spec['totals'], not the report's main figure. Customer-ageing shows '₹2,38,59,162 · not due' instead of Total due ₹4,49,76,643. Advance-holders shows '₹1,98,38,965 · bills raised' instead of Advance held ₹7,36,226. Payment-behaviour shows '₹34,09,91,433 · received', from a column hidden by default; on-time % would fit better. Fix: add an explicit 'headline' key per spec (total_due, advance_total, on-time %) and use it in hub tile()."},
+      {"endpoint": "statement_formula / services.pdf.inr", "issue": "The formula prints a negative balance in brackets: 'balance (₹2,42,810)' for Usha Thakur. The table cells correctly show −₹2,42,810. Use the same −₹ form in the formula, PDF and Excel headers."},
+      {"endpoint": "engine.sort_rows", "issue": "With dir=desc, rows with None values come first. Example: customer-ageing sort=last_payment&dir=desc gives None, None, then 2026-11-18. The (is None, value) key is reversed together with the value. Blanks should stay last in both directions."},
+      {"endpoint": "payment-behaviour", "issue": "A customer whose bills are raised but not yet due is labelled 'No bills yet'. Example: Rohit Agarwal, ₹42.57L billed. Suggested label: 'Nothing due yet'. Also, the bill_settle_days docstring says 'bills due by as_of', but a bill paid before its due date (still in the future) is counted as on time, so 'Σ bills due' slightly overstates the tieout wording."},
+      {"endpoint": "call-list follow-ups", "issue": "Last and next follow-up are '—' on all 42 rows. The code is right: it reads the booking's lead follow_ups, but every converted lead in the demo has follow_ups=[] and next_follow_up_at=None. The columns can't be seen working in the demo, so consider adding collection follow-ups to the story data."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Payment behaviour grouped view", "issue": "Group header and Grand total rows leave On time % and Avg days late blank. These could be computed from on_time/bills_due and late days.", "selector": "[data-testid=report-group-table]", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Collection call list", "issues": ["The 'Next due' date presets only look backwards (Today, Yesterday, This/Last week, month, quarter). A call list needs forward windows such as Next 7 days or Next 30 days.", "For overdue rows, 'Next due' shows the oldest unpaid due date (e.g. 28 Jun 2025), which reads oddly under the label 'Next due'."]},
+      {"screen": "Overdue & ageing", "issues": ["Band headers are inconsistent: '0–30 days' next to '31–60', '61–90', '90+'."]},
+      {"screen": "Customer statement", "issues": ["The Total row leaves the Balance cell blank. It could show the closing balance (with −₹ when negative)."]}
+    ]
+  },
+  "test_report_links": ["/app/tests/phase3f_public/test_reports_v3_f2.py", "/app/tests/phase3f_public/probe_f2.py", "/app/tests/phase3f_public/probe_f2b.py", "/app/tests/phase3f_public/probe_f2d.py", "/app/test_reports/pytest/f2.xml"],
+  "action_items": [
+    "Hub: add a per-report headline key (ageing → total_due, advance-holders → advance_total, payment-behaviour → on-time %) instead of the first money total.",
+    "Statement formula: show negative balances as −₹… to match the table.",
+    "engine.sort_rows: keep None and blank values last when sorting descending.",
+    "Call list: add forward-looking Next due presets (Next 7 days, Next 30 days, This month remaining).",
+    "Optional: rename 'No bills yet' to 'Nothing due yet'; compute on-time % and avg days late on group rows; add collection follow-ups to the demo story."
+  ],
+  "critical_code_review_comments": [
+    "customers2.cancelled projects refunds.amount_total_paise but only sums amount_paise. If a refund doc stores only amount_total_paise, the paid amount will be 0. Currently ties out (₹4,22,892 paid).",
+    "customers2.directory runs an unscoped db.users.find({}) on every call; the same happens in cancelled(). Fine at demo scale.",
+    "Statement 'waived' line uses `e.get('jama_paise') or 0 if waiver else 0`. It is correct due to precedence but hard to read; add parentheses."
+  ],
+  "updated_files": ["/app/tests/phase3f_public/test_reports_v3_f2.py", "/app/tests/phase3f_public/probe_f2.py", "/app/tests/phase3f_public/probe_f2b.py", "/app/tests/phase3f_public/probe_f2c.py", "/app/tests/phase3f_public/probe_f2d.py"],
+  "success_rate": {"backend": "100% (29/29 functional; 5 minor quality issues)", "frontend": "~95% (all flows work; hub headline choice and minor design items)"},
+  "seed_data_creation": "None. No saved views were created and no data was modified.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "F2 public suite: cd /app/tests/phase3f_public && python -m pytest test_reports_v3_f2.py -o addopts='' -q. The in-repo backend suite (backend/tests/test_phase3f_engine.py, private :8021 snapshot) was NOT rerun by me. Data as of 18 Nov 2026: 42 ageing/call-list rows, 5 advance holders (Usha Thakur has a negative balance of −₹2,42,810), 80 KYC rows (all agreements signed, 2 KYC pending), 82 directory customers, 5 cancelled/transferred cases. Waiver test customer: Jyoti Sinha (waiver + waiver cancelled)."
+}

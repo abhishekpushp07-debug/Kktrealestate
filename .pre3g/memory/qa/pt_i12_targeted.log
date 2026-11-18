@@ -1,0 +1,33 @@
+bringing up nodes...
+bringing up nodes...
+
+......................F...                                               [100%]
+=================================== FAILURES ===================================
+______________________ test_no_source_line_over_160_chars ______________________
+[gw1] linux -- Python 3.11.18 /root/.venv/bin/python
+
+    def test_no_source_line_over_160_chars():
+        files = _tracked(BACKEND, "*.py") + [
+            f for f in _tracked(FRONTEND, "src") if f.endswith((".js", ".jsx", ".ts", ".tsx", ".css"))
+        ]
+        long = []
+        for f in files:
+            with open(f, encoding="utf-8") as fh:
+                long += [
+                    f"{os.path.relpath(f, BACKEND)}:{i}" for i, ln in enumerate(fh, 1) if len(ln.rstrip("\n")) > MAX_LINE
+                ]
+>       assert not long, f"{len(long)} lines > {MAX_LINE} chars: {long[:20]}"
+E       AssertionError: 1 lines > 160 chars: ['services/oc_parts_migration.py:123']
+E       assert not ['services/oc_parts_migration.py:123']
+
+tests/test_format_gate.py:49: AssertionError
+=============================== warnings summary ===============================
+tests/test_oc_parts_ageing.py::test_back_billed_stage_part_keeps_its_bill_day_apart_from_posting_time
+  /root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12: PendingDeprecationWarning: Please use `import python_multipart` instead.
+    import multipart
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_format_gate.py::test_no_source_line_over_160_chars - Assert...
+1 failed, 25 passed, 1 warning in 275.02s (0:04:35)
+EXIT 1

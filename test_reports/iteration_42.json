@@ -1,0 +1,39 @@
+{
+  "summary": "Frontend-only retest of the iteration-41 findings on the rebuilt preview (main.42716529.js). Logged in as admin; checked at 1440 and 390 px. Everything was read-only: no submits and no master values changed. Passes: (1) JRN-70 wording. The Manual bill sheet button says 'Raise bill'. There is no 'demand' text on the 4 reports, Settings, Bills raised, Documents or masters. The bills-vs-collection KPIs read Cash billed / Account billed / Total billed. Settings shows 'Bill number format', 'Bill due days' and the job names 'Daily dues' / 'Nightly integrity'. The print title is 'Bill Letter · KKT'. /settings/catalogues shows no codes and the pill reads 'Built-in'. None of the 16 /masters/m/* lists or the template lists show codes, in card or table view. (2) wiz-account, rev-account and md-account are text AmountInputs with the ₹ prefix and 19,23,456 grouping. (3) In all 3 fields: Backspace at '19,|23,456' gives 1,23,456 with the caret at 1; Delete at '19|,23,456' gives 1,93,456 with the caret at 3. (4) The served build has master-change-note / master-change-used-in and no master-edit-note. (5) The charge head card shows 'Default ₹60,000 · GST …'. (6) The pp allocation preview shows 'due 20 Sept 2025' (no ISO dates). The template note says 'Towers already built from it keep their own copy.' The sent-channel buttons read By hand / Post / Email / WhatsApp. At 390 the masters side list is 320px (38vh) and scrolls, and the page title shows above the fold. The tower sales Display footer says 'as shown to sales'. Spot-checks pass: typing PNB in Drawn on bank offers 'Save to Banks' (207 earlier entries; not clicked). The masters show Used in N and the active switch. The booking Activity tab shows 19 receipts, each once. Still open: the wizard breakdown table at 1440 is only partly fixed and has new overflow; the Message templates master still shows codes and 'Demand raised'; the sent pill shows the raw channel key.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "BookingWizard › Value breakdown (BreakdownCard.jsx) at 1440", "issue": "The amount column is fixed, but the table is 575px wide inside a 538px card (table right edge 1141 vs card 1089). The remove × buttons sit outside the card, and the timing combobox runs past the card edge. GST % inputs are 24px wide, so '18' is hidden (scrollWidth 40) and the cells look empty. Long names are still cut ('Maintenance (adva', 175 vs 146px). The 'TOTAL' and 'TIMING' headers run together and 'GST %' wraps.", "selector": "[data-testid=breakdown-table], [data-testid^=breakdown-line-gst-], [data-testid^=breakdown-line-remove-]", "priority": "MEDIUM"},
+      {"component": "Masters › Message templates (/masters/templates, Templates.jsx:93 and :102)", "issue": "The list and editor header show the template code under each name (demand_raised, receipt_sent, reminder_day7, welcome_booking). The template name 'Demand raised' (DB message_templates) still uses 'demand'. This breaks the JRN-70 rules 'no codes on master lists' and 'no demand wording'. The {{placeholder}} chips are fine.", "selector": "[data-testid^=tpl-]", "priority": "MEDIUM"},
+      {"component": "Documents register › sent pill (Documents.jsx:933)", "issue": "Once a document is marked sent, the pill renders the raw {d.sent.channel} ('whatsapp · 16 Nov 2026'). The buttons use CH_LABEL, but the pill does not. Use CH_LABEL[d.sent.channel] here too. Found by code review; no sent row was visible to confirm it on screen.", "selector": "td span.pill", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Manual bill sheet", "issues": ["md-cash shows the ₹ prefix and the placeholder 'Cash ₹', so the empty field reads '₹ Cash ₹'. Drop the ₹ from the placeholder. md-due is still a native mm/dd/yyyy date input (known, pre-existing)."]},
+      {"screen": "Booking › Activity tab", "issues": ["Rows show 'as-of 2026-11-16' as an ISO date and '05:00:00 am' with seconds. Other screens use '16 Nov 2026'."]},
+      {"screen": "Dates app-wide", "issues": ["fmtDate gives 'Sept' for September (en-IN locale), e.g. 'due 20 Sept 2025', while every other month is 3 letters. Optional: force 3-letter months."]},
+      {"screen": "Reports side nav", "issues": ["'Audit Trail' is listed twice under ADMIN (Audit Trail · Data Quality · Audit Trail)."]},
+      {"screen": "Record payment › Mode options", "issues": ["The option text still runs together for screen readers ('Chequeref. required'), carried over from it-41."]},
+      {"screen": "Masters at 390", "issues": ["The side list is fixed (38vh). Below the title, the chip row repeats the same masters, so the cards are still more than one screen down. Optional: hide one of the two navs on mobile."]}
+    ]
+  },
+  "test_report_links": ["/app/memory/qa/phase3/agent_smokes/ui_3_2_retest_it41.md"],
+  "action_items": [
+    "BreakdownCard at 1440: fit the table inside the card. Use table-fixed with sized columns, or move timing and remove onto a second row. Widen the GST % input to at least 48px so '18' shows. Give the name column more width, or wrap or title the long names.",
+    "Message templates: hide t.code in the list and editor header (Templates.jsx:93 and :102). Rename the 'Demand raised' template to 'Bill raised' (data/seed label), keeping the code.",
+    "Documents register sent pill: render CH_LABEL[d.sent.channel].",
+    "Minor polish: drop the ₹ from the md-cash placeholder, use owner-format dates in the Activity 'as-of' text, and remove the duplicate 'Audit Trail' in the Reports nav."
+  ],
+  "critical_code_review_comments": [
+    "AmountInput.jsx: the comma Backspace/Delete handling in keyDown works (verified). Nothing else to flag.",
+    "catalogues._typed_uses now filters deleted_at None and is_active != False, which fixes the it-41 minor note.",
+    "Documents.jsx:933 uses the raw channel key in the sent pill, while lines 516 and 946 use CH_LABEL. The same lookup is used in 2 of 3 places."
+  ],
+  "updated_files": ["/app/memory/qa/phase3/agent_smokes/ui_3_2_retest_it41.md"],
+  "success_rate": {"backend": "not tested (frontend only)", "frontend": "~90% (16 of 18 retest items pass; the wizard breakdown is partial with a new overflow; the master codes leftover is in Message templates)"},
+  "seed_data_creation": "None. No records were created or changed. Dialogs were opened and closed without submitting, and Save to Banks was not clicked.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Login is rate limited, so log in once per browser script. Useful ids are listed in /app/memory/qa/phase3/agent_smokes/ui_3_2_retest_it41.md. Bank 'PNB' (207 uses, not in the bank catalogue) triggers the Save to Banks offer in pp-inst-bank when mode is Cheque. No typed lead source currently has 2+ uses outside the master, so testing the lead-source offer needs 2 new TEST_ leads. Every active booking has bills, so the C360 'No bills raised yet' empty state was checked in source and the bundle only, not on screen. Same for the Documents empty states 'No bills match' and the sent pill.",
+  "rca of the issue": "Breakdown overflow: BreakdownCard renders 7 columns (name, amount, GST%, GST, total, timing, remove) in a card of about 538px, because the Price & Plan column sits between the stepper and the summary at 1440. Widening the name and amount inputs pushed the table past the card and squeezed the GST % input to 24px. Template codes: Templates.jsx renders t.code under t.name. The rendered internal-words scan likely treats the codes as data, not app words."
+}

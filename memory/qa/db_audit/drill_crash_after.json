@@ -1,0 +1,417 @@
+{
+ "post receipt (cash, auto)": {
+  "crash_points": 26,
+  "unrepaired": [],
+  "rows": [
+   {
+    "crash_after_write": 0,
+    "writes_done": [],
+    "crashed": true,
+    "left_bad": [],
+    "retry": 201,
+    "retry_msg": "",
+    "after_retry_bad": []
+   },
+   {
+    "crash_after_write": 1,
+    "writes_done": [],
+    "crashed": true,
+    "left_bad": [],
+    "retry": 201,
+    "retry_msg": "",
+    "after_retry_bad": []
+   },
+   {
+    "crash_after_write": 2,
+    "writes_done": [
+     "counters.find_one_and_update",
+     "bookings.update_one"
+    ],
+    "crashed": true,
+    "left_bad": [],
+    "retry": 201,
+    "retry_msg": "",
+    "after_retry_bad": []
+   },
+   {
+    "crash_after_write": 3,
+    "writes_done": [
+     "counters.find_one_and_update",
+     "bookings.update_one",
+     "payments.insert_one"
+    ],
+    "crashed": true,
+    "left_bad": [],
+    "retry": 201,
+    "retry_msg": "",
+    "after_retry_bad": []
+   },
+   {
+    "crash_after_write": 4,
+    "writes_done": [
+     "counters.find_one_and_update",
+     "bookings.update_one",
+     "payments.insert_one"
+    ],
+    "crashed": true,
+    "left_bad": [],
+    "retry": 201,
+    "retry_msg": "",
+    "after_retry_bad": []
+   },
+   {
+    "crash_after_write": 5,
+    "writes_done": [
+     "audit_logs.update_one",
+     "notifications.insert_many",
+     "generated_documents.update_one"
+    ],
+    "crashed": true,
+    "left_bad": [],
+    "retry": 201,
+    "retry_msg": "",
+    "after_retry_bad": []
+   },
+   {
+    "crash_after_write": 6,
+    "writes_done": [
+     "demands.update_one",
+     "ledger_entries.delete_many",
+     "ledger_entries.insert_many"
+    ],
+    "crashed": true,
+    "left_bad": [],
+    "retry": 201,
+    "retry_msg": "",
+    "after_retry_bad": []
+   },
+   {
+    "crash_after_write": 7,
+    "writes_done": [
+     "notifications.insert_many",
+     "counters.find_one_and_update",
+     "generated_documents.update_one"
+    ],
+    "crashed": true,
+    "left_bad": [],
+    "retry": 201,
+    "retry_msg": "",
+    "after_retry_bad": []
+   },
+   {
+    "crash_after_write": 8,
+    "writes_done": [
+     "customers.update_one",
+     "ledger_entries.delete_many",
+     "ledger_entries.insert_many"
+    ],
+    "crashed": true,
+    "left_bad": [],
+    "retry": 201,
+    "retry_msg": "",
+    "after_retry_bad": []
+   },
+   {
+    "crash_after_write": 9,
+    "writes_done": [
+     "demands.update_one",
+     "ledger_entries.delete_many",
+     "ledger_entries.insert_many"
+    ],
+    "crashed": true,
+    "left_bad": [],
+    "retry": 201,
+    "retry_msg": "",
+    "after_retry_bad": []
+   },
+   {
+    "crash_after_write": 10,
+    "writes_done": [
+     "counters.find_one_and_update",
+     "audit_logs.update_many",
+     "notifications.insert_many"
+    ],
+    "crashed": true,
+    "left_bad": [],
+    "retry": 201,
+    "retry_msg": "",
+    "after_retry_bad": []
+   },
+   {
+    "crash_after_write": 11,
+    "writes_done": [
+     "audit_logs.update_many",
+     "audit_logs.insert_one",
+     "project_summaries.update_one"
+    ],
+    "crashed": true,
+    "left_bad": [],
+    "retry": 201,
+    "retry_msg": "",
+    "after_retry_bad": []
+   },
+   {
+    "crash_after_write": 12,
+    "writes_done": [
+     "ledger_entries.delete_many",
+     "ledger_entries.insert_many",
+     "bookings.update_one"
+    ],
+    "crashed": true,
+    "left_bad": [],
+    "retry": 201,
+    "retry_msg": "",
+    "after_retry_bad": []
+   },
+   {
+    "crash_after_write": 13,
+    "writes_done": [
+     "demands.update_one",
+     "customers.update_one",
+     "notifications.insert_many"
+    ],
+    "crashed": true,
+    "left_bad": [],
+    "retry": 201,
+    "retry_msg": "",
+    "after_retry_bad": []
+   },
+   {
+    "crash_after_write": 14,
+    "writes_done": [
+     "monthly_buckets.update_one",
+     "payments.insert_one",
+     "monthly_buckets.update_one"
+    ],
+    "crashed": true,
+    "left_bad": [],
+    "retry": 201,
+    "retry_msg": "",
+    "after_retry_bad": []
+   },
+   {
+    "crash_after_write": 15,
+    "writes_done": [
+     "ledger_entries.delete_many",
+     "customer_summaries.update_one",
+     "ledger_entries.insert_many"
+    ],
+    "crashed": true,
+    "left_bad": [],
+    "retry": 201,
+    "retry_msg": "",
+    "after_retry_bad": []
+   },
+   {
+    "crash_after_write": 16,
+    "writes_done": [
+     "ledger_entries.insert_many",
+     "audit_logs.update_one",
+     "bookings.update_one"
+    ],
+    "crashed": true,
+    "left_bad": [],
+    "retry": 201,
+    "retry_msg": "",
+    "after_retry_bad": []
+   },
+   {
+    "crash_after_write": 17,
+    "writes_done": [
+     "read_model_marks.update_one",
+     "customer_summaries.update_one",
+     "audit_logs.update_many"
+    ],
+    "crashed": true,
+    "left_bad": [],
+    "retry": 201,
+    "retry_msg": "",
+    "after_retry_bad": []
+   },
+   {
+    "crash_after_write": 18,
+    "writes_done": [
+     "demands.update_one",
+     "customer_summaries.update_one",
+     "ledger_entries.delete_many"
+    ],
+    "crashed": true,
+    "left_bad": [
+     "ledger lines missing"
+    ],
+    "retry": 201,
+    "retry_msg": "",
+    "after_retry_bad": []
+   },
+   {
+    "crash_after_write": 19,
+    "writes_done": [
+     "audit_logs.update_many",
+     "monthly_buckets.update_one",
+     "ledger_entries.delete_many"
+    ],
+    "crashed": true,
+    "left_bad": [
+     "ledger lines missing"
+    ],
+    "retry": 201,
+    "retry_msg": "",
+    "after_retry_bad": []
+   },
+   {
+    "crash_after_write": 20,
+    "writes_done": [
+     "monthly_buckets.update_one",
+     "monthly_buckets.update_one",
+     "read_model_marks.update_one"
+    ],
+    "crashed": true,
+    "left_bad": [],
+    "retry": 201,
+    "retry_msg": "",
+    "after_retry_bad": []
+   },
+   {
+    "crash_after_write": 21,
+    "writes_done": [
+     "read_model_marks.update_one",
+     "monthly_buckets.update_one",
+     "read_model_marks.update_one"
+    ],
+    "crashed": true,
+    "left_bad": [],
+    "retry": 201,
+    "retry_msg": "",
+    "after_retry_bad": []
+   },
+   {
+    "crash_after_write": 22,
+    "writes_done": [
+     "notifications.insert_many",
+     "notifications.insert_many",
+     "audit_logs.update_one"
+    ],
+    "crashed": true,
+    "left_bad": [],
+    "retry": 201,
+    "retry_msg": "",
+    "after_retry_bad": []
+   },
+   {
+    "crash_after_write": 23,
+    "writes_done": [
+     "monthly_buckets.update_one",
+     "ledger_entries.insert_many",
+     "monthly_buckets.update_one"
+    ],
+    "crashed": true,
+    "left_bad": [],
+    "retry": 201,
+    "retry_msg": "",
+    "after_retry_bad": []
+   },
+   {
+    "crash_after_write": 24,
+    "writes_done": [
+     "read_model_marks.update_one",
+     "read_model_marks.update_one",
+     "customer_summaries.update_one"
+    ],
+    "crashed": true,
+    "left_bad": [],
+    "retry": 201,
+    "retry_msg": "",
+    "after_retry_bad": []
+   },
+   {
+    "crash_after_write": 25,
+    "writes_done": [
+     "customer_summaries.update_one",
+     "notifications.insert_many",
+     "notifications.insert_many"
+    ],
+    "crashed": true,
+    "left_bad": [],
+    "retry": 201,
+    "retry_msg": "",
+    "after_retry_bad": []
+   },
+   {
+    "crash_after_write": 26,
+    "writes_done": [
+     "read_model_marks.update_one",
+     "read_model_marks.update_one",
+     "audit_logs.update_one"
+    ],
+    "crashed": false,
+    "left_bad": [],
+    "retry": 201,
+    "retry_msg": "",
+    "after_retry_bad": []
+   }
+  ]
+ },
+ "cheque clear": {
+  "crash_points": 0,
+  "unrepaired": [],
+  "rows": [
+   {
+    "crash_after_write": 0,
+    "writes_done": [],
+    "crashed": false,
+    "left_bad": [],
+    "retry": 409,
+    "retry_msg": "{\"detail\":\"Payment is Cleared\",\"code\":\"NOT_PENDING\",\"request_id\":\"db793ed620dc4d0e\",\"error",
+    "after_retry_bad": []
+   }
+  ]
+ },
+ "waiver approve": {
+  "crash_points": 0,
+  "unrepaired": [
+   {
+    "crash_after_write": 0,
+    "writes_done": [],
+    "crashed": false,
+    "left_bad": [
+     "summary paid 290001000 != \u03a3 cleared 290000000"
+    ],
+    "retry": 409,
+    "retry_msg": "{\"detail\":\"Already approved\",\"code\":\"WAIVER_STATE\",\"request_id\":\"d76f496872494a0f\",\"error\"",
+    "after_retry_bad": [
+     "summary paid 290001000 != \u03a3 cleared 290000000"
+    ]
+   }
+  ],
+  "rows": [
+   {
+    "crash_after_write": 0,
+    "writes_done": [],
+    "crashed": false,
+    "left_bad": [
+     "summary paid 290001000 != \u03a3 cleared 290000000"
+    ],
+    "retry": 409,
+    "retry_msg": "{\"detail\":\"Already approved\",\"code\":\"WAIVER_STATE\",\"request_id\":\"d76f496872494a0f\",\"error\"",
+    "after_retry_bad": [
+     "summary paid 290001000 != \u03a3 cleared 290000000"
+    ]
+   }
+  ]
+ },
+ "cancel booking \u2192 refund": {
+  "crash_points": 0,
+  "unrepaired": [],
+  "rows": [
+   {
+    "crash_after_write": 0,
+    "writes_done": [],
+    "crashed": false,
+    "left_bad": [],
+    "retry": 409,
+    "retry_msg": "{\"detail\":\"Clear or bounce pending cheques before cancelling\",\"code\":\"PENDING_PAYMENTS\",\"r",
+    "after_retry_bad": []
+   }
+  ]
+ }
+}

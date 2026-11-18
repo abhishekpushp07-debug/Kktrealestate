@@ -1,0 +1,13 @@
+22:30:07 tests/effects cg_peak=3881MB testbackend_peak=160MB 17 passed in 9.11s
+22:30:26 tests/story_anchors.py cg_peak=3830MB testbackend_peak=130MB no tests ran in 0.96s
+22:30:47 tests/test_audit_archive.py cg_peak=4023MB testbackend_peak=144MB 4 passed in 2.19s
+22:31:10 tests/test_audit_history.py cg_peak=4738MB testbackend_peak=131MB 5 passed in 2.98s
+22:31:39 tests/test_business_day.py cg_peak=4568MB testbackend_peak=169MB 7 passed, 2 warnings in 10.47s
+22:31:59 tests/test_business_day_guard.py cg_peak=4587MB testbackend_peak=134MB 2 passed in 0.95s
+22:32:19 tests/test_demo_refresh.py cg_peak=4689MB testbackend_peak=133MB 6 passed, 4 warnings in 1.67s
+22:32:38 tests/test_frontend_history_scan.py cg_peak=4364MB testbackend_peak=129MB 2 passed in 0.95s
+22:32:58 tests/test_home_layout.py cg_peak=4673MB testbackend_peak=134MB 2 passed in 1.92s
+22:33:21 tests/test_index_audit.py cg_peak=5401MB testbackend_peak=129MB 41 passed in 1.01s
+22:33:41 tests/test_ledger_example.py cg_peak=4828MB testbackend_peak=134MB 3 passed in 1.45s
+22:34:02 tests/test_ledger_terminology.py cg_peak=5144MB testbackend_peak=132MB 7 passed in 1.21s
+22:34:24 tests/test_phase_2.py cg_peak=5318MB testbackend_peak=134MB 4 passed in 1.94s

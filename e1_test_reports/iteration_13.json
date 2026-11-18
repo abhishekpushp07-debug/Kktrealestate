@@ -1,0 +1,47 @@
+{
+  "iteration": 13,
+  "mode": "retest",
+  "passed": 9,
+  "failed": 2,
+  "retest_needed": true,
+  "bugs": [
+    {
+      "severity": "medium",
+      "criterion": "Bill date on other-charge parts",
+      "title": "Booking page Bills & Receipts does not list other-charge parts or a 'billed on' date for each part; it shows only the first part's date",
+      "evidence": "Browser check gst-part-billed-on-date failed twice. On BK-2526-3185 (/bookings/1208df2e-...) the Other charges row reads 'GST on agreement value (5%) ... stage · 15 Aug 2025 ₹1,55,400' with no per-part lines and no 'billed on' text anywhere. The API is correct: GET /api/bookings (other_charges[].demand_history) returns 200 with separate parts, e.g. bill_day 2025-10-11 / due_on 2025-10-26 for stage 892b47c6 (Foundation bill DM-2526-12572 is dated 11 Oct 2025). Cause: frontend/src/pages/BookingDetail.jsx:600 renders only demand_history[0].bill_day. Data is written but never displayed. BK-2627-2829 and BK-2526-3159 no longer exist after the refresh, so BK-2526-3185, BK-2627-2849 and BK-2627-2841 were used instead."
+    },
+    {
+      "severity": "medium",
+      "criterion": "Outstanding grouping by id",
+      "title": "In Outstanding & Ageing grouped by customer, customers who share a name show as identical rows",
+      "evidence": "Browser check outstanding-group-by-id failed twice. There are 78 rows (one per customer id, which is correct), but 10 names appear twice with nothing to tell them apart (no code or project): Vikash Jha, Neha Thakur, Kavita Sinha, Anjali Malhotra, Deepak Thakur, Santosh Jha, Manoj Malhotra, Rahul Malhotra, Sunita Sinha, Ravi Sinha. API cross-check: GET /api/reports/outstanding-v2?group_by=customer returns 200, and each row's 'group' is the bare name, e.g. 'Vikash Jha' with _link /customers/78ce0d35... and again with _link /customers/fa5c8649.... No customer_code or project field is filled. The other parts of this criterion pass: tower labels include the project code (SGH Tower A/B/C, GGV Villa Block V), and the customer, tower and ungrouped totals all equal ₹41,42,61,920 | ₹37,79,52,263 | ₹3,70,45,883."
+    }
+  ],
+  "action_items": [
+    {
+      "type": "stale_legacy_tests",
+      "severity": "low",
+      "detail": "The full legacy e1_tests suite gives 32 failed and 5 errors (test_tscheck_split_reversal fixture TypeError). These come from files written in earlier iterations (next_stage_preview, flats_priced, home_today, search_groups, upcoming_dues, business_day, ...) that assert fixed figures and ids from before the refresh. Iteration 12 already re-ran only a subset. These results are not counted as checks here. They should be refreshed or retired."
+    },
+    {
+      "type": "coverage_note",
+      "severity": "low",
+      "detail": "p3r-regression-night-day-widths (re-run by name) covers 390px in Night and Day for Home, Customers, Reports hub and the Outstanding sheet. It does not cover 1440px. Overdue equality between Home and Outstanding was confirmed by API: dashboard totals.overdue_paise = outstanding-v2 Overdue KPI = 2172867800. 'Bills raised' was timed as the Other Charges report; 'Bills vs Collection' was not timed."
+    }
+  ],
+  "checks": [
+    {"criterion": "Bill date on other-charge parts", "name": "test_tscheck_p3r13_ledger_fixes.py::test_gst_part_bill_dates", "lane": "backend", "status": "passed", "evidence": "GET /api/bookings + /api/bookings/{id} 200; for 5 bookings with GST parts every demand_history bill_day <= due_on and equals demand_date of the trigger_stage_id bill"},
+    {"criterion": "Bill date on other-charge parts", "name": "gst-part-billed-on-date", "lane": "browser", "status": "failed", "evidence": "Bills & Receipts GST row shows only 'stage · 15 Aug 2025'; no per-part 'billed on' text (failed on 2 runs)"},
+    {"criterion": "Collections carried-from-before + received bridge", "name": "test_tscheck_p3r13_ledger_fixes.py::test_collections_carried_and_bridge", "lane": "backend", "status": "passed", "evidence": "GET /api/reports/collections-v2 200; opening+billed-received=closing=Net balance 3630965700 for the FY and a 16-day window; bridge terms add up to by_clearance"},
+    {"criterion": "Collections carried-from-before + received bridge", "name": "collections-carried-bridge", "lane": "browser", "status": "passed", "evidence": "FY: ₹1.98 Cr + ₹22.07 Cr − ₹20.42 Cr = ₹3.63 Cr = Outstanding Net balance; bridge hidden because all terms are 0. 03–18 Nov: ₹3.5 Cr + ₹1.87 Cr − ₹1.74 Cr = ₹3.63 Cr; bridge 'by payment date ₹1.72 Cr + cheques dated before, cleared in period ₹1.9 L = ₹1.74 Cr' with zero terms omitted"},
+    {"criterion": "Outstanding grouping by id", "name": "test_tscheck_p3r13_ledger_fixes.py::test_outstanding_grouping", "lane": "backend", "status": "passed", "evidence": "group_by=customer gives 78 rows with unique _link; block labels unique; group sums = ungrouped 3704588300"},
+    {"criterion": "Outstanding grouping by id", "name": "outstanding-group-by-id", "lane": "browser", "status": "failed", "evidence": "10 duplicate customer names show with no distinguishing code or project; tower labels and totals OK"},
+    {"criterion": "Cheques in hand complete", "name": "test_tscheck_p3r13_ledger_fixes.py::test_cheques_in_hand_agree", "lane": "backend", "status": "passed", "evidence": "cheques-in-hand total=1 amount 4000000 = home pending_cheques_paise = /reports/cheques?status=Pending KPI and row count"},
+    {"criterion": "Cheques in hand complete", "name": "cheques-in-hand-agree", "lane": "browser", "status": "passed", "evidence": "Home '1 cheque to clear ₹40,000'; Payments '1 cheque in hand', tab Cheques 1, ₹40,000; Register Pending 1 row ₹40,000"},
+    {"criterion": "Speed sanity", "name": "test_tscheck_p3r13_ledger_fixes.py::test_speed", "lane": "backend", "status": "passed", "evidence": "outstanding-v2, collections-v2 (FY), other-charges each <2 s"},
+    {"criterion": "Speed sanity", "name": "reports-open-speed", "lane": "browser", "status": "passed", "evidence": "first open: Outstanding 828 ms, Collections 121 ms, Other charges 226 ms; repeat: 146 / 47 / 61 ms"},
+    {"criterion": "Regression", "name": "p3r-regression-night-day-widths", "lane": "browser", "status": "passed", "evidence": "re-run by name: PROBLEMS [] (Night+Day at 390px, no horizontal scroll, key text present)"}
+  ],
+  "fixture_note": "Read-only run: no payments, stage completions or reseeds. No data was created or modified."
+}

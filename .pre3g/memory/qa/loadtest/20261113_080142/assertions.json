@@ -1,0 +1,158 @@
+{
+ "stages": [
+  {
+   "vus": 3,
+   "assertions": {
+    "lead_created:ok": 36,
+    "lead_converted:FAIL": 36,
+    "integrity_ok_after_stage:ok": 1
+   },
+   "failed_assertions": [
+    {
+     "assertion": "lead_converted",
+     "detail": "convert failed"
+    },
+    {
+     "assertion": "lead_converted",
+     "detail": "convert failed"
+    },
+    {
+     "assertion": "lead_converted",
+     "detail": "convert failed"
+    },
+    {
+     "assertion": "lead_converted",
+     "detail": "convert failed"
+    },
+    {
+     "assertion": "lead_converted",
+     "detail": "convert failed"
+    },
+    {
+     "assertion": "lead_converted",
+     "detail": "convert failed"
+    },
+    {
+     "assertion": "lead_converted",
+     "detail": "convert failed"
+    },
+    {
+     "assertion": "lead_converted",
+     "detail": "convert failed"
+    },
+    {
+     "assertion": "lead_converted",
+     "detail": "convert failed"
+    },
+    {
+     "assertion": "lead_converted",
+     "detail": "convert failed"
+    },
+    {
+     "assertion": "lead_converted",
+     "detail": "convert failed"
+    },
+    {
+     "assertion": "lead_converted",
+     "detail": "convert failed"
+    },
+    {
+     "assertion": "lead_converted",
+     "detail": "convert failed"
+    },
+    {
+     "assertion": "lead_converted",
+     "detail": "convert failed"
+    },
+    {
+     "assertion": "lead_converted",
+     "detail": "convert failed"
+    },
+    {
+     "assertion": "lead_converted",
+     "detail": "convert failed"
+    },
+    {
+     "assertion": "lead_converted",
+     "detail": "convert failed"
+    },
+    {
+     "assertion": "lead_converted",
+     "detail": "convert failed"
+    },
+    {
+     "assertion": "lead_converted",
+     "detail": "convert failed"
+    },
+    {
+     "assertion": "lead_converted",
+     "detail": "convert failed"
+    },
+    {
+     "assertion": "lead_converted",
+     "detail": "convert failed"
+    },
+    {
+     "assertion": "lead_converted",
+     "detail": "convert failed"
+    },
+    {
+     "assertion": "lead_converted",
+     "detail": "convert failed"
+    },
+    {
+     "assertion": "lead_converted",
+     "detail": "convert failed"
+    },
+    {
+     "assertion": "lead_converted",
+     "detail": "convert failed"
+    },
+    {
+     "assertion": "lead_converted",
+     "detail": "convert failed"
+    },
+    {
+     "assertion": "lead_converted",
+     "detail": "convert failed"
+    },
+    {
+     "assertion": "lead_converted",
+     "detail": "convert failed"
+    },
+    {
+     "assertion": "lead_converted",
+     "detail": "convert failed"
+    },
+    {
+     "assertion": "lead_converted",
+     "detail": "convert failed"
+    },
+    {
+     "assertion": "lead_converted",
+     "detail": "convert failed"
+    },
+    {
+     "assertion": "lead_converted",
+     "detail": "convert failed"
+    },
+    {
+     "assertion": "lead_converted",
+     "detail": "convert failed"
+    },
+    {
+     "assertion": "lead_converted",
+     "detail": "convert failed"
+    },
+    {
+     "assertion": "lead_converted",
+     "detail": "convert failed"
+    },
+    {
+     "assertion": "lead_converted",
+     "detail": "convert failed"
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,23 @@
+(trapped) error reading bcrypt version
+Traceback (most recent call last):
+  File "/root/.venv/lib/python3.11/site-packages/passlib/handlers/bcrypt.py", line 620, in _load_backend_mixin
+    version = _bcrypt.__about__.__version__
+              ^^^^^^^^^^^^^^^^^
+AttributeError: module 'bcrypt' has no attribute '__about__'
+[startup] indexes ensured in 0.09s
+UoW mode: ordered-writes+compensation
+KKT backend serving after 0.10s (uow=ordered-writes+compensation); background startup tasks running
+Object storage initialized
+{"request_id": "ad4c9cfd663847c3", "method": "GET", "path": "/api/health", "status": 200, "duration_ms": 2.0, "user_id": null}
+[startup] system_roles ok in 0.16s
+[startup] owner_bootstrap ok in 0.01s
+{"request_id": "a6633356b4ce4bfb", "method": "POST", "path": "/api/auth/login", "status": 200, "duration_ms": 342.4, "user_id": null}
+[startup] seed_phase7 ok in 0.00s
+{"request_id": "cc2c1f4cff834617", "method": "POST", "path": "/api/admin/hard-purge", "status": 200, "duration_ms": 214.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+[phase7] integrity: ok=True bookings=77 counts={}
+[startup] integrity_report ok in 0.18s
+[startup] inventory_masters ok in 0.01s
+[startup] seed_s1_templates ok in 0.00s
+[startup] migrate_s1_templates ok in 0.00s
+[startup] pricing_ps ok in 0.01s
+[startup] schema_validators ok in 0.01s

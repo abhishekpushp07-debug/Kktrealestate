@@ -1,0 +1,73 @@
+FEEEEEEEEEEEEEEE                                                         [100%]Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/root/.venv/lib/python3.11/site-packages/pytest/__main__.py", line 9, in <module>
+    raise SystemExit(_console_main())
+                     ^^^^^^^^^^^^^^^
+  File "/root/.venv/lib/python3.11/site-packages/_pytest/config/__init__.py", line 253, in _console_main
+    code = _main(prog=_get_prog_name(sys.argv))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/.venv/lib/python3.11/site-packages/_pytest/config/__init__.py", line 229, in _main
+    ret: ExitCode | int = config.hook.pytest_cmdline_main(config=config)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/.venv/lib/python3.11/site-packages/pluggy/_caller.py", line 197, in __call__
+    return self._hookexec(
+           ^^^^^^^^^^^^^^^
+  File "/root/.venv/lib/python3.11/site-packages/pluggy/_manager.py", line 183, in _hookexec
+    return self._inner_hookexec(hook_name, methods, kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/.venv/lib/python3.11/site-packages/pluggy/_execution.py", line 195, in _multicall
+    raise exception
+  File "/root/.venv/lib/python3.11/site-packages/pluggy/_execution.py", line 147, in _multicall
+    res = hook_impl.function(*args)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/.venv/lib/python3.11/site-packages/_pytest/main.py", line 377, in pytest_cmdline_main
+    return wrap_session(config, _main)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/.venv/lib/python3.11/site-packages/_pytest/main.py", line 362, in wrap_session
+    os.chdir(session.startpath)
+FileNotFoundError: [Errno 2] No such file or directory: '/tmp/pre3g_wt/backend'
+code":"USER_INACTIVE","message":"User inactive or not found","details":[],"request_id":"7cb8ed58c90b4226"}}
+    assert 401 in (200, 201)
+     +  where 401 = <Response [401]>.status_code
+/tmp/pre3g_wt/backend/tests/test_phase3_booking_page.py:74: AssertionError: {"detail":"User inactive or not found","code":"USER_INACTIVE","request_id":"7cb8ed58c90b4226","error":{"code":"USER_INACTIVE","message":"User inactive or not found","details":[],"request_id":"7cb8ed58c90b4226"}}
+E   KeyError: 'meta'
+/tmp/pre3g_wt/backend/tests/test_phase3f_engine.py:177: KeyError: 'meta'
+E   KeyError: 'meta'
+/tmp/pre3g_wt/backend/tests/test_phase3f_engine.py:177: KeyError: 'meta'
+E   KeyError: 'meta'
+/tmp/pre3g_wt/backend/tests/test_phase3f_engine.py:177: KeyError: 'meta'
+E   KeyError: 'meta'
+/tmp/pre3g_wt/backend/tests/test_phase3f_engine.py:177: KeyError: 'meta'
+E   KeyError: 'meta'
+/tmp/pre3g_wt/backend/tests/test_phase3f_engine.py:177: KeyError: 'meta'
+E   KeyError: 'meta'
+/tmp/pre3g_wt/backend/tests/test_phase3f_engine.py:177: KeyError: 'meta'
+E   KeyError: 'meta'
+/tmp/pre3g_wt/backend/tests/test_phase3f_engine.py:177: KeyError: 'meta'
+E   KeyError: 'meta'
+/tmp/pre3g_wt/backend/tests/test_phase3f_engine.py:177: KeyError: 'meta'
+E   KeyError: 'meta'
+/tmp/pre3g_wt/backend/tests/test_phase3f_engine.py:177: KeyError: 'meta'
+E   KeyError: 'meta'
+/tmp/pre3g_wt/backend/tests/test_phase3f_engine.py:177: KeyError: 'meta'
+E   KeyError: 'columns'
+/tmp/pre3g_wt/backend/tests/test_phase_i_reports.py:205: KeyError: 'columns'
+=========================== short test summary info ============================
+FAILED tests/test_connection_matrix.py::test_connection_matrix_all_green - As...
+FAILED tests/test_phase3_booking_page.py::test_actions_endpoint_reasons_match_the_handlers
+FAILED tests/test_phase3_booking_page.py::test_one_total_and_one_balance_header_overview_ledger
+FAILED tests/test_phase3_booking_page.py::test_customer_activity_shows_each_receipt_once
+FAILED tests/test_phase3_booking_page.py::test_typed_lead_source_and_save_to_master_offer
+FAILED tests/test_phase3f_engine.py::test_f3_equals_existing_report[collections]
+FAILED tests/test_phase3f_engine.py::test_f3_equals_existing_report[day-book]
+FAILED tests/test_phase3f_engine.py::test_f3_equals_existing_report[bank-receipts]
+FAILED tests/test_phase3f_engine.py::test_f3_equals_existing_report[cheques]
+FAILED tests/test_phase3f_engine.py::test_f3_equals_existing_report[bills-vs-collection]
+FAILED tests/test_phase3f_engine.py::test_f3_equals_existing_report[outstanding]
+FAILED tests/test_phase3f_engine.py::test_f3_equals_existing_report[cash-vs-account]
+FAILED tests/test_phase3f_engine.py::test_f3_equals_existing_report[other-charges]
+FAILED tests/test_phase3f_engine.py::test_f3_equals_existing_report[receivables-forecast]
+FAILED tests/test_phase3f_engine.py::test_f3_equals_existing_report[waivers]
+FAILED tests/test_phase_i_reports.py::test_outstanding_three_balances_law - K...
+16 failed in 111.07s (0:01:51)

@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="3" skipped="0" tests="19" time="3.853" timestamp="2026-11-18T04:21:23.124750+00:00" hostname="agent-env-4458acfc-755a-41df-81c9-275a33d29b38"><testcase classname="" name="test_bad_params_422[page=abc]" time="0.503" /><testcase classname="" name="test_bad_params_422[page_size=x]" time="0.110" /><testcase classname="" name="test_bad_params_422[overdue_days=abc]" time="0.123" /><testcase classname="" name="test_bad_params_422[dues_min=abc]" time="0.156" /><testcase classname="" name="test_bad_params_422[dues_max=zz]" time="0.135" /><testcase classname="" name="test_bad_params_422[booked_from=nope]" time="0.145" /><testcase classname="" name="test_bad_params_422[booked_to=2026-13-45]" time="0.127" /><testcase classname="" name="test_bad_params_422[as_of=2099-01-01]" time="0.124" /><testcase classname="" name="test_bad_params_422[as_of=garbage]" time="0.142" /><testcase classname="" name="test_edge_numbers_not_500[page=inf]" time="0.174"><failure message="AssertionError: ('page=inf', '{&quot;detail&quot;:&quot;Internal server error&quot;,&quot;code&quot;:&quot;INTERNAL_ERROR&quot;,&quot;request_id&quot;:&quot;5696f62443364731&quot;,&quot;error&quot;:{&quot;code&quot;:&quot;INTERNAL_ERROR&quot;,&quot;message&quot;:&quot;Internal server error&quot;,&quot;details&quot;:[],&quot;request_id&quot;:&quot;5696f62443364731')&#10;assert 500 != 500&#10; +  where 500 = &lt;Response [500]&gt;.status_code">adm = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzMzlkNmM0ZS1lYTU1LTRmNjMtYjRjZi0xYjk1NzgwODA...iYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzk0OTc1NjgzLCJleHAiOjE3OTQ5NzY1ODN9.OWe1jsq_jXfEJ_HTKY0bPPw5EkDPfKZbdYbiHJRzecU'}
+q = 'page=inf'
+
+    @pytest.mark.parametrize("q", ["page=inf", "page=nan", "page_size=1e400", "page=-5", "page_size=0"])
+    def test_edge_numbers_not_500(adm, q):
+        r = requests.get(f"{URL}?{q}", headers=adm)
+&gt;       assert r.status_code != 500, (q, r.text[:200])
+E       AssertionError: ('page=inf', '{"detail":"Internal server error","code":"INTERNAL_ERROR","request_id":"5696f62443364731","error":{"code":"INTERNAL_ERROR","message":"Internal server error","details":[],"request_id":"5696f62443364731')
+E       assert 500 != 500
+E        +  where 500 = &lt;Response [500]&gt;.status_code
+
+test_reports_v3_retest49.py:35: AssertionError</failure></testcase><testcase classname="" name="test_edge_numbers_not_500[page=nan]" time="0.136"><failure message="AssertionError: ('page=nan', '{&quot;detail&quot;:&quot;Internal server error&quot;,&quot;code&quot;:&quot;INTERNAL_ERROR&quot;,&quot;request_id&quot;:&quot;c5a63f3a772045fe&quot;,&quot;error&quot;:{&quot;code&quot;:&quot;INTERNAL_ERROR&quot;,&quot;message&quot;:&quot;Internal server error&quot;,&quot;details&quot;:[],&quot;request_id&quot;:&quot;c5a63f3a772045fe')&#10;assert 500 != 500&#10; +  where 500 = &lt;Response [500]&gt;.status_code">adm = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzMzlkNmM0ZS1lYTU1LTRmNjMtYjRjZi0xYjk1NzgwODA...iYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzk0OTc1NjgzLCJleHAiOjE3OTQ5NzY1ODN9.OWe1jsq_jXfEJ_HTKY0bPPw5EkDPfKZbdYbiHJRzecU'}
+q = 'page=nan'
+
+    @pytest.mark.parametrize("q", ["page=inf", "page=nan", "page_size=1e400", "page=-5", "page_size=0"])
+    def test_edge_numbers_not_500(adm, q):
+        r = requests.get(f"{URL}?{q}", headers=adm)
+&gt;       assert r.status_code != 500, (q, r.text[:200])
+E       AssertionError: ('page=nan', '{"detail":"Internal server error","code":"INTERNAL_ERROR","request_id":"c5a63f3a772045fe","error":{"code":"INTERNAL_ERROR","message":"Internal server error","details":[],"request_id":"c5a63f3a772045fe')
+E       assert 500 != 500
+E        +  where 500 = &lt;Response [500]&gt;.status_code
+
+test_reports_v3_retest49.py:35: AssertionError</failure></testcase><testcase classname="" name="test_edge_numbers_not_500[page_size=1e400]" time="0.133"><failure message="AssertionError: ('page_size=1e400', '{&quot;detail&quot;:&quot;Internal server error&quot;,&quot;code&quot;:&quot;INTERNAL_ERROR&quot;,&quot;request_id&quot;:&quot;cfc814f538434a8c&quot;,&quot;error&quot;:{&quot;code&quot;:&quot;INTERNAL_ERROR&quot;,&quot;message&quot;:&quot;Internal server error&quot;,&quot;details&quot;:[],&quot;request_id&quot;:&quot;cfc814f538434a8c')&#10;assert 500 != 500&#10; +  where 500 = &lt;Response [500]&gt;.status_code">adm = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzMzlkNmM0ZS1lYTU1LTRmNjMtYjRjZi0xYjk1NzgwODA...iYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzk0OTc1NjgzLCJleHAiOjE3OTQ5NzY1ODN9.OWe1jsq_jXfEJ_HTKY0bPPw5EkDPfKZbdYbiHJRzecU'}
+q = 'page_size=1e400'
+
+    @pytest.mark.parametrize("q", ["page=inf", "page=nan", "page_size=1e400", "page=-5", "page_size=0"])
+    def test_edge_numbers_not_500(adm, q):
+        r = requests.get(f"{URL}?{q}", headers=adm)
+&gt;       assert r.status_code != 500, (q, r.text[:200])
+E       AssertionError: ('page_size=1e400', '{"detail":"Internal server error","code":"INTERNAL_ERROR","request_id":"cfc814f538434a8c","error":{"code":"INTERNAL_ERROR","message":"Internal server error","details":[],"request_id":"cfc814f538434a8c')
+E       assert 500 != 500
+E        +  where 500 = &lt;Response [500]&gt;.status_code
+
+test_reports_v3_retest49.py:35: AssertionError</failure></testcase><testcase classname="" name="test_edge_numbers_not_500[page=-5]" time="0.159" /><testcase classname="" name="test_edge_numbers_not_500[page_size=0]" time="0.140" /><testcase classname="" name="test_export_bad_params_422[export.xlsx]" time="0.148" /><testcase classname="" name="test_export_bad_params_422[export.pdf]" time="0.154" /><testcase classname="" name="test_as_of_today_ok" time="0.123" /><testcase classname="" name="test_final_status_other_charges" time="0.141" /><testcase classname="" name="test_shared_view_ownership" time="0.891" /></testsuite></testsuites>

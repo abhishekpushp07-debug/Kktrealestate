@@ -1,0 +1,12 @@
+start 17:13:28
+{"outcome":"running","trigger":"manual","as_of":"2026-11-15"}
+17:13:58 True None None
+17:14:29 True None None
+17:15:00 True None None
+17:15:30 True None None
+17:16:01 True None None
+17:16:32 True None None
+17:17:02 True None None
+17:17:33 True None None
+17:18:04 True None None
+17:18:34 False done 2026-11-15

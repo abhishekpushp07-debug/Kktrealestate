@@ -1,0 +1,502 @@
+import { useEffect, useState } from "react";
+import { Activity, Database, HardDrive, RefreshCw, Timer } from "lucide-react";
+import api from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
+import { Button } from "@/components/ui/button";
+import { DemoRefresh } from "./DemoRefresh";
+
+const human = (k) => {
+  const t = String(k).replace(/_/g, " ").toLowerCase();
+  return t.charAt(0).toUpperCase() + t.slice(1);
+};
+
+const ms = (v) => (v == null ? "—" : `${Math.round(v)} ms`);
+const Tone = ({ v, warn, bad }) => (
+  <span
+    className={
+      v == null
+        ? ""
+        : v > bad
+          ? "text-brick font-semibold"
+          : v > warn
+            ? "text-amber"
+            : "text-sage-700"
+    }
+  >
+    {ms(v)}
+  </span>
+);
+
+const mb = (b) =>
+  b == null
+    ? "—"
+    : b >= 1073741824
+      ? `${(b / 1073741824).toFixed(2)} GB`
+      : `${(b / 1048576).toFixed(1)} MB`;
+
+/** Z.1 — disk % + archives + last backup, warning badge at ≥ 80 % used; audited prune. */
+function DiskBackups({ tick, onPruned }) {
+  const [b, setB] = useState(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    api
+      .get("/admin/backups")
+      .then((r) => alive && setB(r.data))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [tick]);
+  if (!b) return null;
+  const used = b.disk?.used_pct ?? 0;
+  const prune = async () => {
+    setBusy(true);
+    try {
+      await api.post("/admin/backups/prune");
+      onPruned?.();
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div
+      className="mb-5 rounded-xl border border-warm-200 bg-warm-50/60 p-4"
+      data-testid="ops-disk-backups"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="label flex items-center gap-2">
+          <HardDrive className="h-3.5 w-3.5" />
+          Disk &amp; backups
+          {b.warning && (
+            <span
+              className="rounded-full bg-brick/10 px-2 py-0.5 text-xs font-semibold text-brick"
+              data-testid="ops-disk-warning"
+            >
+              Disk {used}% used
+            </span>
+          )}
+        </p>
+        <Button
+          variant="quiet"
+          size="compact"
+          onClick={prune}
+          disabled={busy}
+          data-testid="ops-backups-prune"
+        >
+          Prune now
+        </Button>
+      </div>
+      <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-warm-100">
+        <div
+          className={`h-full ${used >= 80 ? "bg-brick" : "bg-sage"}`}
+          style={{ width: `${Math.min(used, 100)}%` }}
+        />
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-3 text-sm md:grid-cols-4">
+        <div data-testid="ops-disk-pct">
+          <p className="label">Disk</p>
+          <p className="font-display text-xl">{used}%</p>
+          <p className="text-xs text-txt-muted">
+            {mb(b.disk?.free_bytes)} free of {mb(b.disk?.total_bytes)}
+          </p>
+        </div>
+        <div data-testid="ops-last-backup">
+          <p className="label">Last backup</p>
+          <p className="font-display text-xl">{b.last_backup ? mb(b.last_backup.bytes) : "—"}</p>
+          <p className="text-xs text-txt-muted">
+            {b.last_backup
+              ? new Date(b.last_backup.created_at).toLocaleString()
+              : b.last_skip
+                ? `skipped: ${b.last_skip.reason}`
+                : "never"}
+          </p>
+        </div>
+        <div data-testid="ops-archives">
+          <p className="label">Archives</p>
+          <p className="font-display text-xl">{b.archives.length}</p>
+          <p className="text-xs text-txt-muted">{mb(b.archives_total_bytes)} on disk</p>
+        </div>
+        <div data-testid="ops-policy">
+          <p className="label">Policy</p>
+          <p className="text-sm">
+            keep {b.policy.keep_per_db} / db · {b.policy.keep_test_db} for test DBs
+          </p>
+          <p className="text-xs text-txt-muted">
+            cap {mb(b.policy.max_total_mb * 1048576)} · min free {b.policy.min_free_pct}%
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function UniquenessRules({ rules }) {
+  const off = (rules || []).filter((r) => r.status === "not_applied");
+  if (!off.length) return null;
+  return (
+    <div
+      className="mt-4 rounded-[10px] border border-brick/30 bg-brick/5 p-3"
+      data-testid="ops-uniqueness-warning"
+    >
+      {off.map((r) => (
+        <p key={r.index} className="text-sm text-brick" data-testid={`ops-uniqueness-${r.index}`}>
+          {r.message} · {r.key}
+        </p>
+      ))}
+    </div>
+  );
+}
+
+function OpsSummary({ d, groups }) {
+  return (
+    <>
+      <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-5">
+        {[
+          ["Requests", d.requests.requests, `${d.requests.rps} rps`],
+          ["p50", ms(d.requests.p50_ms)],
+          ["p95", ms(d.requests.p95_ms)],
+          ["Uptime", `${Math.round(d.uptime_s / 60)} min`, d.startup?.phase],
+          [
+            "Pool",
+            `${d.db_pool.live.checked_out}/${d.db_pool.config.maxPoolSize}`,
+            `${d.db_pool.live.created} created`,
+          ],
+        ].map(([l, v, h]) => (
+          <div
+            key={l}
+            className="rounded-xl bg-warm-50 p-3"
+            data-testid={`ops-kpi-${l.toLowerCase()}`}
+          >
+            <p className="label">{l}</p>
+            <p className="font-display text-xl">{v}</p>
+            {h && <p className="text-xs text-txt-muted">{h}</p>}
+          </div>
+        ))}
+      </div>
+      <div className="mt-5 overflow-x-auto">
+        <table className="w-full text-sm" data-testid="ops-groups">
+          <thead>
+            <tr className="text-left text-xs uppercase tracking-wide text-txt-muted">
+              <th className="py-2 pr-3">Route group</th>
+              <th className="pr-3">Count</th>
+              <th className="pr-3">p50</th>
+              <th className="pr-3">p95</th>
+              <th className="pr-3">p99</th>
+              <th className="pr-3">DB p95</th>
+              <th className="pr-3" title="average Mongo queries per request">
+                Avg q
+              </th>
+              <th>4xx / 5xx</th>
+            </tr>
+          </thead>
+          <tbody>
+            {groups.map(([g, s]) => (
+              <tr key={g} className="border-t border-warm-100">
+                <td className="py-1.5 pr-3 font-medium">{human(g)}</td>
+                <td className="pr-3 tabular-nums">{s.count}</td>
+                <td className="pr-3 tabular-nums">{ms(s.p50_ms)}</td>
+                <td className="pr-3 tabular-nums">
+                  <Tone v={s.p95_ms} warn={150} bad={300} />
+                </td>
+                <td className="pr-3 tabular-nums">{ms(s.p99_ms)}</td>
+                <td className="pr-3 tabular-nums">{ms(s.db_p95_ms)}</td>
+                <td
+                  className={`pr-3 tabular-nums ${s.avg_queries > 6 ? "font-semibold text-brick" : ""}`}
+                  data-testid={`ops-avgq-${g}`}
+                >
+                  {s.avg_queries ?? "—"}
+                </td>
+                <td className="tabular-nums">
+                  {s.errors_4xx} /{" "}
+                  <span className={s.errors_5xx ? "text-brick font-semibold" : ""}>
+                    {s.errors_5xx}
+                  </span>
+                </td>
+              </tr>
+            ))}
+            {!groups.length && (
+              <tr>
+                <td colSpan={7} className="py-3 text-txt-muted">
+                  No requests in window yet.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </>
+  );
+}
+
+function OpsJobs({ d, jobs }) {
+  return (
+    <div data-testid="ops-jobs">
+      <p className="label flex items-center gap-1">
+        <Timer className="h-3.5 w-3.5" />
+        Background jobs
+      </p>
+      <ul className="mt-2 space-y-1 text-sm">
+        {jobs.map(([n, j]) => (
+          <li key={n} className="flex justify-between gap-2">
+            <span>{human(n)}</span>
+            <span className="text-txt-muted tabular-nums">
+              {j.ok ? "ok" : "failed"} · {ms(j.duration_ms)} ·{" "}
+              {new Date(j.last_run).toLocaleTimeString()}
+            </span>
+          </li>
+        ))}
+        {!jobs.length && <li className="text-txt-muted">No job has run in this process yet.</li>}
+      </ul>
+      {d.job_runs && (
+        <div className="mt-3" data-testid="ops-job-runs">
+          <p className="label">Job runs (durable)</p>
+          <ul className="mt-1 space-y-1 text-sm">
+            {Object.entries(d.job_runs.jobs).map(([n, j]) => (
+              <li key={n} className="flex justify-between gap-2" data-testid={`ops-job-run-${n}`}>
+                <span>
+                  {human(n)}
+                  {d.job_runs.stale.includes(n) && (
+                    <span
+                      className="ml-2 rounded-full bg-brick/10 px-2 py-0.5 text-xs font-semibold text-brick"
+                      data-testid={`ops-job-stale-${n}`}
+                    >
+                      stale &gt; {d.job_runs.stale_after_h} h
+                    </span>
+                  )}
+                </span>
+                <span className="text-txt-muted tabular-nums">
+                  {j.last_status || "never"} · last OK{" "}
+                  {j.last_ok_at ? new Date(j.last_ok_at).toLocaleString() : "—"}
+                  {j.failed_items ? ` · ${j.failed_items} item errors` : ""}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      <p className="mt-3 text-xs text-txt-muted">
+        Read models: oldest project summary{" "}
+        {d.read_models.oldest_project_summary_age_s == null
+          ? "—"
+          : `${Math.round(d.read_models.oldest_project_summary_age_s / 60)} min`}{" "}
+        old · last full refresh{" "}
+        {d.read_models.last_full_refresh
+          ? new Date(d.read_models.last_full_refresh).toLocaleString()
+          : "—"}
+      </p>
+    </div>
+  );
+}
+
+function OpsBackup({ b }) {
+  if (!b) return null;
+  const d = { backup: b };
+  return (
+    <div data-testid="ops-backup">
+      <p className="label">
+        Backup (app-level export)
+        {d.backup.stale && (
+          <span
+            className="ml-2 rounded-full bg-brick/10 px-2 py-0.5 text-xs font-semibold text-brick"
+            data-testid="ops-backup-stale"
+          >
+            stale
+          </span>
+        )}
+      </p>
+      <p className="mt-2 text-sm">
+        {d.backup.last_backup
+          ? `Backup · ${(d.backup.last_backup.bytes / 1048576).toFixed(1)} MB · ${d.backup.age_h} h ago`
+          : "No backup recorded yet"}
+      </p>
+      <p className="mt-1 text-xs text-txt-muted">
+        {d.backup.last_restore_drill
+          ? "Last restore drill: " +
+            (d.backup.last_restore_drill.integrity_ok
+              ? "integrity ok"
+              : "integrity " + "findings") +
+            " · " +
+            new Date(d.backup.last_restore_drill.at).toLocaleString()
+          : "No restore drill yet"}{" "}
+        · {d.backup.note}
+      </p>
+    </div>
+  );
+}
+
+export function SystemHealthCard() {
+  const { user } = useAuth();
+  const [d, setD] = useState(null);
+  const [err, setErr] = useState(null);
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    if (user?.role_name !== "Super Admin") return undefined;
+    let alive = true;
+    api
+      .get("/admin/ops")
+      .then((r) => alive && setD(r.data))
+      .catch((e) => alive && setErr(e?.response?.data?.error?.message || "Unavailable"));
+    const t = setTimeout(() => setTick((x) => x + 1), 30000);
+    return () => {
+      alive = false;
+      clearTimeout(t);
+    };
+  }, [tick, user?.role_name]);
+  if (user?.role_name !== "Super Admin") return null;
+  const isSuper = true;
+  const ack = async (id) => {
+    try {
+      await api.post(`/admin/alerts/${id}/ack`, { note: "Acknowledged from System Health" });
+      setTick((x) => x + 1);
+    } catch (e) {
+      setErr(e?.response?.data?.error?.message || "Could not acknowledge");
+    }
+  };
+  const groups = Object.entries(d?.requests?.by_group || {});
+  const jobs = Object.entries(d?.jobs || {});
+  return (
+    <section className="card p-6" data-testid="system-health-card">
+      <DemoRefresh tick={tick} />
+      <DiskBackups tick={tick} onPruned={() => setTick((x) => x + 1)} />
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start gap-3">
+          <span className="grid h-9 w-9 place-items-center rounded-[10px] bg-warm-100">
+            <Activity className="h-5 w-5" strokeWidth={1.75} />
+          </span>
+          <div>
+            <h3 className="e-caps-blue">System health</h3>
+            <p className="text-sm text-txt-muted">
+              Rolling {Math.round((d?.requests?.window_s || 900) / 60)} min · auto-refresh 30 s ·
+              read-only
+            </p>
+          </div>
+        </div>
+        <Button variant="quiet" onClick={() => setTick((x) => x + 1)} data-testid="ops-refresh">
+          <RefreshCw className="h-4 w-4" />
+          Refresh
+        </Button>
+      </div>
+      {err && (
+        <p className="mt-4 text-sm text-brick" data-testid="ops-error">
+          {err}
+        </p>
+      )}
+      {d && (
+        <>
+          <OpsSummary d={d} groups={groups} />
+          <UniquenessRules rules={d.uniqueness} />
+          <div className="mt-5 grid gap-4 md:grid-cols-2 [&>*]:min-w-0">
+            <OpsJobs d={d} jobs={jobs} />
+            <div data-testid="ops-slow">
+              <p className="label flex items-center gap-1">
+                <Database className="h-3.5 w-3.5" />
+                Slow requests (&gt; 500 ms) · errors{" "}
+                {Object.entries(d.requests.errors_by_code)
+                  .map(([c, n]) => `${c}×${n}`)
+                  .join(" ") || "none"}
+              </p>
+              <ul className="mt-2 space-y-1 text-xs">
+                {d.requests.slow.slice(0, 8).map((s) => (
+                  <li key={s.request_id} className="flex justify-between gap-2 font-mono">
+                    <span className="truncate" title="record ids hidden">
+                      {pathLabel(s.path)}
+                    </span>
+                    <span className="shrink-0 text-txt-muted">
+                      {ms(s.ms)} · {s.status} · {s.request_id}
+                    </span>
+                  </li>
+                ))}
+                {!d.requests.slow.length && <li className="text-txt-muted">None.</li>}
+              </ul>
+            </div>
+            {d.alerts && (
+              <div data-testid="ops-alerts">
+                <p className="label">
+                  Alerts{" "}
+                  {d.alerts.firing?.length ? (
+                    <span className="ml-1 rounded-full bg-brick/10 px-2 py-0.5 text-xs font-semibold text-brick">
+                      {d.alerts.firing.length} firing
+                    </span>
+                  ) : (
+                    <span className="ml-1 rounded-full bg-sage/10 px-2 py-0.5 text-xs font-semibold text-sage">
+                      all clear
+                    </span>
+                  )}
+                </p>
+                <ul className="mt-2 space-y-1 text-sm">
+                  {(d.alerts.firing || []).map((a) => (
+                    <li
+                      key={a.id}
+                      className="flex min-w-0 flex-wrap justify-between gap-2"
+                      data-testid={`ops-alert-${a.id}`}
+                    >
+                      <span className="min-w-0 break-words [overflow-wrap:anywhere]">
+                        {a.message}
+                      </span>
+                      <span className="text-xs uppercase text-txt-muted">{a.severity}</span>
+                      {isSuper && (
+                        <button
+                          type="button"
+                          className="text-xs text-gold underline"
+                          data-testid={`ops-alert-ack-${a.id}`}
+                          onClick={() => ack(a.id)}
+                        >
+                          Acknowledge
+                        </button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-2 text-xs text-txt-muted">
+                  Rules: backend/ops/alerts.yaml · evaluated{" "}
+                  {d.alerts.evaluated_at
+                    ? new Date(d.alerts.evaluated_at).toLocaleTimeString()
+                    : "not yet"}
+                  {d.load_shed
+                    ? ` · shed ${d.load_shed.shed_total} · in-flight ${d.load_shed.inflight}/${d.load_shed.cap}`
+                    : ""}
+                </p>
+              </div>
+            )}
+            <OpsBackup b={d.backup} />
+            {Array.isArray(d.storage) && (
+              <div data-testid="ops-storage">
+                <p className="label">Storage by project (files pipeline)</p>
+                {d.storage.length === 0 ? (
+                  <p className="mt-2 text-sm text-txt-muted">No files uploaded yet</p>
+                ) : (
+                  <ul className="mt-2 space-y-1 text-sm">
+                    {d.storage.slice(0, 8).map((s) => (
+                      <li
+                        key={s.project_id || "none"}
+                        className="flex justify-between"
+                        data-testid={`ops-storage-${s.project_id || "none"}`}
+                      >
+                        <span className="truncate">{s.project}</span>
+                        <span className="tabular-nums text-txt-muted">
+                          {s.files} files · {(s.bytes / 1048576).toFixed(1)} MB
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+
+// screen words, not raw ids: "/api/blocks/<id>/construction/stage" → "blocks › construction › stage"
+function pathLabel(p) {
+  return (p || "")
+    .replace(/^\/api\//, "")
+    .replace(/\/[0-9a-f]{8}-[0-9a-f-]{27}/gi, "")
+    .split("/")
+    .filter(Boolean)
+    .join(" › ")
+    .replace(/[-_]/g, " ");
+}

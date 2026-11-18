@@ -1,0 +1,42 @@
+{
+ "vus": 3,
+ "duration_s": 31,
+ "requests": 15,
+ "rps": 0.5,
+ "stopped": null,
+ "errors": {
+  "422": 3
+ },
+ "assertions": {
+  "lead_created:ok": 3,
+  "lead_converted:ok": 3,
+  "integrity_ok_after_stage:ok": 1
+ },
+ "failed_assertions": [],
+ "groups": {
+  "breakdown": {
+   "n": 3,
+   "p50": 10.3,
+   "p95": 27.3,
+   "p99": 27.3
+  },
+  "customers": {
+   "n": 3,
+   "p50": 20.8,
+   "p95": 22.4,
+   "p99": 22.4
+  },
+  "leads": {
+   "n": 6,
+   "p50": 41.3,
+   "p95": 49.1,
+   "p99": 49.1
+  },
+  "login": {
+   "n": 3,
+   "p50": 237.2,
+   "p95": 239.4,
+   "p99": 239.4
+  }
+ }
+}

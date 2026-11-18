@@ -1,0 +1,54 @@
+(trapped) error reading bcrypt version
+Traceback (most recent call last):
+  File "/root/.venv/lib/python3.11/site-packages/passlib/handlers/bcrypt.py", line 620, in _load_backend_mixin
+    version = _bcrypt.__about__.__version__
+              ^^^^^^^^^^^^^^^^^
+AttributeError: module 'bcrypt' has no attribute '__about__'
+index audit_logs.id skipped: An existing index has the same name as the requested index. When index names are not specified, they are auto generated 
+[startup] indexes ensured in 0.10s
+UoW mode: ordered-writes+compensation
+KKT backend serving after 0.12s (uow=ordered-writes+compensation); background startup tasks running
+[startup] another replica holds the startup lease; skipping migrations here
+Object storage initialized
+{"request_id": "00be233a5c1f4114", "method": "GET", "path": "/api/health", "status": 200, "duration_ms": 2.3, "user_id": null}
+{"request_id": "e7cf0ff8d4134fe1", "method": "POST", "path": "/api/auth/login", "status": 200, "duration_ms": 215.5, "user_id": null}
+{"request_id": "11392f49f62a4723", "method": "POST", "path": "/api/admin/hard-purge", "status": 200, "duration_ms": 64.3, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "c45fe65a43aa46d7", "method": "POST", "path": "/api/auth/login", "status": 200, "duration_ms": 212.4, "user_id": null}
+{"request_id": "ce3f2d0f89ab4a19", "method": "GET", "path": "/api/bookings", "status": 200, "duration_ms": 20.7, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "1628c3262caa4add", "method": "GET", "path": "/api/bookings/311b342d-970f-40f3-88fd-3632c798f8f8", "status": 200, "duration_ms": 10.3, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "095690bf4d304b20", "method": "GET", "path": "/api/bookings/311b342d-970f-40f3-88fd-3632c798f8f8/statement.pdf", "status": 200, "duration_ms": 247.7, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "40b4d9d9a4694d40", "method": "GET", "path": "/api/bookings/311b342d-970f-40f3-88fd-3632c798f8f8/allotment.pdf", "status": 200, "duration_ms": 73.0, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "5372eda9fa0944c8", "method": "GET", "path": "/api/payments/25b9dcba-9159-4d03-8116-989793ce953a/receipt.pdf", "status": 200, "duration_ms": 32.0, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "08f283f8c5884a45", "method": "GET", "path": "/api/bookings/311b342d-970f-40f3-88fd-3632c798f8f8/demands/c0561207-8c53-45ab-a4f5-dc75a936b4ec/letter.pdf", "status": 200, "duration_ms": 25.7, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "a8edc09e382b442b", "method": "GET", "path": "/api/reports", "status": 200, "duration_ms": 3.4, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "8a2de7ca956041fd", "method": "GET", "path": "/api/reports/collections-v2", "status": 200, "duration_ms": 70.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "0db4ef5075484ce6", "method": "GET", "path": "/api/reports/outstanding-v2", "status": 200, "duration_ms": 31.9, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "dd1ebe7d77404b21", "method": "GET", "path": "/api/reports/demand-vs-collection", "status": 200, "duration_ms": 26.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "26d4324d3291493d", "method": "GET", "path": "/api/reports/cash-vs-account", "status": 200, "duration_ms": 14.4, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "eb7181b580e24b0e", "method": "GET", "path": "/api/reports/cheques", "status": 200, "duration_ms": 49.2, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "1692dfa0f4b046f5", "method": "GET", "path": "/api/reports/receivables-forecast", "status": 200, "duration_ms": 50.9, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "06a80e6eed32412f", "method": "GET", "path": "/api/reports/cancellations", "status": 200, "duration_ms": 6.2, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "2673f44b6e3d4451", "method": "GET", "path": "/api/reports/bank-receipts", "status": 200, "duration_ms": 13.4, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "d00b571bcff247f4", "method": "GET", "path": "/api/reports/other-charges", "status": 200, "duration_ms": 15.5, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "c0f7f4d546ce4fea", "method": "GET", "path": "/api/reports/roznamcha-summary", "status": 200, "duration_ms": 24.2, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "366ccca7255c41e5", "method": "GET", "path": "/api/reports/collections", "status": 200, "duration_ms": 69.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "e4259e2e4f2641f0", "method": "GET", "path": "/api/reports/outstanding", "status": 200, "duration_ms": 31.4, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "edf7591b64ad43e8", "method": "GET", "path": "/api/reports/advances", "status": 200, "duration_ms": 7.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "80b83d4a412241fc", "method": "GET", "path": "/api/reports/roznamcha-range", "status": 200, "duration_ms": 18.3, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "b20388dbf2b543ee", "method": "GET", "path": "/api/reports/upcoming-dues", "status": 200, "duration_ms": 45.4, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "aced3652363c4a6a", "method": "GET", "path": "/api/reports/inventory", "status": 200, "duration_ms": 20.4, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "1a9bcce9fb754ebd", "method": "GET", "path": "/api/reports/sales-leads", "status": 200, "duration_ms": 17.9, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "2eb57e60b0694a26", "method": "GET", "path": "/api/reports/site-visits", "status": 200, "duration_ms": 9.2, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "e805d30341ec4405", "method": "GET", "path": "/api/reports/sales-team", "status": 200, "duration_ms": 44.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "e905512189f04c65", "method": "GET", "path": "/api/reports/discount-register", "status": 200, "duration_ms": 11.5, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "eeb4a705cf1a42e6", "method": "GET", "path": "/api/reports/waiver-register", "status": 200, "duration_ms": 4.7, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "0a0b18df77f7405e", "method": "GET", "path": "/api/reports/inventory-control", "status": 200, "duration_ms": 8.7, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "cb8091b1ce2545b3", "method": "GET", "path": "/api/reports/landowner-share", "status": 200, "duration_ms": 8.1, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "395fa73d9cca4e99", "method": "GET", "path": "/api/reports/hold-register", "status": 200, "duration_ms": 46.0, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "47119520c4ca4ab1", "method": "GET", "path": "/api/reports/masked-inventory", "status": 200, "duration_ms": 9.0, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "588ea9fbc2a44b71", "method": "GET", "path": "/api/reports/construction-vs-plan", "status": 200, "duration_ms": 25.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "68c673bff63b48bb", "method": "GET", "path": "/api/reports/project-statement", "status": 200, "duration_ms": 2.9, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "21c9fb38fb104310", "method": "GET", "path": "/api/reports/construction-progress", "status": 200, "duration_ms": 9.1, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "1941515f0c744962", "method": "GET", "path": "/api/reports/service-sla", "status": 200, "duration_ms": 5.2, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "3cb9a48d98e347a4", "method": "GET", "path": "/api/reports/activity", "status": 200, "duration_ms": 272.3, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "e3bc33bc8da44c85", "method": "GET", "path": "/api/reports/data-quality", "status": 200, "duration_ms": 33.1, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}

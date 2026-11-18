@@ -1,0 +1,6 @@
+test_index_audit: 41 passed in 0.08s
+test_hardening: 6 passed, 3 errors in 3.21s
+test_erp_leak_scan: 1 passed in 0.49s
+test_permission_matrix: 7 passed, 2 warnings in 3.51s
+test_fuzz_walker: 2 passed in 147.10s (0:02:27)
+DONE

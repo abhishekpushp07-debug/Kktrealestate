@@ -1,0 +1,30 @@
+{
+ "stages": [
+  {
+   "vus": 50,
+   "assertions": {
+    "lead_created:ok": 102,
+    "lead_converted:ok": 102,
+    "booking_created:ok": 100,
+    "booking_total_matches_preview:ok": 100,
+    "payment_posted:ok": 85,
+    "c360_shows_booking:ok": 77,
+    "ledger_received_equals_payment:ok": 77,
+    "ledger_bill_raised_positive:ok": 77,
+    "inventory_flat_booked:ok": 75,
+    "receipt_pdf:ok": 75,
+    "demand_register:ok": 62,
+    "project_statement:ok": 62,
+    "stage_demands_equal_active_bookings:FAIL": 1,
+    "documents_register:ok": 1,
+    "integrity_ok_after_stage:ok": 1
+   },
+   "failed_assertions": [
+    {
+     "assertion": "stage_demands_equal_active_bookings",
+     "detail": "20 vs 22"
+    }
+   ]
+  }
+ ]
+}

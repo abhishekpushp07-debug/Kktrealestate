@@ -1,0 +1,246 @@
+[
+ {
+  "theme": "light",
+  "width": 1440,
+  "screen": "home",
+  "h_overflow_px": 0,
+  "data_theme": "light"
+ },
+ {
+  "theme": "light",
+  "width": 1440,
+  "screen": "booking",
+  "h_overflow_px": 0,
+  "data_theme": "light"
+ },
+ {
+  "theme": "light",
+  "width": 1440,
+  "screen": "customer360",
+  "h_overflow_px": 0,
+  "data_theme": "light"
+ },
+ {
+  "theme": "light",
+  "width": 1440,
+  "screen": "bills-raised",
+  "h_overflow_px": 0,
+  "data_theme": "light"
+ },
+ {
+  "theme": "light",
+  "width": 1440,
+  "screen": "roznamcha",
+  "h_overflow_px": 0,
+  "data_theme": "light"
+ },
+ {
+  "theme": "light",
+  "width": 1440,
+  "screen": "reports",
+  "h_overflow_px": 0,
+  "data_theme": "light"
+ },
+ {
+  "theme": "light",
+  "width": 1440,
+  "screen": "masters",
+  "h_overflow_px": 0,
+  "data_theme": "light"
+ },
+ {
+  "theme": "light",
+  "search": "Rah",
+  "shown_ms": "195",
+  "wall_ms": 216
+ },
+ {
+  "theme": "light",
+  "search": "A-1",
+  "shown_ms": "198",
+  "wall_ms": 219
+ },
+ {
+  "theme": "light",
+  "search": "BK",
+  "shown_ms": "193",
+  "wall_ms": 210
+ },
+ {
+  "theme": "light",
+  "search": "zzqx",
+  "shown_ms": "194",
+  "wall_ms": 211
+ },
+ {
+  "theme": "light",
+  "width": 390,
+  "screen": "home",
+  "h_overflow_px": 0,
+  "data_theme": "light"
+ },
+ {
+  "theme": "light",
+  "width": 390,
+  "screen": "booking",
+  "h_overflow_px": 0,
+  "data_theme": "light"
+ },
+ {
+  "theme": "light",
+  "width": 390,
+  "screen": "customer360",
+  "h_overflow_px": 0,
+  "data_theme": "light"
+ },
+ {
+  "theme": "light",
+  "width": 390,
+  "screen": "bills-raised",
+  "h_overflow_px": 0,
+  "data_theme": "light"
+ },
+ {
+  "theme": "light",
+  "width": 390,
+  "screen": "roznamcha",
+  "h_overflow_px": 0,
+  "data_theme": "light"
+ },
+ {
+  "theme": "light",
+  "width": 390,
+  "screen": "reports",
+  "h_overflow_px": 0,
+  "data_theme": "light"
+ },
+ {
+  "theme": "light",
+  "width": 390,
+  "screen": "masters",
+  "h_overflow_px": 0,
+  "data_theme": "light"
+ },
+ {
+  "theme": "night",
+  "width": 1440,
+  "screen": "home",
+  "h_overflow_px": 0,
+  "data_theme": "night"
+ },
+ {
+  "theme": "night",
+  "width": 1440,
+  "screen": "booking",
+  "h_overflow_px": 0,
+  "data_theme": "night"
+ },
+ {
+  "theme": "night",
+  "width": 1440,
+  "screen": "customer360",
+  "h_overflow_px": 0,
+  "data_theme": "night"
+ },
+ {
+  "theme": "night",
+  "width": 1440,
+  "screen": "bills-raised",
+  "h_overflow_px": 0,
+  "data_theme": "night"
+ },
+ {
+  "theme": "night",
+  "width": 1440,
+  "screen": "roznamcha",
+  "h_overflow_px": 0,
+  "data_theme": "night"
+ },
+ {
+  "theme": "night",
+  "width": 1440,
+  "screen": "reports",
+  "h_overflow_px": 0,
+  "data_theme": "night"
+ },
+ {
+  "theme": "night",
+  "width": 1440,
+  "screen": "masters",
+  "h_overflow_px": 0,
+  "data_theme": "night"
+ },
+ {
+  "theme": "night",
+  "search": "Rah",
+  "shown_ms": "194",
+  "wall_ms": 222
+ },
+ {
+  "theme": "night",
+  "search": "A-1",
+  "shown_ms": "203",
+  "wall_ms": 227
+ },
+ {
+  "theme": "night",
+  "search": "BK",
+  "shown_ms": "194",
+  "wall_ms": 211
+ },
+ {
+  "theme": "night",
+  "search": "zzqx",
+  "shown_ms": "192",
+  "wall_ms": 218
+ },
+ {
+  "theme": "night",
+  "width": 390,
+  "screen": "home",
+  "h_overflow_px": 0,
+  "data_theme": "night"
+ },
+ {
+  "theme": "night",
+  "width": 390,
+  "screen": "booking",
+  "h_overflow_px": 0,
+  "data_theme": "night"
+ },
+ {
+  "theme": "night",
+  "width": 390,
+  "screen": "customer360",
+  "h_overflow_px": 0,
+  "data_theme": "night"
+ },
+ {
+  "theme": "night",
+  "width": 390,
+  "screen": "bills-raised",
+  "h_overflow_px": 0,
+  "data_theme": "night"
+ },
+ {
+  "theme": "night",
+  "width": 390,
+  "screen": "roznamcha",
+  "h_overflow_px": 0,
+  "data_theme": "night"
+ },
+ {
+  "theme": "night",
+  "width": 390,
+  "screen": "reports",
+  "h_overflow_px": 0,
+  "data_theme": "night"
+ },
+ {
+  "theme": "night",
+  "width": 390,
+  "screen": "masters",
+  "h_overflow_px": 0,
+  "data_theme": "night"
+ }
+]

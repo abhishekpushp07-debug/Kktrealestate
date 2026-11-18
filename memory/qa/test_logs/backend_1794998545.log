@@ -1,0 +1,48 @@
+(trapped) error reading bcrypt version
+Traceback (most recent call last):
+  File "/root/.venv/lib/python3.11/site-packages/passlib/handlers/bcrypt.py", line 620, in _load_backend_mixin
+    version = _bcrypt.__about__.__version__
+              ^^^^^^^^^^^^^^^^^
+AttributeError: module 'bcrypt' has no attribute '__about__'
+index audit_logs.id skipped: An existing index has the same name as the requested index. When index names are not specified, they are auto generated 
+[startup] indexes ensured in 0.10s
+UoW mode: ordered-writes+compensation
+KKT backend serving after 0.12s (uow=ordered-writes+compensation); background startup tasks running
+Object storage initialized
+[startup] system_roles ok in 0.15s
+[startup] owner_bootstrap ok in 0.00s
+[startup] seed_phase7 ok in 0.00s
+{"request_id": "bffe230699d74f36", "method": "GET", "path": "/api/health", "status": 200, "duration_ms": 2.3, "user_id": null}
+{"request_id": "6a1e178f91684ef9", "method": "POST", "path": "/api/auth/login", "status": 200, "duration_ms": 215.1, "user_id": null}
+{"request_id": "ac62ab222dcb41b8", "method": "POST", "path": "/api/admin/hard-purge", "status": 200, "duration_ms": 71.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+[phase7] integrity: ok=True bookings=79 counts={}
+[startup] integrity_report ok in 0.65s
+{"request_id": "e2c3a14205f04918", "method": "POST", "path": "/api/auth/login", "status": 200, "duration_ms": 277.0, "user_id": null}
+{"request_id": "bed1c69c7a8f41f2", "method": "POST", "path": "/api/admin/ops/after-commit/drain", "status": 200, "duration_ms": 2.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "dde78f816c8947d3", "method": "POST", "path": "/api/admin/ops/after-commit/drain", "status": 200, "duration_ms": 2.1, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+[startup] inventory_masters ok in 0.02s
+{"request_id": "27302a940d8340ad", "method": "POST", "path": "/api/admin/ops/after-commit/drain", "status": 200, "duration_ms": 2.4, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+[startup] seed_s1_templates ok in 0.00s
+[startup] migrate_s1_templates ok in 0.00s
+{"request_id": "29b13df1bfd9403e", "method": "GET", "path": "/api/projects", "status": 200, "duration_ms": 217.5, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "7e7d4615dd684aae", "method": "GET", "path": "/api/master/block-types", "status": 200, "duration_ms": 6.9, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "fb6c399826f244ed", "method": "GET", "path": "/api/master/flat-types", "status": 200, "duration_ms": 8.2, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+[startup] pricing_ps ok in 0.03s
+[startup] schema_validators ok in 0.01s
+[startup] price_paise_backfill ok in 0.00s
+[startup] background tasks complete in 2.4s: {'seed_if_empty': 'skipped (watermark)', 'seed_phase15': 'skipped (watermark)', 'seed_phase3': 'skipped (watermark)', 'system_roles': 0.15, 'seed_marketing_user': 'skipped (watermark)', 'owner_bootstrap': 0.0, 'migrate_phase7': 'skipped (watermark)', 'seed_phase7': 0.0, 'backfill_demand_installments': 'skipped (watermark)', 'migrate_phase_g': 'skipped (watermark)', 'sweep_notifications': 'skipped (watermark)', 'integrity_report': 0.65, 'inventory_masters': 0.02, 'counters': 'skipped (watermark)', 'seed_s1_templates': 0.0, 'migrate_s1_templates': 0.0, 'reconcile': 'skipped (watermark)', 'startup_phase11': 'skipped (watermark)', 'pricing_ps': 0.03, 'schema_validators': 0.01, 'price_paise_backfill': 0.0, 'backfill_paid_parts': 'skipped (watermark)'}
+{"request_id": "68020c5950924e66", "method": "POST", "path": "/api/blocks", "status": 201, "duration_ms": 319.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "75d16d2a6a6b4bf0", "method": "GET", "path": "/api/master/payment-plans", "status": 200, "duration_ms": 8.7, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "7a8254a3a0374c4c", "method": "POST", "path": "/api/payment-plan-assignments", "status": 201, "duration_ms": 25.7, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "ee1b40b2b39b485a", "method": "GET", "path": "/api/flats", "status": 200, "duration_ms": 7.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "d38774b821b94e4d", "method": "PATCH", "path": "/api/flats/a41d8365-1ae1-4551-8c05-b631916ea4fe/pricing", "status": 200, "duration_ms": 22.7, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "96ec85ee67b148c5", "method": "GET", "path": "/api/flats/a41d8365-1ae1-4551-8c05-b631916ea4fe", "status": 200, "duration_ms": 9.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "6ff9d92b0bef4b42", "method": "POST", "path": "/api/customers", "status": 201, "duration_ms": 33.2, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "e576c31fc81845b0", "method": "GET", "path": "/api/projects/8e4ef80c-0ce8-4fe6-8c46-7b552afe0d8a/blocks/c85cfe6e-75f8-4e6b-b029-9ba4a4f5e895/payment-plans", "status": 200, "duration_ms": 4.7, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+raw access to ledger_entries: ledger projection rebuild
+raw access to ledger_entries: ledger projection rebuild
+{"request_id": "7fe613161ca84ce0", "method": "POST", "path": "/api/bookings", "status": 201, "duration_ms": 130.9, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+raw access to ledger_entries: ledger projection rebuild
+{"request_id": "4de4414476ea4871", "method": "POST", "path": "/api/waivers", "status": 201, "duration_ms": 46.3, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "f70e49d4fb1042a5", "method": "POST", "path": "/api/waivers/3a6bd002-918a-44df-ab02-8d65235a564d/approve", "status": 409, "duration_ms": 6.9, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "616ac963b5904793", "method": "POST", "path": "/api/waivers/3a6bd002-918a-44df-ab02-8d65235a564d/approve", "status": 409, "duration_ms": 11.0, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}

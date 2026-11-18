@@ -1,0 +1,127 @@
+/* KKT Elite — the ONE token set (REQ-170…174). Every screen, the UI kit, charts and Tailwind colours read these.
+   Theme lives on <html data-theme="night|day"> (set before first paint by public/index.html). Night is the default. */
+:root,
+:root[data-theme="night"] {
+  color-scheme: dark;
+  --accent: #5b8cff; /* sapphire: interaction, progress, rings (text-safe on graphite) */
+  --accent-2: #7aa6ff;
+  --accent-strong: #3d7bff;
+  --accent-soft: color-mix(in srgb, #3d7bff 14%, #0c1018);
+  --accent-line: color-mix(in srgb, #7aa6ff 32%, #0c1018);
+  --accent-fg: #05070c;
+  --champagne: #d4b477; /* premium moments only */
+  --silver: #c9d0dc;
+
+  --canvas: #05070c;
+  --canvas-glow: radial-gradient(900px 500px at 100% -10%, rgb(61 123 255 / 0.13), transparent 60%);
+  --surface: #0c1018;
+  --surface-2: #111724;
+  --line: #1a202b;
+  --line-strong: #252c39;
+  --sidebar: #05070c;
+
+  --text-1: #eef1f6;
+  --text-2: #b9c1d1;
+  --text-3: #8a93a6;
+  --ink-2: #dfe4ec;
+  --ink-3: #c3cad8;
+  --ink-4: #aab3c4;
+
+  --due: #ff7a59;
+  --due-soft: color-mix(in srgb, #ff7a59 12%, #0c1018);
+  --advance: #5ed3a2;
+  --advance-soft: color-mix(in srgb, #5ed3a2 12%, #0c1018);
+  --warn: #ff8a4c; /* orange spaced caps: OVERDUE N DAYS */
+  --warn-soft: color-mix(in srgb, #ff8a4c 12%, #0c1018);
+  --info: #7aa6ff;
+  --info-soft: color-mix(in srgb, #3d7bff 10%, #0c1018);
+
+  --primary-bg: #f3f5f9;
+  --primary-fg: #05070c;
+  --overlay: rgb(0 0 0 / 0.65);
+  --shadow-1: 0 1px 2px rgb(0 0 0 / 0.3);
+  --shadow-2: 0 1px 2px rgb(0 0 0 / 0.3), 0 12px 32px -14px rgb(0 0 0 / 0.7);
+  --chart-1: var(--accent);
+  --chart-2: var(--accent-2);
+  --chart-3: var(--advance);
+  --chart-4: var(--due);
+  --chart-5: #5f6880;
+  --chart-grid: var(--line);
+  --chart-axis: var(--text-3);
+}
+
+:root[data-theme="day"],
+:root[data-theme="light"] {
+  color-scheme: light;
+  --accent: #2f63e0;
+  --accent-2: #3d7bff;
+  --accent-strong: #2452c4;
+  --accent-soft: #eef3fe;
+  --accent-line: #c9d8fb;
+  --accent-fg: #ffffff;
+  --champagne: #a8823f;
+  --silver: #4b5563;
+
+  --canvas: #ffffff;
+  --canvas-glow: none;
+  --surface: #ffffff;
+  --surface-2: #f6f7f9;
+  --line: #ececef;
+  --line-strong: #e2e4e9;
+  --sidebar: #ffffff;
+
+  --text-1: #0b0f17;
+  --text-2: #374151;
+  --text-3: #5f6673;
+  --ink-2: #1f2937;
+  --ink-3: #374151;
+  --ink-4: #4b5563;
+
+  --due: #bf3a1f;
+  --due-soft: #fdf3f0;
+  --advance: #0f7550;
+  --advance-soft: #e6f5ee;
+  --warn: #a24c12;
+  --warn-soft: #fdf5ee;
+  --info: #2f5bd3;
+  --info-soft: #eef3fe;
+
+  --primary-bg: #0b0f17;
+  --primary-fg: #ffffff;
+  --overlay: rgb(11 15 23 / 0.45);
+  --shadow-1: 0 1px 2px rgb(16 24 40 / 0.04);
+  --shadow-2: 0 1px 2px rgb(16 24 40 / 0.04), 0 8px 24px rgb(16 24 40 / 0.06);
+  --chart-1: var(--accent);
+  --chart-2: var(--accent-2);
+  --chart-3: var(--advance);
+  --chart-4: var(--due);
+  --chart-5: #8a919d;
+  --chart-grid: var(--line);
+  --chart-axis: var(--text-3);
+}
+
+/* Elite surfaces stay dark in Day (REQ-173) */
+.elite-dark {
+  --surface: #0c1018;
+  --surface-2: #111724;
+  --line: rgb(255 255 255 / 0.07);
+  --line-strong: rgb(255 255 255 / 0.12);
+  --text-1: #eef1f6;
+  --text-2: #b9c1d1;
+  --text-3: #8a93a6;
+  --ink-2: #dfe4ec;
+  --due: #ff7a59;
+  --advance: #5ed3a2;
+  --warn: #ff8a4c;
+  --accent: #3d7bff;
+  --accent-2: #7aa6ff;
+  --champagne: #d4b477;
+  --primary-bg: #f3f5f9;
+  --primary-fg: #05070c;
+  color: #eef1f6;
+}
+
+html {
+  background: var(--canvas);
+  color: var(--text-1);
+}

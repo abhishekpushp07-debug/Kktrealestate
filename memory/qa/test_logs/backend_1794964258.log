@@ -1,0 +1,31 @@
+(trapped) error reading bcrypt version
+Traceback (most recent call last):
+  File "/root/.venv/lib/python3.11/site-packages/passlib/handlers/bcrypt.py", line 620, in _load_backend_mixin
+    version = _bcrypt.__about__.__version__
+              ^^^^^^^^^^^^^^^^^
+AttributeError: module 'bcrypt' has no attribute '__about__'
+index audit_logs.id skipped: An existing index has the same name as the requested index. When index names are not specified, they are auto generated 
+[startup] indexes ensured in 0.09s
+UoW mode: ordered-writes+compensation
+KKT backend serving after 0.10s (uow=ordered-writes+compensation); background startup tasks running
+Object storage initialized
+[startup] system_roles ok in 0.12s
+{"request_id": "92492662f07641bc", "method": "GET", "path": "/api/health", "status": 200, "duration_ms": 1.9, "user_id": null}
+[startup] owner_bootstrap ok in 0.20s
+[startup] seed_phase7 ok in 0.00s
+{"request_id": "a08d7c5fbcc54d84", "method": "POST", "path": "/api/auth/login", "status": 200, "duration_ms": 316.1, "user_id": null}
+{"request_id": "f73cebf95d4248e5", "method": "POST", "path": "/api/admin/hard-purge", "status": 200, "duration_ms": 130.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+[phase7] integrity: ok=True bookings=79 counts={}
+[startup] integrity_report ok in 0.18s
+[startup] inventory_masters ok in 0.01s
+[startup] seed_s1_templates ok in 0.00s
+[startup] migrate_s1_templates ok in 0.00s
+[startup] pricing_ps ok in 0.01s
+[startup] schema_validators ok in 0.01s
+[startup] price_paise_backfill ok in 0.00s
+{"request_id": "287ee338e6954ef6", "method": "POST", "path": "/api/auth/login", "status": 200, "duration_ms": 282.4, "user_id": null}
+[startup] background tasks complete in 1.6s: {'seed_if_empty': 'skipped (watermark)', 'seed_phase15': 'skipped (watermark)', 'seed_phase3': 'skipped (watermark)', 'system_roles': 0.12, 'seed_marketing_user': 'skipped (watermark)', 'owner_bootstrap': 0.2, 'migrate_phase7': 'skipped (watermark)', 'seed_phase7': 0.0, 'backfill_demand_installments': 'skipped (watermark)', 'migrate_phase_g': 'skipped (watermark)', 'sweep_notifications': 'skipped (watermark)', 'integrity_report': 0.18, 'inventory_masters': 0.01, 'counters': 'skipped (watermark)', 'seed_s1_templates': 0.0, 'migrate_s1_templates': 0.0, 'reconcile': 'skipped (watermark)', 'startup_phase11': 'skipped (watermark)', 'pricing_ps': 0.01, 'schema_validators': 0.01, 'price_paise_backfill': 0.0, 'backfill_paid_parts': 'skipped (watermark)'}
+{"request_id": "38c2edb7c65242c9", "method": "POST", "path": "/api/projects", "status": 201, "duration_ms": 16.2, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "550402310cf34a4c", "method": "GET", "path": "/api/health", "status": 200, "duration_ms": 1.0, "user_id": null}
+{"request_id": "72358a6df5264af6", "method": "PATCH", "path": "/api/cms/projects/d45a0968-43c2-4b33-a3c0-4631a8a77887/website", "status": 200, "duration_ms": 8.2, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "63d8be46cc054f31", "method": "GET", "path": "/api/public/site-visits/availability", "status": 200, "duration_ms": 2.7, "user_id": null}

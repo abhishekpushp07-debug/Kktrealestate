@@ -1,0 +1,14 @@
+19:17:12 cg=1475MB top=mongod:758MB python:130MB MainThread:117MB 
+19:17:22 cg=2171MB top=mongod:1300MB python:130MB MainThread:117MB 
+19:17:32 cg=2711MB top=mongod:1458MB python:130MB python:128MB 
+19:17:42 cg=2793MB top=mongod:1448MB python:162MB python:146MB 
+19:17:52 cg=2790MB top=mongod:1448MB python:158MB python:146MB 
+19:18:02 cg=2797MB top=mongod:1450MB python:161MB python:146MB 
+19:18:12 cg=4927MB top=python:2193MB mongod:1501MB python:150MB 
+19:18:22 cg=7539MB top=python:4690MB mongod:1501MB python:150MB 
+19:18:32 cg=3006MB top=mongod:1559MB python:198MB python:188MB 
+19:18:42 cg=2931MB top=mongod:1507MB python:209MB python:151MB 
+19:18:52 cg=2936MB top=mongod:1507MB python:201MB python:154MB 
+19:19:02 cg=2934MB top=mongod:1506MB python:201MB python:153MB 
+19:19:12 cg=3159MB top=mongod:1508MB python:196MB python:153MB 
+19:19:22 cg=2896MB top=mongod:1509MB python:199MB python:153MB 

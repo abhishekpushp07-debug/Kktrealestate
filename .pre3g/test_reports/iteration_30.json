@@ -1,0 +1,36 @@
+{
+  "summary": "Fix-round-2 check (F1/F2) on preview. Backend: 9/9 public-URL pytest pass (/app/tests/f2_public). Without an expiry, Hold is refused with 422 'Hold expiry is required (date and time, no default)' on all four paths: PATCH /flats/{id}/status, POST /blocks/{id}/bulk-status, POST /inventory/bulk action=hold and POST /bookings/{id}/transfer old_flat_status=Hold. Nothing changes on the refusal (same flat version, booking stays on its flat). With a future expiry, flat PATCH and bulk-status put the flats on Hold with hold.expires_at set. Releasing to Available clears hold. A past expiry gets 422. GET /admin/reseed/status returns 200 {status:idle}. Unit file tests/test_hold_expiry_everywhere.py -n 0 passed 4/4, including the transfer-with-expiry path and test_second_reseed_while_one_runs_is_409. FRONTEND BLOCKER FOUND AND FIXED: preview runs PREVIEW_MODE=production, and build/ (built 03:03 UTC) was older than the F2 source edits (03:40 UTC). The served UI had no 'Hold until' input, and Mark Hold sent no expires_at. I rebuilt with `node scripts/dev.js --build-only`; express serves the new build with no restart. After the rebuild: the flat drawer shows the 'Hold until' datetime input and Mark Hold stays disabled until a date is set. With a date, P1 goes to Hold and the header shows 'Hold expires 12/30/2026 6:00 PM'. Mark Available released it. In Transfer, choosing old unit = Hold shows 'Hold until (required)'. Submitting without it shows the toast 'Hold expiry is required' and the booking does not move. Regression: Home due-ageing equals /reports/outstanding and outstanding-v2 exactly (1,445,527,000 / 498,850,100 / 386,609,300 / 679,609,400 / 4,417,403,600 paise; counts 25/10/9/12/70; total ₹7,42,79,994). The 3 story holds (C-204, B-102, B-103) all have expiries and display in the Inventory Hold filter and the drawer.",
+  "backend_issues": {"critical": [], "minor": [
+    {"endpoint": "PATCH /api/flats/{id}/status", "issue": "body.version is accepted but never checked (no optimistic-concurrency guard). Pre-existing, outside F2 scope."}
+  ]},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "FlatDrawer header", "issue": "Right after Mark Hold, the header chip says 'Hold' but 'Real: Available' stays stale until the drawer is reopened. Story holds opened fresh show 'Real: Hold' correctly.", "selector": "[role=dialog] header", "priority": "LOW"}
+    ],
+    "integration_issues": [
+      {"flow": "Preview deploy", "issue": "The production-mode preview serves frontend/build/, which is only rebuilt when missing. F2 frontend edits were not live until I ran `node scripts/dev.js --build-only`. Rebuild after every frontend change, or the tester and root will see a stale UI.", "affected_selectors": ["flat-status-hold-until", "transfer-old-hold-until"]}
+    ],
+    "design_issues": [
+      {"screen": "Flat drawer / Transfer dialog", "issues": ["'Hold until' uses the native <input type=datetime-local> instead of the app's shadcn calendar picker", "Transfer submit is not disabled when old unit = Hold and no date is set (the backend toast catches it). This is inconsistent with the drawer, where Mark Hold is disabled."]}
+    ]
+  },
+  "test_report_links": ["/app/tests/f2_public/test_f2_hold_expiry_public.py", "/app/test_reports/pytest/f2_public.xml", "/app/backend/tests/test_hold_expiry_everywhere.py"],
+  "action_items": [
+    "Keep in mind that the preview build must be rebuilt (node scripts/dev.js --build-only) after frontend edits. I rebuilt it at 04:03 UTC.",
+    "Optional: disable transfer-submit when old_flat_status=Hold and old_flat_hold_until is empty",
+    "Optional: refresh the drawer 'Real:' state after a status change",
+    "Optional: FlatDrawer undo of a Hold to Available move re-sends prev.hold.expires_at, which fails with HOLD_EXPIRY_PAST if that expiry has already passed"
+  ],
+  "critical_code_review_comments": [
+    "hold_doc/_expiry is shared correctly by the flats, blocks and bookings routers. In transfer it is validated before the pending-cheque and UoW checks, so a refusal moves nothing.",
+    "In inventory bulk hold the expiry is validated before the reason check, so a request without expiry and without reason returns the expiry error first. That is acceptable.",
+    "blocks bulk-status hold_doc sets for_user_id to the acting user and reason_id to None. Fine for the owner rule."
+  ],
+  "updated_files": ["/app/frontend/build (rebuilt only, no source change)", "/app/tests/f2_public/test_f2_hold_expiry_public.py (new)"],
+  "success_rate": {"backend": "100% (9/9 public + 4/4 unit)", "frontend": "100% after rebuild (0% before: stale bundle)"},
+  "seed_data_creation": "None. Temporarily held GGV Villa Block P flats P1/P2/P3 and released them all back to Available (verified hold=None). No reseed or demo-refresh was called. No transfer was executed (only the 422 path).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run the public F2 tests with: cd /app/tests/f2_public && python -m pytest test_f2_hold_expiry_public.py -q -c /dev/null (kept outside backend/tests so the heavy conftest snapshot is avoided). The frontend is a production build: check build/index.html mtime against the source mtime before UI testing.",
+  "rca of the issue": "The F2 UI was missing in preview because scripts/dev.js with PREVIEW_MODE=production only builds when build/index.html is missing. Source was edited after the 03:03 build, so the stale bundle had no 'Hold until' input. Mitigation: rebuild with node scripts/dev.js --build-only."
+}

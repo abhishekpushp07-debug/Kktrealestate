@@ -1,0 +1,100 @@
+import { useState } from "react";
+import { Check, ChevronsUpDown, Plus } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+
+export function Combobox({
+  options = [],
+  value,
+  onChange,
+  placeholder = "Select…",
+  testId,
+  disabled,
+  why,
+  className,
+  ariaLabel,
+  onCreateNew,
+  createLabel = "Create new…",
+}) {
+  const [open, setOpen] = useState(false);
+  const selected = options.find((o) => o.value === value);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          role="combobox"
+          why={why}
+          disabled={disabled}
+          data-testid={testId}
+          aria-label={ariaLabel || placeholder}
+          aria-expanded={open}
+          className={cn(
+            "h-9 w-full justify-between font-normal",
+            !selected && "text-muted-foreground",
+            className,
+          )}
+        >
+          <span className="truncate">{selected ? selected.label : placeholder}</span>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+        <Command>
+          <CommandInput
+            placeholder="Search…"
+            data-testid={testId ? `${testId}-search` : undefined}
+          />
+          <CommandList>
+            <CommandEmpty>No results.</CommandEmpty>
+            <CommandGroup>
+              {options.map((o) => (
+                <CommandItem
+                  key={o.value}
+                  value={`${o.label} ${o.sub || ""}`}
+                  data-testid={testId ? `${testId}-option-${o.value}` : undefined}
+                  onSelect={() => {
+                    onChange(o.value === value ? null : o.value);
+                    setOpen(false);
+                  }}
+                >
+                  <Check
+                    className={cn("mr-2 h-4 w-4", value === o.value ? "opacity-100" : "opacity-0")}
+                  />
+                  <span className="flex-1 truncate">{o.label}</span>
+                  {o.sub && <span className="ml-2 text-xs text-muted-foreground">{o.sub}</span>}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+            {onCreateNew && (
+              <CommandGroup>
+                <CommandItem
+                  value="__create_new__"
+                  onSelect={() => {
+                    setOpen(false);
+                    onCreateNew();
+                  }}
+                  data-testid={testId ? `${testId}-create-new` : "combobox-create-new"}
+                  className="font-semibold text-ink-950"
+                >
+                  <Plus className="mr-2 h-4 w-4 text-gold" />
+                  {createLabel}
+                </CommandItem>
+              </CommandGroup>
+            )}
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}

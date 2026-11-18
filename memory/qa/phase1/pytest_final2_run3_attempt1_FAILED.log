@@ -1,0 +1,376 @@
+bringing up nodes...
+bringing up nodes...
+
+........................................................................ [  9%]
+........................................................................ [ 19%]
+........................................................................ [ 28%]
+.................F..s................................................... [ 38%]
+........................................................................ [ 47%]
+........F............................................................... [ 57%]
+..........FF............................................................ [ 66%]
+........................................................................ [ 76%]
+................FF...................................................... [ 86%]
+.........sss........F....................................F...FFs........ [ 95%]
+..............s..................                                        [100%]
+=================================== FAILURES ===================================
+___________ test_demands_honour_block_id_and_planned_date_roundtrip ____________
+[gw1] linux -- Python 3.11.18 /root/.venv/bin/python
+
+    def test_demands_honour_block_id_and_planned_date_roundtrip():
+        h = _h()
+        blocks = requests.get(f"{API}/blocks?page_size=50", headers=h, timeout=30).json()
+        blocks = blocks if isinstance(blocks, list) else blocks["items"]
+        with_dem = next(
+            b
+            for b in blocks
+            if requests.get(
+                f"{API}/payments/demands", headers=h, params={"block_id": b["id"], "page_size": 5}, timeout=30
+            ).json()["items"]
+        )
+        items = requests.get(
+            f"{API}/payments/demands", headers=h, params={"block_id": with_dem["id"], "page_size": 200}, timeout=30
+        ).json()["items"]
+        assert items and all(d["block_id"] == with_dem["id"] for d in items)
+        cons = requests.get(f"{API}/blocks/{with_dem['id']}/construction", headers=h, timeout=30).json()
+        cvp = requests.get(
+            f"{API}/reports/construction-vs-plan", headers=h, params={"block_id": with_dem["id"]}, timeout=60
+        ).json()
+        planned_stage_names = {
+            r["stage"].split(". ", 1)[1].replace(" ← next", "")
+            for r in cvp["rows"]
+            if not r.get("_subtotal") and r["status"] != "Completed" and r["expected_paise"] > 0
+        }
+        pend = next((s for s in cons["stages"] if s["status"] != "Completed" and s["name"] in planned_stage_names), None)
+        if not pend:
+            pytest.skip("no pending stage with a plan row")
+        r = requests.patch(
+            f"{API}/blocks/{with_dem['id']}/construction/stages/{pend['stage_id']}/planned-date",
+            headers=h,
+            json={"planned_date": "2027-03-15"},
+            timeout=30,
+        )
+        assert r.status_code == 200, r.text
+        fc = requests.get(
+            f"{API}/reports/receivables-forecast", headers=h, params={"block_id": with_dem["id"]}, timeout=60
+        ).json()
+        assert fc["group_by"] == "month" and any(row["group"] == "2027-03" for row in fc["rows"])
+        before = requests.get(f"{API}/reports/receivables-forecast", headers=h, timeout=60).json()["totals"]
+        assert before["expected_paise"] + before["raised_paise"] == before["agreement_paise"]  # identity retained
+        done = next((s for s in cons["stages"] if s["status"] == "Completed"), None)
+        if done:
+            assert (
+                requests.patch(
+                    f"{API}/blocks/{with_dem['id']}/construction/stages/{done['stage_id']}/planned-date",
+                    headers=h,
+                    json={"planned_date": "2027-03-15"},
+                    timeout=30,
+                ).status_code
+                == 409
+            )
+        assert (
+            requests.patch(
+                f"{API}/blocks/{with_dem['id']}/construction/stages/{pend['stage_id']}/planned-date",
+                headers=h,
+                json={"planned_date": None},
+                timeout=30,
+            ).status_code
+            == 200
+        )
+        logs = requests.get(f"{API}/audit-logs", headers=h, params={"page_size": 20}, timeout=30).json()
+>       assert any(l.get("action") == "construction.planned_date" for l in logs.get("items", []))
+E       assert False
+E        +  where False = any(<generator object test_demands_honour_block_id_and_planned_date_roundtrip.<locals>.<genexpr> at 0xf92dbc42de00>)
+
+tests/test_phase_i_reports.py:166: AssertionError
+____________________ test_every_module_imports_in_isolation ____________________
+[gw1] linux -- Python 3.11.18 /root/.venv/bin/python
+
+    def test_every_module_imports_in_isolation():
+        mods = [m for m in _modules() if not m.startswith(SCRIPT_ONLY_PREFIX)]
+        with ThreadPoolExecutor(max_workers=6) as ex:
+            results = list(ex.map(_import_in_fresh_interpreter, mods))
+        failed = [(m, err) for m, rc, err in results if rc != 0]
+>       assert not failed, failed
+E       AssertionError: [('e1_tests.test_tscheck_refresh_state', 'Traceback (most recent call last):
+E           File "<string>", line 1, in <module>
+E         ...rge.py", line 1, in <module>
+E             from conftest import block_id
+E         ModuleNotFoundError: No module named \'conftest\'
+E         ')]
+E       assert not [('e1_tests.test_tscheck_refresh_state', 'Traceback (most recent call last):\n  File "<string>", line 1, in <module>\n...rge.py", line 1, in <module>\n    from conftest import block_id\nModuleNotFoundError: No module named \'conftest\'\n')]
+
+tests/test_import_hygiene.py:117: AssertionError
+________________________ test_backend_ruff_format_clean ________________________
+[gw0] linux -- Python 3.11.18 /root/.venv/bin/python
+
+    def test_backend_ruff_format_clean():
+        r = _run([sys.executable, "-m", "ruff", "format", "--check", "."], BACKEND)
+>       assert r.returncode == 0, r.stdout[-2000:]
+E       AssertionError: }), {"_id": 0, "total_demand_paise": 1, "paid_paise": 1}
+E         253 +         definitions.open_demands_match({"booking_id": {"$in": live}}),
+E         254 +         {"_id": 0, "total_demand_paise": 1, "paid_paise": 1},
+E         255 |     ):
+E             |
+E         
+E         unformatted: File would be reformatted
+E           --> tests/test_business_day_guard.py:91:15
+E            |
+E         90 | def test_frontend_guard_catches_a_planted_utc_slice():
+E            -     planted = 'const today = () => new Date().toISOString().slice(0, 10);\n'
+E         91 +     planted = "const today = () => new Date().toISOString().slice(0, 10);\n"
+E         92 |     assert front_scan(FRONT / "pages" / "x.jsx", planted)
+E            |
+E         
+E         unformatted: File would be reformatted
+E           --> tests/test_one_outstanding.py:59:41
+E            |
+E         58 |     c = requests.get(
+E            -         f"{API}/reports/collections-v2", headers=h, params={"from_date": "2025-04-01", "to_date": "2027-03-31"}, timeout=60
+E         59 +         f"{API}/reports/collections-v2",
+E         60 +         headers=h,
+E         61 +         params={"from_date": "2025-04-01", "to_date": "2027-03-31"},
+E         62 +         timeout=60,
+E         63 |     ).json()
+E            |
+E         
+E         unformatted: File would be reformatted
+E           --> tests/test_refresh_keeps_setup.py:13:24
+E            |
+E         12 |
+E            - MASTERISH = re.compile(r"(types|reasons|modes|templates|categories|catalogue|plans|bank_accounts|amenities|^spec_|^cms_)")
+E         13 + MASTERISH = re.compile(
+E         14 +     r"(types|reasons|modes|templates|categories|catalogue|plans|bank_accounts|amenities|^spec_|^cms_)"
+E         15 + )
+E         16 |
+E            |
+E         
+E         unformatted: File would be reformatted
+E            --> tools/story_seed.py:592:13
+E             |
+E         591 |         when = max(when, bk["booked"])
+E             -         log(f"  pay {d2s(when)} {bk['archetype']} {bk['flat']['flat_number']} {category} {amount} {mode} rng={hash(R.getstate()[1]) & 0xFFFF:04x}")
+E         592 +         log(
+E         593 +             f"  pay {d2s(when)} {bk['archetype']} {bk['flat']['flat_number']} {category} {amount} {mode} rng={hash(R.getstate()[1]) & 0xFFFF:04x}"
+E         594 +         )
+E         595 |         if amount <= 0 or when > self.today:
+E             |
+E         
+E         18 files would be reformatted, 282 files already formatted
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/root/.venv/bin/python', '-m', 'ruff', 'format', '--check', '.'], returncode=1, stdout='unform...f amount <= 0 or when > self.today:\n    |\n\n18 files would be reformatted, 282 files already formatted\n', stderr='').returncode
+
+tests/test_format_gate.py:26: AssertionError
+_________________________ test_backend_imports_sorted __________________________
+[gw0] linux -- Python 3.11.18 /root/.venv/bin/python
+
+    def test_backend_imports_sorted():
+        r = _run([sys.executable, "-m", "ruff", "check", "--select", "I", "--output-format", "concise", "."], BACKEND)
+>       assert r.returncode == 0, r.stdout[-2000:]
+E       AssertionError: e1_tests/conftest.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+E         e1_tests/test_tscheck_business_day.py:2:1: I001 [*] Import block is un-sorted or un-formatted
+E         e1_tests/test_tscheck_journey_order.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+E         e1_tests/test_tscheck_next_stage_preview.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+E         e1_tests/test_tscheck_purge.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+E         e1_tests/test_tscheck_refresh_guard.py:3:1: I001 [*] Import block is un-sorted or un-formatted
+E         e1_tests/test_tscheck_split_reversal.py:3:1: I001 [*] Import block is un-sorted or un-formatted
+E         Found 7 errors.
+E         [*] 7 fixable with `--fix`.
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/root/.venv/bin/python', '-m', 'ruff', 'check', '--select', 'I', '--output-format', 'concise',...py:3:1: I001 [*] Import block is un-sorted or un-formatted\nFound 7 errors.\n[*] 7 fixable with `--fix`.\n', stderr='').returncode
+
+tests/test_format_gate.py:31: AssertionError
+_______________ test_ruff_undefined_unused_bugbear_whole_backend _______________
+[gw0] linux -- Python 3.11.18 /root/.venv/bin/python
+
+    def test_ruff_undefined_unused_bugbear_whole_backend():
+        r = _ruff("--select", "F821,F841,F811,B002,B006,B015,B018,B020,B023,B032", ".")
+>       assert r.returncode == 0, r.stdout[-3000:]
+E       AssertionError: e1_tests/test_tscheck_story_coverage.py:32:5: F841 Local variable `bounce` is assigned to but never used
+E         Found 1 error.
+E         1 unsafe fix available with `--fix --unsafe-fixes`.
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/root/.venv/bin/python', '-m', 'ruff', 'check', '--output-format', 'concise', '--select', 'F82...unce` is assigned to but never used\nFound 1 error.\n1 unsafe fix available with `--fix --unsafe-fixes`.\n', stderr='').returncode
+
+tests/test_static_gates.py:45: AssertionError
+______________________ test_ruff_complexity_runtime_code _______________________
+[gw0] linux -- Python 3.11.18 /root/.venv/bin/python
+
+    def test_ruff_complexity_runtime_code():
+        r = _ruff("--select", "C901", "--config", "lint.mccabe.max-complexity=25", *RUNTIME)
+>       assert r.returncode == 0, r.stdout[-3000:]
+E       AssertionError: routers/reports_i.py:58:11: C901 `collections_v2` is too complex (27 > 25)
+E         Found 1 error.
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/root/.venv/bin/python', '-m', 'ruff', 'check', '--output-format', 'concise', '--select', 'C90...de=1, stdout='routers/reports_i.py:58:11: C901 `collections_v2` is too complex (27 > 25)\nFound 1 error.\n', stderr='').returncode
+
+tests/test_static_gates.py:50: AssertionError
+___________________ test_no_legacy_coarse_codes_in_frontend ____________________
+[gw1] linux -- Python 3.11.18 /root/.venv/bin/python
+
+    def test_no_legacy_coarse_codes_in_frontend():
+        legacy = re.compile(r'(?:can(?:Any)?\(\s*|perm:\s*|perm=|,\s*)"([a-z_]+\.[a-z_]+)"')
+        bad = []
+        for f in list(SRC.rglob("*.jsx")) + list(SRC.rglob("*.js")):
+            if f.name == "permissions.js":
+                continue
+            for m in legacy.finditer(f.read_text()):
+                code = m.group(1)
+                if code.count(".") == 1 and not code.endswith((".jsx", ".js", ".png", ".svg", ".com", ".in", ".json")):
+                    bad.append((str(f.relative_to(SRC)), code))
+>       assert not bad, bad
+E       AssertionError: [('lib/format.js', 'payment.reverse'), ('lib/format.js', 'admin.reseed'), ('lib/format.js', 'admin.audit_archive'), ('lib/format.js', 'lead.stage'), ('lib/format.js', 'stage.complete')]
+E       assert not [('lib/format.js', 'payment.reverse'), ('lib/format.js', 'admin.reseed'), ('lib/format.js', 'admin.audit_archive'), ('lib/format.js', 'lead.stage'), ('lib/format.js', 'stage.complete')]
+
+tests/test_frontend_history_scan.py:55: AssertionError
+_____________ test_every_master_and_catalogue_collection_is_setup ______________
+[gw1] linux -- Python 3.11.18 /root/.venv/bin/python
+
+    def test_every_master_and_catalogue_collection_is_setup():
+        async def go():
+            cl = AsyncIOMotorClient(os.environ["MONGO_URL"])
+            names = await cl[os.environ["DB_NAME"]].list_collection_names()
+            cl.close()
+            return names
+    
+        missing = [c for c in _run(go()) if MASTERISH.search(c) and c not in SETUP_COLLECTIONS | ALWAYS_KEPT]
+>       assert missing == [], f"classify these as setup (or always-kept): {missing}"
+E       AssertionError: classify these as setup (or always-kept): ['cms_testimonials']
+E       assert ['cms_testimonials'] == []
+E         
+E         Left contains one more item: 'cms_testimonials'
+E         Use -v to get more diff
+
+tests/test_refresh_keeps_setup.py:28: AssertionError
+___________________ test_transfer_keeps_the_money_law[False] ___________________
+[gw0] linux -- Python 3.11.18 /root/.venv/bin/python
+
+H = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzMzlkNmM0ZS1lYTU1LTRmNjMtYjRjZi0xYjk1NzgwODA...4LCJleHAiOjE3OTQ3OTQ3NTh9.CCPMHGtMNB0BbJU0gHr_tiWogwe5uYdGtwxEk1kyEN8', 'X-Rate-Limit-Bypass': 'kkt-test-bypass-local'}
+revise_first = False
+
+    @pytest.mark.parametrize("revise_first", [False, True])
+    def test_transfer_keeps_the_money_law(H, revise_first):
+        story = {p["id"] for p in call(H, "GET", "/projects")["items"] if p.get("code") in ("SGH", "GGV")}
+        flats = call(H, "GET", "/flats", status="Available", page_size=200)["items"]
+        ok = lambda f: f.get("price") and f.get("project_id") in story  # noqa: E731  story towers carry payment plans
+>       f1, f2 = claim_flat(flats, ok), claim_flat(flats, ok)
+                                        ^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_transfer_money_law.py:57: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+flats = [{'inventory_state': 'Available', 'display_state': 'Show as Available', 'display_override': False, 'masked': False, .....ntory_state': 'Available', 'display_state': 'Show as Available', 'display_override': False, 'masked': False, ...}, ...]
+ok = <function test_transfer_keeps_the_money_law.<locals>.<lambda> at 0xfa30680f99e0>
+
+    def claim_flat(flats, ok=lambda f: True) -> dict:
+        """First flat in `flats` passing `ok` that no other test in this session has claimed; the claim is recorded atomically."""
+        with open(_CLAIMS, "a+") as fh:
+            fcntl.flock(fh, fcntl.LOCK_EX)
+            try:
+                fh.seek(0)
+                raw = fh.read()
+                data = json.loads(raw) if raw else {}
+                taken = set(data.get(_SESSION, []))
+>               flat = next(f for f in flats if f["id"] not in taken and ok(f))
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E               StopIteration
+
+tests/flat_claims.py:20: StopIteration
+___________________ test_transfer_keeps_the_money_law[True] ____________________
+[gw0] linux -- Python 3.11.18 /root/.venv/bin/python
+
+H = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzMzlkNmM0ZS1lYTU1LTRmNjMtYjRjZi0xYjk1NzgwODA...4LCJleHAiOjE3OTQ3OTQ3NTh9.CCPMHGtMNB0BbJU0gHr_tiWogwe5uYdGtwxEk1kyEN8', 'X-Rate-Limit-Bypass': 'kkt-test-bypass-local'}
+revise_first = True
+
+    @pytest.mark.parametrize("revise_first", [False, True])
+    def test_transfer_keeps_the_money_law(H, revise_first):
+        story = {p["id"] for p in call(H, "GET", "/projects")["items"] if p.get("code") in ("SGH", "GGV")}
+        flats = call(H, "GET", "/flats", status="Available", page_size=200)["items"]
+        ok = lambda f: f.get("price") and f.get("project_id") in story  # noqa: E731  story towers carry payment plans
+>       f1, f2 = claim_flat(flats, ok), claim_flat(flats, ok)
+                 ^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_transfer_money_law.py:57: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+flats = [{'inventory_state': 'Available', 'display_state': 'Show as Available', 'display_override': False, 'masked': False, .....ntory_state': 'Available', 'display_state': 'Show as Available', 'display_override': False, 'masked': False, ...}, ...]
+ok = <function test_transfer_keeps_the_money_law.<locals>.<lambda> at 0xfa3068153d80>
+
+    def claim_flat(flats, ok=lambda f: True) -> dict:
+        """First flat in `flats` passing `ok` that no other test in this session has claimed; the claim is recorded atomically."""
+        with open(_CLAIMS, "a+") as fh:
+            fcntl.flock(fh, fcntl.LOCK_EX)
+            try:
+                fh.seek(0)
+                raw = fh.read()
+                data = json.loads(raw) if raw else {}
+                taken = set(data.get(_SESSION, []))
+>               flat = next(f for f in flats if f["id"] not in taken and ok(f))
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E               StopIteration
+
+tests/flat_claims.py:20: StopIteration
+=============================== warnings summary ===============================
+../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
+../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
+  /root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12: PendingDeprecationWarning: Please use `import python_multipart` instead.
+    import multipart
+
+../../root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854
+../../root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854
+  /root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854: DeprecationWarning: 'crypt' is deprecated and slated for removal in Python 3.13
+    from crypt import crypt as _crypt
+
+tests/test_startup_s1_s3_idempotent.py:71
+tests/test_startup_s1_s3_idempotent.py:71
+  /app/backend/tests/test_startup_s1_s3_idempotent.py:71: PytestUnknownMarkWarning: Unknown pytest.mark.timeout - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.timeout(900)
+
+tests/test_phase_k_p1.py::test_loadshed_sheds_with_prebuilt_503_and_exempts_probes
+  /root/.venv/lib/python3.11/site-packages/starlette/testclient.py:41: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    [], typing.ContextManager[anyio.abc.BlockingPortal]
+
+tests/test_phase_q.py::test_void_watermark_deterministic
+tests/test_phase_q.py::test_void_watermark_deterministic
+tests/test_phase_q.py::test_void_watermark_deterministic
+tests/test_phase_q.py::test_void_watermark_deterministic
+tests/test_phase_q.py::test_void_watermark_deterministic
+tests/test_phase_q.py::test_void_watermark_deterministic
+tests/test_phase_q.py::test_void_watermark_deterministic
+tests/test_phase_q.py::test_void_watermark_deterministic
+  /root/.venv/lib/python3.11/site-packages/pypdf/_page.py:1368: DeprecationWarning: Calling `PageObject.replace_contents()` for pages not assigned to a writer is deprecated and will be removed in pypdf 7.0.0. Attach the page to the writer first or use `PdfWriter(clone_from=...)` directly. The existing approach has proved being unreliable.
+    self.replace_contents(ContentStream(new_content_array, self.pdf))
+
+tests/test_kkt_erp.py::TestBlock::test_create_block_and_generation
+tests/test_kkt_erp.py::TestFlatType::test_create_flat_type_auto_area
+tests/test_phase_7.py::TestPortalPhase7::test_portal_booking_payment_plan
+tests/test_phase_7.py::TestPortalPhase7::test_portal_booking_payment_plan
+  /root/.venv/lib/python3.11/site-packages/_pytest/fixtures.py:1313: PytestRemovedIn10Warning: Class-scoped fixture defined as instance method is deprecated.
+  Instance attributes set in this fixture will NOT be visible to test methods,
+  as each test gets a new instance while the fixture runs only once per class.
+  Use @classmethod decorator and set attributes on cls instead.
+  See https://docs.pytest.org/en/stable/deprecations.html#class-scoped-fixture-as-instance-method
+    fixturefunc = resolve_fixture_function(fixturedef, request)
+
+tests/test_phase_5.py::TestPortalData::test_booking_detail_and_subresources
+  /root/.venv/lib/python3.11/site-packages/_pytest/python.py:171: PytestReturnNotNoneWarning: Test functions should return None, but tests/test_phase_5.py::TestPortalData::test_booking_detail_and_subresources returned <class 'str'>.
+  Did you mean to use `assert` instead of `return`?
+  See https://docs.pytest.org/en/stable/how-to/assert.html#return-not-none for more information.
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_phase_i_reports.py::test_demands_honour_block_id_and_planned_date_roundtrip
+FAILED tests/test_import_hygiene.py::test_every_module_imports_in_isolation
+FAILED tests/test_format_gate.py::test_backend_ruff_format_clean - AssertionE...
+FAILED tests/test_format_gate.py::test_backend_imports_sorted - AssertionErro...
+FAILED tests/test_static_gates.py::test_ruff_undefined_unused_bugbear_whole_backend
+FAILED tests/test_static_gates.py::test_ruff_complexity_runtime_code - Assert...
+FAILED tests/test_frontend_history_scan.py::test_no_legacy_coarse_codes_in_frontend
+FAILED tests/test_refresh_keeps_setup.py::test_every_master_and_catalogue_collection_is_setup
+FAILED tests/test_transfer_money_law.py::test_transfer_keeps_the_money_law[False]
+FAILED tests/test_transfer_money_law.py::test_transfer_keeps_the_money_law[True]
+10 failed, 737 passed, 6 skipped, 20 warnings in 627.24s (0:10:27)

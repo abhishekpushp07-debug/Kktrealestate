@@ -1,0 +1,13 @@
+start 18:29:59
+{"outcome":"running","trigger":"manual","as_of":"2026-11-16"}
+18:30:31 True done 2026-11-15
+18:31:02 True done 2026-11-15
+18:31:33 True done 2026-11-15
+18:32:04 True done 2026-11-15
+18:32:34 True done 2026-11-15
+18:33:05 True done 2026-11-15
+18:33:35 True done 2026-11-15
+18:34:06 True done 2026-11-15
+18:34:37 True done 2026-11-15
+18:35:07 True done 2026-11-15
+18:35:38 False failed: tieout: FAIL Home month Cash·Account·Other == Σ allocation parts          report={'Cash': 934780200, 'Account': 609774400 raw={'Cash': 894543000, 'Account': 596362000  2026-11-15

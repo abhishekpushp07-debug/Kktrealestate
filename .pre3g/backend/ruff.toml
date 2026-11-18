@@ -1,0 +1,5 @@
+line-length = 120
+extend-exclude = ["__pycache__", ".ruff_cache", "e1_tests"]  # e1_tests: tester-owned, run explicitly
+
+[format]
+quote-style = "double"

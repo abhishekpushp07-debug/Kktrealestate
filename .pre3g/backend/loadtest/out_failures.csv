@@ -1,0 +1,3 @@
+Method,Name,Error,Occurrences,First Seen,Last Seen
+GET,/api/public/*,HTTPError('429 Client Error: Too Many Requests for url: /api/public/*'),5955,2026-10-24T01:46:17Z,2026-10-24T01:49:00Z
+POST,POST /api/payments,HTTPError('429 Client Error: Too Many Requests for url: POST /api/payments'),2128,2026-10-24T01:46:22Z,2026-10-24T01:49:00Z

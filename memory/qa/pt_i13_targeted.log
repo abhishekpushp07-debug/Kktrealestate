@@ -1,0 +1,12 @@
+bringing up nodes...
+bringing up nodes...
+
+...................................                                      [100%]
+=============================== warnings summary ===============================
+tests/test_oc_parts_ageing.py::test_back_billed_stage_part_keeps_its_bill_day_apart_from_posting_time
+  /root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12: PendingDeprecationWarning: Please use `import python_multipart` instead.
+    import multipart
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+35 passed, 1 warning in 4.62s
+EXIT 0

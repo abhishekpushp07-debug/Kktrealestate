@@ -1,0 +1,119 @@
+{
+ "stages": [
+  {
+   "vus": 20,
+   "assertions": {
+    "lead_created:ok": 134,
+    "lead_converted:ok": 134,
+    "booking_created:ok": 134,
+    "booking_total_matches_preview:ok": 134,
+    "payment_posted:ok": 133,
+    "c360_shows_booking:ok": 133,
+    "ledger_received_equals_payment:ok": 133,
+    "ledger_bill_raised_positive:ok": 133,
+    "inventory_flat_booked:ok": 133,
+    "receipt_pdf:ok": 133,
+    "demand_register:ok": 128,
+    "project_statement:ok": 128,
+    "stage_demands_match_active_bookings:ok": 5,
+    "documents_register:ok": 5,
+    "integrity_ok_after_stage:ok": 1
+   },
+   "failed_assertions": []
+  },
+  {
+   "vus": 50,
+   "assertions": {
+    "lead_created:ok": 204,
+    "lead_converted:ok": 204,
+    "booking_created:ok": 164,
+    "booking_total_matches_preview:ok": 164,
+    "payment_posted:ok": 150,
+    "c360_shows_booking:ok": 147,
+    "ledger_received_equals_payment:ok": 147,
+    "ledger_bill_raised_positive:ok": 147,
+    "inventory_flat_booked:ok": 147,
+    "receipt_pdf:ok": 147,
+    "booking_created:FAIL": 18,
+    "flat_dropped_from_pool": 18,
+    "demand_register:ok": 144,
+    "project_statement:ok": 144,
+    "integrity_ok_after_stage:ok": 1
+   },
+   "failed_assertions": [
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed: "
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed: "
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed: "
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed: "
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed: "
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed: "
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed: "
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed: "
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed: "
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed: "
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed: "
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed: "
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed: "
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed: "
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed: "
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed: "
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed: "
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed: "
+    }
+   ]
+  }
+ ]
+}

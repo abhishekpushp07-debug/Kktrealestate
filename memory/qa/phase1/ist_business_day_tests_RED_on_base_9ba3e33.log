@@ -1,0 +1,264 @@
+bringing up nodes...
+bringing up nodes...
+
+FFFFF.FFF                                                                [100%]
+=================================== FAILURES ===================================
+___________ test_today_is_the_india_day_in_the_utc_lag_window[0-30] ____________
+[gw0] linux -- Python 3.11.18 /root/.venv/bin/python
+
+hh = 0, mm = 30
+
+    @pytest.mark.parametrize("hh,mm", [(0, 30), (5, 29)])
+    def test_today_is_the_india_day_in_the_utc_lag_window(hh, mm):
+        d = clock.today() - timedelta(days=1)
+>       t = _at(d, hh, mm)
+            ^^^^^^^^^^^^^^
+
+tests/test_business_day.py:30: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+d = datetime.date(2026, 11, 15), hh = 0, mm = 30
+
+    def _at(d, hh, mm):
+>       return datetime.combine(d, time(hh, mm), tzinfo=clock.business_tz())
+                                                        ^^^^^^^^^^^^^^^^^
+E       AttributeError: module 'services.clock' has no attribute 'business_tz'
+
+tests/test_business_day.py:23: AttributeError
+___________ test_today_is_the_india_day_in_the_utc_lag_window[5-29] ____________
+[gw0] linux -- Python 3.11.18 /root/.venv/bin/python
+
+hh = 5, mm = 29
+
+    @pytest.mark.parametrize("hh,mm", [(0, 30), (5, 29)])
+    def test_today_is_the_india_day_in_the_utc_lag_window(hh, mm):
+        d = clock.today() - timedelta(days=1)
+>       t = _at(d, hh, mm)
+            ^^^^^^^^^^^^^^
+
+tests/test_business_day.py:30: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+d = datetime.date(2026, 11, 15), hh = 5, mm = 29
+
+    def _at(d, hh, mm):
+>       return datetime.combine(d, time(hh, mm), tzinfo=clock.business_tz())
+                                                        ^^^^^^^^^^^^^^^^^
+E       AttributeError: module 'services.clock' has no attribute 'business_tz'
+
+tests/test_business_day.py:23: AttributeError
+___________________ test_day_helpers_bounds_and_passthrough ____________________
+[gw0] linux -- Python 3.11.18 /root/.venv/bin/python
+
+    def test_day_helpers_bounds_and_passthrough():
+>       assert clock.day_of("2026-11-16") == "2026-11-16"
+               ^^^^^^^^^^^^
+E       AttributeError: module 'services.clock' has no attribute 'day_of'
+
+tests/test_business_day.py:45: AttributeError
+____________ test_financial_year_turns_at_india_midnight_on_1_april ____________
+[gw0] linux -- Python 3.11.18 /root/.venv/bin/python
+
+    def test_financial_year_turns_at_india_midnight_on_1_april():
+>       tok = clock.AS_OF.set(_at(datetime(2027, 4, 1).date(), 0, 30).astimezone(UTC))
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_business_day.py:55: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+d = datetime.date(2027, 4, 1), hh = 0, mm = 30
+
+    def _at(d, hh, mm):
+>       return datetime.combine(d, time(hh, mm), tzinfo=clock.business_tz())
+                                                        ^^^^^^^^^^^^^^^^^
+E       AttributeError: module 'services.clock' has no attribute 'business_tz'
+
+tests/test_business_day.py:23: AttributeError
+___________________ test_no_utc_derived_dates_in_server_code ___________________
+[gw1] linux -- Python 3.11.18 /root/.venv/bin/python
+
+    def test_no_utc_derived_dates_in_server_code():
+        hits = [h for f in server_files() if f.name != "clock.py" for h in scan(f)]
+>       assert not hits, "UTC-derived dates (use services.clock):\n" + "\n".join(hits)
+E       AssertionError: UTC-derived dates (use services.clock):
+E         events.py:294: value sliced to a date (a stored timestamp is UTC: use clock.day_of): day = (after.get("payment_date") or after.get("paid_date") or evt.get("created_at") or "")[
+E         routers/admin.py:612: stored UTC timestamp sliced to a date (use clock.day_of): headers={"Content-Disposition": f'attachment; filename="kkt-backup-{b["created_at"][:10]}.zip"'},
+E         routers/audit.py:37: UTC day end appended to a date (use clock.day_end_utc / day_range): rng["$lte"] = date_to if len(date_to) > 10 else date_to + "T23:59:59.999999+00:00"
+E         routers/bootstrap.py:56: value sliced to a date (a stored timestamp is UTC: use clock.day_of): today = now_iso()[:10]
+E         routers/bootstrap.py:56: now_iso()[:n] is the UTC date: today = now_iso()[:10]
+E         routers/construction.py:735: stored UTC timestamp sliced to a date (use clock.day_of): "accepted_on": ts[:10],
+E         routers/customers.py:382: now_iso()[:n] is the UTC date: today = now_iso()[:10]
+E         routers/customers.py:382: value sliced to a date (a stored timestamp is UTC: use clock.day_of): today = now_iso()[:10]
+E         routers/dashboard.py:182: UTC now → date: end = datetime.now(UTC).replace(hour=23, minute=59, second=59).isoformat()
+E         routers/dashboard_widgets.py:272: UTC now → date: end = datetime.now(UTC).replace(hour=23, minute=59, second=59).isoformat()
+E         routers/demand_register.py:148: now_iso()[:n] is the UTC date: today = now_iso()[:10]
+E         routers/demand_register.py:148: value sliced to a date (a stored timestamp is UTC: use clock.day_of): today = now_iso()[:10]
+E         routers/demand_register.py:444: value sliced to a date (a stored timestamp is UTC: use clock.day_of): today = now_iso()[:10]
+E         routers/demand_register.py:444: now_iso()[:n] is the UTC date: today = now_iso()[:10]
+E         routers/demand_register.py:569: now_iso()[:n] is the UTC date: today = now_iso()[:10]
+E         routers/demand_register.py:569: value sliced to a date (a stored timestamp is UTC: use clock.day_of): today = now_iso()[:10]
+E         routers/docgen.py:200: UTC day end appended to a date (use clock.day_end_utc / day_range): **({"$lte": date_to + "T23:59:59"} if date_to else {}),
+E         routers/docgen.py:211: value sliced to a date (a stored timestamp is UTC: use clock.day_of): today = now_iso()[:10]
+E         routers/docgen.py:211: now_iso()[:n] is the UTC date: today = now_iso()[:10]
+E         routers/exports.py:178: stored UTC timestamp sliced to a date (use clock.day_of): filename=f"{e['report']}-{e['created_at'][:10]}.csv",
+E         routers/files.py:439: UTC now → date: f.get("retention_until") and f["retention_until"] > datetime.now(timezone.utc).date().isoformat()
+E         routers/leads.py:104: UTC now → date: end = datetime.now(UTC).replace(hour=23, minute=59, second=59).isoformat()
+E         routers/messaging.py:56: UTC day end appended to a date (use clock.day_end_utc / day_range): **({"$lte": date_to + "T23:59:59" if date_to else "~"} if date_to else {}),
+E         routers/messaging.py:113: now_iso()[:n] is the UTC date: as_of=now_iso()[:10],
+E         routers/messaging.py:113: value sliced to a date (a stored timestamp is UTC: use clock.day_of): as_of=now_iso()[:10],
+E         routers/messaging.py:284: now_iso()[:n] is the UTC date: ) or {"total_demand_paise": 0, "paid_paise": 0, "due_date": now_iso()[:10]}
+E         routers/messaging.py:284: value sliced to a date (a stored timestamp is UTC: use clock.day_of): ) or {"total_demand_paise": 0, "paid_paise": 0, "due_date": now_iso()[:10]}
+E         routers/messaging.py:285: date.today() is the container (UTC) date: days = max((date.today() - date.fromisoformat(d["due_date"])).days, 0)
+E         routers/messaging.py:346: UTC day end appended to a date (use clock.day_end_utc / day_range): **({"$lte": date_to + "T23:59:59"} if date_to else {}),
+E         routers/notifications.py:152: now_iso()[:n] is the UTC date: today = now_iso()[:10]
+E         routers/notifications.py:152: value sliced to a date (a stored timestamp is UTC: use clock.day_of): today = now_iso()[:10]
+E         routers/project_setup.py:268: value sliced to a date (a stored timestamp is UTC: use clock.day_of): {"id": old["id"]}, {"$set": {"is_active": False, "effective_to": now_iso()[:10]}}
+E         routers/project_setup.py:268: now_iso()[:n] is the UTC date: {"id": old["id"]}, {"$set": {"is_active": False, "effective_to": now_iso()[:10]}}
+E         routers/project_setup.py:284: value sliced to a date (a stored timestamp is UTC: use clock.day_of): {"$set": setv, "$setOnInsert": {**ins, "effective_from": now_iso()[:10]}},
+E         routers/project_setup.py:284: now_iso()[:n] is the UTC date: {"$set": setv, "$setOnInsert": {**ins, "effective_from": now_iso()[:10]}},
+E         routers/project_statement.py:205: now_iso()[:n] is the UTC date: subtitle=f"{p['name']} · generated by {user.get('name', '')} · {now_iso()[:16].replace('T', ' ')}",
+E         routers/propagation.py:137: stored UTC timestamp sliced to a date (use clock.day_of): ctx = {"booking_id": None, "customer_id": None, "block_id": None, "project_id": None, "date": a["created_at"][:10]}
+E         routers/public.py:32: UTC now → date: TODAY = lambda: datetime.now(UTC).date().isoformat()
+E         routers/reports.py:724: value sliced to a date (a stored timestamp is UTC: use clock.day_of): sorted([r for r in rows if r["overdue_paise"] > 0], key=lambda r: -r["overdue_paise"])[:10]
+E         routers/reports.py:1147: UTC day end appended to a date (use clock.day_end_utc / day_range): q = {**_scope(user, project_id), "status": "Cancelled", "cancellation.at": {"$gte": f, "$lte": t + "T23:59:59"}}
+E         routers/reports.py:1218: UTC day end appended to a date (use clock.day_end_utc / day_range): "created_at": {"$gte": f, "$lte": t + "T23:59:59"},
+E         routers/reports.py:1483: UTC day end appended to a date (use clock.day_end_utc / day_range): rng = {"$gte": f, "$lte": t + "T23:59:59"}
+E         routers/reports.py:1648: UTC day end appended to a date (use clock.day_end_utc / day_range): q = {"company_id": user["company_id"], "created_at": {"$gte": f, "$lte": t + "T23:59:59"}}
+E         routers/reports_i.py:95: value sliced to a date (a stored timestamp is UTC: use clock.day_of): return (p.get("cleared_at") or p["payment_date"])[:10] if date_basis == "clearance" else p["payment_date"]
+E         routers/reports_i.py:119: value sliced to a date (a stored timestamp is UTC: use clock.day_of): rd = (p["reversal"].get("at") or p["updated_at"])[:10]
+E         routers/reports_i.py:119: stored UTC timestamp sliced to a date (use clock.day_of): rd = (p["reversal"].get("at") or p["updated_at"])[:10]
+E         routers/reports_i.py:1235: UTC day end appended to a date (use clock.day_end_utc / day_range): {**scope, "created_at": {"$gte": f, "$lte": t + "T23:59:59"}}, {"_id": 0, "assigned_to": 1}
+E         routers/reports_n.py:123: value sliced to a date (a stored timestamp is UTC: use clock.day_of): "as_of": now_iso()[:10],
+E         routers/reports_n.py:123: now_iso()[:n] is the UTC date: "as_of": now_iso()[:10],
+E         routers/reports_n.py:216: value sliced to a date (a stored timestamp is UTC: use clock.day_of): "as_of": now_iso()[:10],
+E         routers/reports_n.py:216: now_iso()[:n] is the UTC date: "as_of": now_iso()[:10],
+E         routers/reports_n.py:363: now_iso()[:n] is the UTC date: "as_of": now_iso()[:10],
+E         routers/reports_n.py:363: value sliced to a date (a stored timestamp is UTC: use clock.day_of): "as_of": now_iso()[:10],
+E         routers/reports_n.py:456: now_iso()[:n] is the UTC date: "as_of": now_iso()[:10],
+E         routers/reports_n.py:456: value sliced to a date (a stored timestamp is UTC: use clock.day_of): "as_of": now_iso()[:10],
+E         routers/roznamcha.py:129: UTC day end appended to a date (use clock.day_end_utc / day_range): "reversal.at": {"$gte": d1.isoformat(), "$lte": d2.isoformat() + "T23:59:59.999999+00:00"},
+E         routers/visits.py:660: UTC now → date: f"DTSTAMP:{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}",
+E         seed_phase2.py:411: date.today() is the container (UTC) date: today = date.today()
+E         seed_phase2.py:849: date.today() is the container (UTC) date: await pay(bk, date.today() - timedelta(days=2), 500000, "Account", "CHEQUE", status="Pending")
+E         seed_phase3.py:384: date.today() is the container (UTC) date: today = date.today()
+E         seed_phase5.py:165: value sliced to a date (a stored timestamp is UTC: use clock.day_of): "taken_on": (m.get("completed_on") or now_iso()[:10]),
+E         seed_phase5.py:165: now_iso()[:n] is the UTC date: "taken_on": (m.get("completed_on") or now_iso()[:10]),
+E         services/alerts.py:130: UTC now → date: today = datetime.now(UTC).date().isoformat()
+E         services/allocation.py:54: value sliced to a date (a stored timestamp is UTC: use clock.day_of): "due_date": (l.get("due_date") or l["demanded_at"])[:10],
+E         services/allocation.py:54: stored UTC timestamp sliced to a date (use clock.day_of): "due_date": (l.get("due_date") or l["demanded_at"])[:10],
+E         services/definitions.py:311: value sliced to a date (a stored timestamp is UTC: use clock.day_of): ((l.get("demanded_at") or "")[:10], l.get("demanded_paise") or 0)
+E         services/documents.py:70: now_iso()[:n] is the UTC date: today = now_iso()[:10]
+E         services/documents.py:70: value sliced to a date (a stored timestamp is UTC: use clock.day_of): today = now_iso()[:10]
+E         services/documents.py:164: value sliced to a date (a stored timestamp is UTC: use clock.day_of): date=now_iso()[:10],
+E         services/documents.py:164: now_iso()[:n] is the UTC date: date=now_iso()[:10],
+E         services/documents.py:212: value sliced to a date (a stored timestamp is UTC: use clock.day_of): date=(r.get("created_at") or now_iso())[:10],
+E         services/documents.py:220: stored UTC timestamp sliced to a date (use clock.day_of): f"cancelled{(' on ' + _pdf.fmt_date(b['cancelled_at'][:10])) if b.get('cancelled_at') else ''}. "
+E         services/documents.py:372: value sliced to a date (a stored timestamp is UTC: use clock.day_of): f"Voided on {_pdf.fmt_date((d.get('voided_at') or '')[:10])} by {d.get('voided_by_name', '')} — {d.get('void_reason', ''
+E         services/job_runs.py:131: UTC now → date: today = _now().date().isoformat()
+E         services/ledger.py:187: stored UTC timestamp sliced to a date (use clock.day_of): "date": at[:10],
+E         services/messaging/outbox.py:100: now_iso()[:n] is the UTC date: "as_of": as_of or now_iso()[:10],
+E         services/messaging/outbox.py:100: value sliced to a date (a stored timestamp is UTC: use clock.day_of): "as_of": as_of or now_iso()[:10],
+E         services/numbering.py:18: UTC now → date: d = d or clock.now().date()
+E         services/pdf.py:611: value sliced to a date (a stored timestamp is UTC: use clock.day_of): )[:10]:
+E         services/trends.py:22: date.today() is the container (UTC) date: d = (until or date.today()).replace(day=1)
+E         tools/backup.py:165: UTC now → date: stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+E         tools/demo_journeys.py:71: value sliced to a date (a stored timestamp is UTC: use clock.day_of): dates = f"{(lead.get('created_at') or '')[:10]} → {visit.get('date', '—')} → {b['booking_date']} → bills {bills} → recei
+E         tools/demo_journeys.py:150: date.today() is the container (UTC) date: today = date.fromisoformat(((marker.get("value") or {}).get("as_of")) or date.today().isoformat())
+E         tools/story_logic_check.py:25: value sliced to a date (a stored timestamp is UTC: use clock.day_of): return (v or "")[:10] or None
+E         tools/story_seed.py:1377: date.today() is the container (UTC) date: today = date.fromisoformat(args.as_of) if args.as_of else date.today()
+E         tools/tieout_reports.py:70: value sliced to a date (a stored timestamp is UTC: use clock.day_of): d = (p.get("cleared_at") or p["payment_date"])[:10] if basis == "clearance" else p["payment_date"]
+E         tools/tieout_reports.py:73: stored UTC timestamp sliced to a date (use clock.day_of): if p["status"] == "Reversed" and f0 <= ((p.get("reversal") or {}).get("at") or p["updated_at"])[:10] <= f1:
+E         tools/tieout_reports.py:73: value sliced to a date (a stored timestamp is UTC: use clock.day_of): if p["status"] == "Reversed" and f0 <= ((p.get("reversal") or {}).get("at") or p["updated_at"])[:10] <= f1:
+E         tools/tieout_reports.py:563: UTC day end appended to a date (use clock.day_end_utc / day_range): {"company_id": cid, "is_active": {"$ne": False}, "created_at": {"$gte": F0, "$lte": F1 + "T23:59:59"}}
+E         tools/tieout_reports.py:573: UTC day end appended to a date (use clock.day_end_utc / day_range): db.audit_logs.count_documents({"company_id": cid, "created_at": {"$gte": F0, "$lte": F1 + "T23:59:59"}}),
+E       assert not ['events.py:294: value sliced to a date (a stored timestamp is UTC: use clock.day_of): day = (after.get("payment_date"... 'routers/construction.py:735: stored UTC timestamp sliced to a date (use clock.day_of): "accepted_on": ts[:10],', ...]
+
+tests/test_business_day_guard.py:49: AssertionError
+____________ test_late_night_entries_land_on_the_india_day[0-30-0] _____________
+[gw0] linux -- Python 3.11.18 /root/.venv/bin/python
+
+H = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxODBlMTgyOC02OTBjLTRmN2ItYjdiOS1lNDI0MTNiMjB...2LCJleHAiOjE3OTQ3ODEyODZ9.mQZfyYi3hBe0vyn9KMdhLHcGpf-Y8D9AyxLaEKHJfP8', 'X-Rate-Limit-Bypass': 'kkt-test-bypass-local'}
+ctx = {'modes': {'CASH': {'id': '838d6b1b-b163-45aa-8d06-6d3de9e95d73', 'company_id': 'ce127b4f-3997-45da-a7b0-1fe952915495'...': {'line1': '88, Kankarbagh', 'line2': None, 'city': 'Patna', 'state': 'Bihar', ...}, 'address_permanent': None, ...}}
+hh = 0, mm = 30, slot = 0
+
+    @pytest.mark.parametrize("hh,mm,slot", [(0, 30, 0), (5, 29, 3)])
+    def test_late_night_entries_land_on_the_india_day(H, ctx, hh, mm, slot):
+        D = clock.today() - timedelta(days=1)
+>       T, d, prev = _at(D, hh, mm), D.isoformat(), (D - timedelta(days=1)).isoformat()
+                     ^^^^^^^^^^^^^^
+
+tests/test_business_day.py:124: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+d = datetime.date(2026, 11, 15), hh = 0, mm = 30
+
+    def _at(d, hh, mm):
+>       return datetime.combine(d, time(hh, mm), tzinfo=clock.business_tz())
+                                                        ^^^^^^^^^^^^^^^^^
+E       AttributeError: module 'services.clock' has no attribute 'business_tz'
+
+tests/test_business_day.py:23: AttributeError
+____________ test_late_night_entries_land_on_the_india_day[5-29-3] _____________
+[gw0] linux -- Python 3.11.18 /root/.venv/bin/python
+
+H = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxODBlMTgyOC02OTBjLTRmN2ItYjdiOS1lNDI0MTNiMjB...2LCJleHAiOjE3OTQ3ODEyODZ9.mQZfyYi3hBe0vyn9KMdhLHcGpf-Y8D9AyxLaEKHJfP8', 'X-Rate-Limit-Bypass': 'kkt-test-bypass-local'}
+ctx = {'modes': {'CASH': {'id': '838d6b1b-b163-45aa-8d06-6d3de9e95d73', 'company_id': 'ce127b4f-3997-45da-a7b0-1fe952915495'...': {'line1': '88, Kankarbagh', 'line2': None, 'city': 'Patna', 'state': 'Bihar', ...}, 'address_permanent': None, ...}}
+hh = 5, mm = 29, slot = 3
+
+    @pytest.mark.parametrize("hh,mm,slot", [(0, 30, 0), (5, 29, 3)])
+    def test_late_night_entries_land_on_the_india_day(H, ctx, hh, mm, slot):
+        D = clock.today() - timedelta(days=1)
+>       T, d, prev = _at(D, hh, mm), D.isoformat(), (D - timedelta(days=1)).isoformat()
+                     ^^^^^^^^^^^^^^
+
+tests/test_business_day.py:124: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+d = datetime.date(2026, 11, 15), hh = 5, mm = 29
+
+    def _at(d, hh, mm):
+>       return datetime.combine(d, time(hh, mm), tzinfo=clock.business_tz())
+                                                        ^^^^^^^^^^^^^^^^^
+E       AttributeError: module 'services.clock' has no attribute 'business_tz'
+
+tests/test_business_day.py:23: AttributeError
+__________________________ test_a_picked_date_is_kept __________________________
+[gw0] linux -- Python 3.11.18 /root/.venv/bin/python
+
+H = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxODBlMTgyOC02OTBjLTRmN2ItYjdiOS1lNDI0MTNiMjB...2LCJleHAiOjE3OTQ3ODEyODZ9.mQZfyYi3hBe0vyn9KMdhLHcGpf-Y8D9AyxLaEKHJfP8', 'X-Rate-Limit-Bypass': 'kkt-test-bypass-local'}
+ctx = {'modes': {'CASH': {'id': '838d6b1b-b163-45aa-8d06-6d3de9e95d73', 'company_id': 'ce127b4f-3997-45da-a7b0-1fe952915495'...': {'line1': '88, Kankarbagh', 'line2': None, 'city': 'Patna', 'state': 'Bihar', ...}, 'address_permanent': None, ...}}
+
+    def test_a_picked_date_is_kept(H, ctx):
+        """JRN-32: a payment dated yesterday on the form keeps yesterday, also when saved at 00:30 IST."""
+        D = clock.today()
+>       T, y = _at(D, 0, 30), (D - timedelta(days=1)).isoformat()
+               ^^^^^^^^^^^^^
+
+tests/test_business_day.py:192: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+d = datetime.date(2026, 11, 16), hh = 0, mm = 30
+
+    def _at(d, hh, mm):
+>       return datetime.combine(d, time(hh, mm), tzinfo=clock.business_tz())
+                                                        ^^^^^^^^^^^^^^^^^
+E       AttributeError: module 'services.clock' has no attribute 'business_tz'
+
+tests/test_business_day.py:23: AttributeError
+=============================== warnings summary ===============================
+../../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
+../../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
+  /root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12: PendingDeprecationWarning: Please use `import python_multipart` instead.
+    import multipart
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_business_day.py::test_today_is_the_india_day_in_the_utc_lag_window[0-30]
+FAILED tests/test_business_day.py::test_today_is_the_india_day_in_the_utc_lag_window[5-29]
+FAILED tests/test_business_day.py::test_day_helpers_bounds_and_passthrough - ...
+FAILED tests/test_business_day.py::test_financial_year_turns_at_india_midnight_on_1_april
+FAILED tests/test_business_day_guard.py::test_no_utc_derived_dates_in_server_code
+FAILED tests/test_business_day.py::test_late_night_entries_land_on_the_india_day[0-30-0]
+FAILED tests/test_business_day.py::test_late_night_entries_land_on_the_india_day[5-29-3]
+FAILED tests/test_business_day.py::test_a_picked_date_is_kept - AttributeErro...
+8 failed, 1 passed, 2 warnings in 1.05s
