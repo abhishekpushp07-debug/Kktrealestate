@@ -774,13 +774,6 @@ def _hand_day(t, p):
     ).today().isoformat()
 
 
-def _period(p):
-    p = p or {}
-    q = [f"period_from={p['period_from']}"] if p.get("period_from") else []
-    q += [f"period_to={p['period_to']}"] if p.get("period_to") else []
-    return "&".join(q)
-
-
 def _received_lines(t, rows=None, p=None):
     """REQ-320/327: cheques in hand (tap → the list) and refunds paid out, beside Received and never inside it."""
     out = []
@@ -798,7 +791,7 @@ def _received_lines(t, rows=None, p=None):
             _line(
                 "refunds",
                 f"Refunds paid out {_m(-t['refunds_paid_paise'])}",
-                "/reports/v3/cancellations?" + (_period(p) or "period_from=2000-01-01"),
+                "/reports/v3/cancellations?period_from=2000-01-01",  # a refund can be paid in a later period than its cancellation
             )
         )
     if t.get("reversal_paise"):

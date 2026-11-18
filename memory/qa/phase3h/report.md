@@ -60,7 +60,7 @@ The bridge tuple `(42054546400, 44888000, -1088900)` breaks down as:
 | 324 named remainder | Done | red "Unexplained remainder" line only if non-zero (never appears today) |
 | 325 ₹15,000 traced | Done | §1 Gap 1 |
 | 326 cancelled receipts stay | Done | receipts keep their month; tieout PASS |
-| 327 refunds line | Done | "Refunds paid out −₹R" (Feb 2026 on preview −₹4,22,892) |
+| 327 refunds line | Done | "Refunds paid out −₹R" (Feb 2026 on preview −₹4,22,892); tap → all cancellations (a refund can be paid in a later period than its cancellation — iteration 53 HIGH fixed) |
 | 328/329 Bills vs Collection live / Include cancelled | Done | default live only; switch adds "· cancelled" rows + "Cancelled bookings ₹23,28,400" (preview) |
 | 330 default = Customer status | Done | tieout_reports "Customer status bridge line == Bills vs Collection" PASS ×3 |
 | 331 ₹4.6 lakh traced | Done | §1 Gap 2 |
@@ -103,7 +103,8 @@ The bridge tuple `(42054546400, 44888000, -1088900)` breaks down as:
 - Runner fix: orphaned uvicorn workers of the scratch server kept writing a scheduler lock into the scratch DB, which made
   the next `mongorestore` fail (duplicate `locks.name`). `run_perf.sh` now reaps them between steps.
 
-## 6 · Not verified
+## 6 · Not verified / left as is
+- Testing agent iteration 53: 15/16 → the one HIGH (refunds drill empty) fixed and checked by API; minor notes left: cheques `in_hand_on=<past day>` rows show today's state (Cleared, 0 days); all-time chip reads "01 Jan 2000 – —"; Cancellations flat label "SGH C-403" vs "SGH · Tower C · C-403"; long customer names clipped with "…" in PDFs.
 - Payment against a manual bill in the UI on preview (0 manual bills there); covered by pytest only.
 - Future As of typed into the URL falls to an error card (no fallback to today) — low, left as is.
 - Write timings above the 3G baseline (§5).
