@@ -118,13 +118,14 @@ def test_document_project_scope_404():
         if p.get("website", {}).get("slug")
     ]
     assert len(projects) >= 2
-    a, b = projects[0], projects[1]
-    bk = next(
-        x
-        for x in requests.get(f"{BASE}/bookings?project_id={b['id']}&page_size=5", headers=h, timeout=15).json()[
-            "items"
-        ]
-    )
+
+    def first_booking(p):
+        items = requests.get(f"{BASE}/bookings?project_id={p['id']}&page_size=5", headers=h, timeout=15).json()["items"]
+        return items[0] if items else None
+
+    # b = a project that has a booking (list order moves when other tests add projects); a = any other project
+    b, bk = next((p, x) for p in projects if (x := first_booking(p)))
+    a = next(p for p in projects if p["id"] != b["id"])
     roles = requests.get(f"{BASE}/roles", headers=h, timeout=15).json()["items"]
     sales = next(r for r in roles if r["name"] == "Sales")
     email = f"scoped-{uuid.uuid4().hex[:6]}@kkt.in"

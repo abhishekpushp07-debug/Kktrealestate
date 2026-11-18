@@ -215,3 +215,44 @@ def test_outstanding_three_balances_law():
     r = o["rows"][0]
     s = requests.get(f"{API}/bookings/{r['_link'].rsplit('/', 1)[1]}", headers=h, timeout=30).json()["summary"]
     assert s["net_balance_paise"] == r["net_balance_paise"] and s["outstanding_paise"] == r["outstanding_paise"]
+
+
+def test_manual_bill_counts_in_outstanding_and_ageing(admin_headers):
+    """PRE-01 (owner decision A, 2026-11-18): a manual bill is owed money — it is in Outstanding, aged by its own due
+    date, and the three-balances law (Net balance = Udhar − Jama) holds on a booking that carries one."""
+    import uuid
+    from datetime import date, timedelta
+
+    from tests.flat_claims import own_flats
+
+    def call(method, path, body=None):
+        r = requests.request(method, f"{API}{path}", headers={**admin_headers, "Idempotency-Key": uuid.uuid4().hex},
+                             json=body, timeout=120)  # fmt: skip
+        assert r.status_code in (200, 201), (path, r.status_code, r.text[:300])
+        return r.json()
+
+    def row(bid):
+        rows = call("GET", "/reports/outstanding-v2")["rows"]
+        return next(r for r in rows if r["_link"].endswith(bid))
+
+    today = date.today()
+    f = own_flats(API, admin_headers, 1)[0]
+    cust = call("POST", "/customers", {"full_name": "QA Manual Bill", "phone": f"9{uuid.uuid4().int % 10**9:09d}"})
+    plans = call("GET", f"/projects/{f['project_id']}/blocks/{f['block_id']}/payment-plans")["items"]
+    bk = call("POST", "/bookings", {"flat_id": f["id"], "customer_id": cust["id"], "agreement_value": f["price"],
+              "cash_agreed": 0, "account_agreed": f["price"], "payment_plan_id": plans[0]["id"],
+              "booking_date": (today - timedelta(days=50)).isoformat(), "other_charges": []})  # fmt: skip
+    before = call("GET", f"/bookings/{bk['id']}")["summary"]
+    band_before = row(bk["id"])["band_0-30"]
+    call("POST", "/demands/manual", {"booking_id": bk["id"], "name": "QA manual bill", "cash_amount": 5000,
+         "account_amount": 20000, "demand_date": (today - timedelta(days=20)).isoformat(),
+         "due_date": (today - timedelta(days=10)).isoformat()})  # fmt: skip
+    s = call("GET", f"/bookings/{bk['id']}")["summary"]
+    assert s["outstanding_paise"] == before["outstanding_paise"] + 2_500_000
+    assert s["cash_due_paise"] == before["cash_due_paise"] + 500_000
+    assert s["account_due_paise"] == before["account_due_paise"] + 2_000_000
+    assert s["net_balance_paise"] == s["total_udhar_paise"] - s["total_jama_paise"] == s["balance_paise"]
+    r = row(bk["id"])
+    assert r["net_balance_paise"] == r["outstanding_paise"] - r["advance_paise"] == r["udhar_paise"] - r["jama_paise"]
+    assert r["outstanding_paise"] == s["outstanding_paise"]
+    assert r["band_0-30"] == band_before + 2_500_000  # aged by the manual bill's own due date (10 days late)

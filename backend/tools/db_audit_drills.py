@@ -6,6 +6,7 @@
     python -m tools.db_audit_drills races  --label before [--reps 20]
     python -m tools.db_audit_drills stale  --label before [--redis redis://127.0.0.1:6390/0]
     python -m tools.db_audit_drills startup --label before [--reps 10]
+    python -m tools.db_audit_drills dupstart          # JRN-133: a repeat in the copy never stops startup
     python -m tools.db_audit_drills teardown           # drops kkt_audit_scratch
 Two backend processes (A :8101, B :8102) share the scratch DB, exactly like 2 live replicas share Atlas.
 """
@@ -227,6 +228,9 @@ def races(label, reps):
                       lambda: B.post("/api/payments", json=pay_body(bid, md, 900000), headers={"Idempotency-Key": uuid.uuid4().hex}))  # fmt: skip
         bad = booking_checks(bid)
         out[f"codes={code(ra)}/{code(rb)}"] += 1
+        for r in (ra, rb):  # a 409 must be a money rule (share already paid), never "booking busy"
+            if isinstance(r, httpx.Response) and r.status_code == 409:
+                out[f"409 reason={(r.json().get('error') or {}).get('code') or r.json().get('code')}"] += 1
         out["integrity_bad"] += bool(bad)
         if bad and len(ex) < 3:
             ex.append({"booking": bid, "bad": bad})
@@ -643,6 +647,41 @@ def startup(label, reps):
     save(f"startup_{label}", dict(res))
 
 
+# ---------------------------------------------------------------- JRN-133: a duplicate never stops startup
+def dupstart():
+    from services.invariants import NOT_APPLIED
+
+    db = mdb()
+    dup = db.ledger_entries.find_one({}, {"_id": 0})
+    db.ledger_entries.drop_index("uniq_ledger_seq")  # an "old copy" from before the rule, already holding a repeat
+    db.ledger_entries.insert_one({**dup, "id": f"drill-dup-{uuid.uuid4().hex}"})
+    proc = start(PORTS[0])
+    try:
+        wait_up(PORTS[0])
+        c = client(PORTS[0])
+        ops = c.get("/api/admin/ops").json()
+        rule = next(r for r in ops["uniqueness"] if r["index"] == "uniq_ledger_seq")
+        log = open(f"/tmp/kkt_drill_{PORTS[0]}.log").read()
+        out = {
+            "health": c.get("/api/health").json().get("status"),
+            "bookings_list_status": c.get("/api/bookings", params={"page_size": 5}).status_code,
+            "home_status": c.get("/api/home/bundle", params={"period": "month"}).status_code,
+            "system_health_rule": rule,
+            "log_names_rule": f"{NOT_APPLIED}: ledger_entries.uniq_ledger_seq" in log,
+            "other_rules": {r["index"]: r["status"] for r in ops["uniqueness"] if r["index"] != "uniq_ledger_seq"},
+        }
+    finally:
+        proc.kill()
+        db.ledger_entries.delete_many({"id": {"$regex": "^drill-dup-"}})
+    out["pass"] = (
+        out["health"] == "ok"
+        and out["bookings_list_status"] == out["home_status"] == 200
+        and rule.get("message") == NOT_APPLIED
+        and out["log_names_rule"]
+    )
+    save("dupstart_after", out)
+
+
 def save(name, obj):
     os.makedirs(OUT, exist_ok=True)
     with open(f"{OUT}/drill_{name}.json", "w") as fh:
@@ -652,7 +691,7 @@ def save(name, obj):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("what", choices=["setup", "races", "stale", "startup", "teardown", "serve"])
+    ap.add_argument("what", choices=["setup", "races", "stale", "startup", "dupstart", "teardown", "serve"])
     ap.add_argument("--label", default="run")
     ap.add_argument("--reps", type=int, default=20)
     ap.add_argument("--redis")
@@ -672,6 +711,8 @@ def main():
         stale(a.label, a.reps, a.redis)
     elif a.what == "startup":
         startup(a.label, a.reps)
+    elif a.what == "dupstart":
+        dupstart()
 
 
 if __name__ == "__main__":

@@ -10,7 +10,7 @@ import requests
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from tests.conftest import BASE
-from tests.flat_claims import claim_flat
+from tests.flat_claims import claim_flat, own_flats
 from tests.story_anchors import bk
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -209,10 +209,8 @@ def test_type_change_marks_review_and_keep_values(admin_headers):
 
 def test_legacy_patch_accepts_pricing_fields(admin_headers):
     """Fix 3: PATCH /flats/{id} accepts saleable_sqft and routes through the same pricing engine."""
-    flats = requests.get(f"{BASE}/api/flats?status=Available&page_size=50", headers=admin_headers).json()["items"]
-    if not any(f.get("pricing_mode") == "rate" and f.get("rate_per_sqft") for f in flats):
-        pytest.skip("no rate-priced available flat")
-    flat = claim_flat(flats, lambda f: f.get("pricing_mode") == "rate" and f.get("rate_per_sqft"))
+    # own tower: the first 50 Available flats are all claimed by earlier tests in a full session
+    flat = own_flats(f"{BASE}/api", admin_headers, 1)[0]
     r = requests.patch(
         f"{BASE}/api/flats/{flat['id']}",
         json={"saleable_sqft": flat["saleable_sqft"] + 10, "version": flat["version"]},

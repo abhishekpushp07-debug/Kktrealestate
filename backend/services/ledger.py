@@ -17,6 +17,17 @@ def _orders(cash_agreed: int, account_agreed: int, pct: float) -> tuple[int, int
     return pct_of(cash_agreed, pct), pct_of(account_agreed, pct)
 
 
+def is_manual_bill(d: dict) -> bool:
+    """A bill raised by hand (Demand register "manual bill"): owed by its own amount per share, outside the plan %."""
+    return d.get("trigger_type") == "MANUAL"
+
+
+def _manual_totals(demands) -> tuple[int, int]:
+    """PRE-01 (owner decision A, 2026-11-18): manual bills count in Outstanding — added to the order raised per share."""
+    m = [d for d in demands if is_manual_bill(d)]
+    return sum(d.get("cash_demand_paise", 0) for d in m), sum(d.get("account_demand_paise", 0) for d in m)
+
+
 def _oc_totals(lines: list[dict]) -> tuple[int, int]:
     return sum(l.get("demanded_paise", 0) for l in lines), sum(l.get("paid_paise", 0) for l in lines)
 
@@ -81,6 +92,7 @@ class _Running:
         self.closed = False
         self.lines = lines
         self.waived = {"Cash": 0, "Account": 0, "Other": 0}
+        self.manual_cash = self.manual_account = 0
 
     def apply(self, kind: str, src: dict) -> tuple:
         return getattr(self, f"_{kind.lower()}")(src)
@@ -100,6 +112,9 @@ class _Running:
             src.get("cumulative_percent") is not None
         ):  # manual/other demands carry no plan %, they add Udhar by amount only
             self.pct = src["cumulative_percent"]
+        if is_manual_bill(src):
+            self.manual_cash += src.get("cash_demand_paise", 0)
+            self.manual_account += src.get("account_demand_paise", 0)
         note = f"{src.get('installment_name') or src['milestone_name']} ({src.get('percent') if src.get('percent') is not None else self.pct}%)"
         return src["total_demand_paise"], None, src["demand_number"], note
 
@@ -239,6 +254,8 @@ async def _rebuild(booking_id: str) -> list[dict]:
             acc.account_agreed,
         )
         c_ord, a_ord = (cash_paid, account_paid) if closed else _orders(cash_agreed, account_agreed, pct)
+        if not closed:
+            c_ord, a_ord = c_ord + acc.manual_cash, a_ord + acc.manual_account
         oc_dem, oc_paid = _oc_totals(list(lines.values()))
         if closed:
             oc_dem = oc_paid
@@ -274,6 +291,8 @@ async def _rebuild(booking_id: str) -> list[dict]:
     # final summary
     pct_now = b.get("raised_percent", b.get("construction_percent", pct))
     c_ord, a_ord = _orders(b["cash_agreed_paise"], b["account_agreed_paise"], pct_now)
+    m_cash, m_account = _manual_totals(demands)
+    c_ord, a_ord = c_ord + m_cash, a_ord + m_account
     if b.get("status") == "Cancelled":
         c_ord, a_ord = cash_paid, account_paid  # ledger closed: nothing further due
         for line in lines.values():

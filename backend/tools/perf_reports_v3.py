@@ -15,7 +15,7 @@ from pymongo import MongoClient
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from _env import DEMO_PASSWORD  # noqa: E402
-from perf_budget import BYPASS, PORT, SCRATCH_DB, pct, server_ms, snapshot, start_backend  # noqa: E402
+from perf_budget import BYPASS, CFG, PORT, SCRATCH_DB, pct, server_ms, snapshot, start_backend  # noqa: E402
 
 from reports_v3.registry import REGISTRY  # noqa: E402
 
@@ -37,7 +37,10 @@ def main():
     ap.add_argument("--cold", type=int, default=6)
     ap.add_argument("--warm", type=int, default=20)
     ap.add_argument("--only", default="")
+    ap.add_argument("--workers", type=int, default=1)
+    ap.add_argument("--cpus", help="pin the backend to these CPUs, e.g. 0,1 (Elite = 2 cores)")
     a = ap.parse_args()
+    CFG.update(workers=a.workers, cpus=a.cpus)
     snapshot(a.source)
     proc = start_backend()
     scratch = MongoClient(os.environ["MONGO_URL"])[SCRATCH_DB]
@@ -74,7 +77,8 @@ def main():
     lines = [
         f"# Phase 3F report speed — {a.source} — {time.strftime('%Y-%m-%d %H:%M UTC', time.gmtime())}",
         "",
-        f"Scratch copy of `{a.source}`, private backend. first = first page after a write ({a.cold} samples, every cache stale); "
+        f"Scratch copy of `{a.source}`, private backend ({a.workers} process(es)"
+        f"{', CPUs ' + a.cpus if a.cpus else ''}). first = first page after a write ({a.cold} samples, every cache stale); "
         f"cached = {a.warm} repeats. Server time (`Server-Timing: total`). Budget p95 first ≤ {FIRST} ms, cached ≤ {CACHED} ms.",
         "",
         "| Segment | Report | Rows | first p50 | first p95 | cached p50 | cached p95 | Within |",

@@ -1,12 +1,12 @@
 # Connection matrix (F-42, REQ-67…73)
 
-Generated 2026-11-18 11:48 UTC on the private test copy · 28 actions × 26 surfaces = 728 cells · **726 green, 2 red**
+Generated 2026-11-18 14:51 UTC on the private test copy · 28 actions × 26 surfaces = 728 cells · **728 green, 0 red**
 
 Direct reads checked immediately; read models / after-commit surfaces within 5 s. Unlisted metrics must be unchanged.
 
 | action | booking_page | customer_360 | ledger | bills_raised | received | cheque_register | roznamcha | demand_register | home_widgets | home_command | home_trends | collections | outstanding | project_statement | cancellations | hold_register | lead_funnel | status_counters | inventory_value | pdfs | documents | journey | notifications | customer_card | booking_card | project_card |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| create booking | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🔴 | 🔴 | 🟢 | 🟢 | 🟢 | 🟢 |
+| create booking | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 |
 | payment Cash | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 |
 | payment Cheque | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 |
 | payment NEFT/RTGS | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 |
@@ -45,7 +45,7 @@ Informational ("any") metrics remaining: 12
 ## Cells (before → after)
 
 ### create booking
-- 🟢 **booking_page** — advance null → 0; agreement null → 420000000; bill null → 55900000; flat null → "15c97449-318c-45a1-b30d-b89b50f36d46"; outstanding null → 55900000; pending_cheques null → 0; plan null → "b00e6509-91aa-424f-b4f3-122560648d61"; received null → 0; status null → "Active"
+- 🟢 **booking_page** — advance null → 0; agreement null → 420000000; bill null → 55900000; flat null → "ba52343c-df19-4472-8a31-2dd516682b07"; outstanding null → 55900000; pending_cheques null → 0; plan null → "b00e6509-91aa-424f-b4f3-122560648d61"; received null → 0; status null → "Active"
 - 🟢 **customer_360** — bill null → 55900000; bookings 0 → 1; received null → 0; status null → "Active"
 - 🟢 **ledger** — jama null → 0; rows null → 3; udhar null → 55900000
 - 🟢 **bills_raised** — count null → 1; raised null → 42000000
@@ -65,9 +65,9 @@ Informational ("any") metrics remaining: 12
 - 🟢 **status_counters** — fid_status "Available" → "Booked"; project_bookings 68 → 69; tower_bookings 0 → 1
 - 🟢 **inventory_value** — available 84 → 83; available_value 44603910000 → 44183910000; booked 68 → 69; sold_value 38288770000 → 38708770000
 - 🟢 **pdfs** — last_demand_pdf null → "DM-2627-20721:200"; statement_pdf null → true; statement_rows null → 3
-- 🔴 **documents** — docs null → 0 · FAIL: docs: expected grows, before None → after 0
-- 🔴 **journey** — entries null → 2; last null → "booking.create"; last_has_values null → false · FAIL: last_has_values: expected = True, before None → after False
-- 🟢 **notifications** — newest "2026-11-18T11:44:37.207751+00:00" → "2026-11-18T11:44:50.470995+00:00"; unread 2677 → 2680
+- 🟢 **documents** — docs null → 4
+- 🟢 **journey** — entries null → 6; last null → "booking.create"; last_has_values null → true
+- 🟢 **notifications** — newest "2026-11-18T14:47:52.539183+00:00" → "2026-11-18T14:48:19.689576+00:00"; unread 2677 → 2688
 - 🟢 **customer_card** — advance null → 0; billed null → 55900000; due null → 55900000; received null → 0
 - 🟢 **booking_card** — advance null → 0; billed null → 55900000; due null → 55900000; received null → 0
 - 🟢 **project_card** — outstanding 4339227100 → 4395127100
@@ -235,7 +235,7 @@ Informational ("any") metrics remaining: 12
 - 🟢 **pdfs** — statement_rows 3 → 4
 - 🟢 **documents** — unchanged
 - 🟢 **journey** — entries 7 → 9; last "payment.post" → "payment.bounce"
-- 🟢 **notifications** — newest "2026-11-18T11:45:46.597476+00:00" → "2026-11-18T11:45:52.602833+00:00"; unread 2754 → 2756
+- 🟢 **notifications** — newest "2026-11-18T14:48:59.206501+00:00" → "2026-11-18T14:49:05.038582+00:00"; unread 2754 → 2756
 - 🟢 **customer_card** — billed 55900000 → 55950000; due 55900000 → 55950000
 - 🟢 **booking_card** — billed 55900000 → 55950000; due 55900000 → 55950000
 - 🟢 **project_card** — outstanding 4729527100 → 4729577100
@@ -263,7 +263,7 @@ Informational ("any") metrics remaining: 12
 - 🟢 **pdfs** — statement_rows 4 → 5
 - 🟢 **documents** — unchanged
 - 🟢 **journey** — entries 7 → 8; last "payment.post" → "payment.reverse"
-- 🟢 **notifications** — newest "2026-11-18T11:45:54.879244+00:00" → "2026-11-18T11:46:00.881856+00:00"; unread 2767 → 2768
+- 🟢 **notifications** — newest "2026-11-18T14:49:06.873364+00:00" → "2026-11-18T14:49:12.740664+00:00"; unread 2767 → 2768
 - 🟢 **customer_card** — due 55650000 → 55900000; received 250000 → 0
 - 🟢 **booking_card** — due 55650000 → 55900000; received 250000 → 0
 - 🟢 **project_card** — collected 24901653600 → 24901403600; outstanding 4785227100 → 4785477100
@@ -291,7 +291,7 @@ Informational ("any") metrics remaining: 12
 - 🟢 **pdfs** — last_demand_pdf "DM-2627-20729:200" → "DM-2627-20738:200"; statement_rows 3 → 5
 - 🟢 **documents** — docs 4 → 5
 - 🟢 **journey** — entries 6 → 8; last "booking.create" → "demand.create"
-- 🟢 **notifications** — newest "2026-11-18T11:46:03.238448+00:00" → "2026-11-18T11:46:10.248577+00:00"; unread 2779 → 2797
+- 🟢 **notifications** — newest "2026-11-18T14:49:14.618006+00:00" → "2026-11-18T14:49:21.885498+00:00"; unread 2779 → 2800
 - 🟢 **customer_card** — billed 55900000 → 77950000; due 55900000 → 77950000
 - 🟢 **booking_card** — billed 55900000 → 77950000; due 55900000 → 77950000
 - 🟢 **project_card** — outstanding 4841377100 → 5039827100
@@ -347,7 +347,7 @@ Informational ("any") metrics remaining: 12
 - 🟢 **pdfs** — last_demand_pdf "DM-2627-20752:200" → null; statement_rows 6 → 7
 - 🟢 **documents** — docs 4 → 5
 - 🟢 **journey** — entries 8 → 10; last "payment.post" → "booking.cancel"
-- 🟢 **notifications** — newest "2026-11-18T11:46:23.320561+00:00" → "2026-11-18T11:46:29.522837+00:00"; unread 2850 → 2854
+- 🟢 **notifications** — newest "2026-11-18T14:49:34.107990+00:00" → "2026-11-18T14:49:40.145094+00:00"; unread 2850 → 2854
 - 🟢 **customer_card** — advance 0 → null; billed 77950000 → null; due 77700000 → null; received 250000 → null
 - 🟢 **booking_card** — billed 77950000 → 250000; due 77700000 → 0
 - 🟢 **project_card** — collected 24901653600 → 24901403600; outstanding 5195477100 → 5117777100
@@ -375,7 +375,7 @@ Informational ("any") metrics remaining: 12
 - 🟢 **pdfs** — last_demand_pdf "DM-2627-20754:200" → null; statement_rows 6 → 7
 - 🟢 **documents** — docs 4 → 5
 - 🟢 **journey** — entries 8 → 10; last "payment.post" → "booking.cancel"
-- 🟢 **notifications** — newest "2026-11-18T11:46:31.890625+00:00" → "2026-11-18T11:46:38.024505+00:00"; unread 2866 → 2870
+- 🟢 **notifications** — newest "2026-11-18T14:49:42.090955+00:00" → "2026-11-18T14:49:48.095626+00:00"; unread 2866 → 2870
 - 🟢 **customer_card** — advance 0 → null; billed 77950000 → null; due 77700000 → null; received 250000 → null
 - 🟢 **booking_card** — billed 77950000 → 250000; due 77700000 → 0
 - 🟢 **project_card** — collected 24901653600 → 24901403600; outstanding 5195477100 → 5117777100
@@ -403,7 +403,7 @@ Informational ("any") metrics remaining: 12
 - 🟢 **pdfs** — statement_rows 7 → 8
 - 🟢 **documents** — unchanged
 - 🟢 **journey** — unchanged
-- 🟢 **notifications** — newest "2026-11-18T11:46:40.652485+00:00" → "2026-11-18T11:46:46.862337+00:00"; unread 2886 → 2887
+- 🟢 **notifications** — newest "2026-11-18T14:49:50.079699+00:00" → "2026-11-18T14:49:56.160848+00:00"; unread 2886 → 2887
 - 🟢 **customer_card** — unchanged
 - 🟢 **booking_card** — billed 15000000 → 0; received 15000000 → 0
 - 🟢 **project_card** — unchanged
@@ -431,13 +431,13 @@ Informational ("any") metrics remaining: 12
 - 🟢 **pdfs** — statement_rows 7 → 9
 - 🟢 **documents** — unchanged
 - 🟢 **journey** — unchanged
-- 🟢 **notifications** — newest "2026-11-18T11:46:49.241855+00:00" → "2026-11-18T11:46:55.492140+00:00"; unread 2903 → 2904
+- 🟢 **notifications** — newest "2026-11-18T14:49:58.128517+00:00" → "2026-11-18T14:50:04.194084+00:00"; unread 2903 → 2904
 - 🟢 **customer_card** — unchanged
 - 🟢 **booking_card** — billed 11800000 → 0; received 11800000 → 0
 - 🟢 **project_card** — unchanged
 
 ### transfer
-- 🟢 **booking_page** — flat "735cdd52-e456-4ddd-8198-6f9c5dd86428" → "cf749a0d-d9be-41ab-8c40-a12cff2a0156"
+- 🟢 **booking_page** — flat "9dd91b3c-3e7d-46c0-8671-6d942bebde59" → "e64a40c1-b4ab-4f69-ba3a-772192040f9e"
 - 🟢 **customer_360** — unchanged
 - 🟢 **ledger** — rows 6 → 7
 - 🟢 **bills_raised** — unchanged
@@ -459,7 +459,7 @@ Informational ("any") metrics remaining: 12
 - 🟢 **pdfs** — statement_rows 6 → 7
 - 🟢 **documents** — unchanged
 - 🟢 **journey** — entries 8 → 10; last "payment.post" → "booking.transfer"
-- 🟢 **notifications** — newest "2026-11-18T11:46:57.989551+00:00" → "2026-11-18T11:47:04.167560+00:00"; unread 2916 → 2917
+- 🟢 **notifications** — newest "2026-11-18T14:50:06.143865+00:00" → "2026-11-18T14:50:12.187056+00:00"; unread 2916 → 2917
 - 🟢 **customer_card** — unchanged
 - 🟢 **booking_card** — unchanged
 - 🟢 **project_card** — unchanged
@@ -487,7 +487,7 @@ Informational ("any") metrics remaining: 12
 - 🟢 **pdfs** — statement_rows 6 → 7
 - 🟢 **documents** — unchanged
 - 🟢 **journey** — entries 8 → 10; last "payment.post" → "booking.agreement_revision"
-- 🟢 **notifications** — newest "2026-11-18T11:47:06.642075+00:00" → "2026-11-18T11:47:12.672506+00:00"; unread 2929 → 2930
+- 🟢 **notifications** — newest "2026-11-18T14:50:14.200235+00:00" → "2026-11-18T14:50:20.280852+00:00"; unread 2929 → 2930
 - 🟢 **customer_card** — billed 77950000 → 78100000; due 77700000 → 77850000
 - 🟢 **booking_card** — billed 77950000 → 78100000; due 77700000 → 77850000
 - 🟢 **project_card** — outstanding 5273177100 → 5273327100
@@ -515,7 +515,7 @@ Informational ("any") metrics remaining: 12
 - 🟢 **pdfs** — last_demand_pdf "DM-2627-20764:200" → "DM-2627-20765:200"
 - 🟢 **documents** — docs 4 → 5
 - 🟢 **journey** — entries 7 → 10; last "booking.create" → "booking.plan_change"
-- 🟢 **notifications** — newest "2026-11-18T11:47:15.102507+00:00" → "2026-11-18T11:47:21.351401+00:00"; unread 2942 → 2946
+- 🟢 **notifications** — newest "2026-11-18T14:50:22.234456+00:00" → "2026-11-18T14:50:28.416953+00:00"; unread 2942 → 2946
 - 🟢 **customer_card** — billed 77950000 → 452800000; due 77950000 → 452800000
 - 🟢 **booking_card** — billed 77950000 → 452800000; due 77950000 → 452800000
 - 🟢 **project_card** — outstanding 5351277100 → 5726127100
@@ -599,7 +599,7 @@ Informational ("any") metrics remaining: 12
 - 🟢 **pdfs** — unchanged
 - 🟢 **documents** — unchanged
 - 🟢 **journey** — unchanged
-- 🟢 **notifications** — newest "2026-11-18T11:47:21.351401+00:00" → "2026-11-18T11:47:47.269309+00:00"; unread 2946 → 2948
+- 🟢 **notifications** — newest "2026-11-18T14:50:28.416953+00:00" → "2026-11-18T14:50:53.080335+00:00"; unread 2946 → 2948
 - 🟢 **customer_card** — unchanged
 - 🟢 **booking_card** — unchanged
 - 🟢 **project_card** — unchanged
@@ -633,7 +633,7 @@ Informational ("any") metrics remaining: 12
 - 🟢 **project_card** — unchanged
 
 ### lead → visit → booking
-- 🟢 **booking_page** — advance null → 0; agreement null → 420000000; bill null → 77950000; flat null → "7c854eba-374c-4261-8b8b-8124018a1b8c"; outstanding null → 77950000; pending_cheques null → 0; plan null → "b00e6509-91aa-424f-b4f3-122560648d61"; received null → 0; status null → "Active"
+- 🟢 **booking_page** — advance null → 0; agreement null → 420000000; bill null → 77950000; flat null → "8d70eaa6-0c1d-40e5-a826-3daff34f34b1"; outstanding null → 77950000; pending_cheques null → 0; plan null → "b00e6509-91aa-424f-b4f3-122560648d61"; received null → 0; status null → "Active"
 - 🟢 **customer_360** — bill null → 77950000; bookings null → 1; received null → 0; status null → "Active"
 - 🟢 **ledger** — jama null → 0; rows null → 5; udhar null → 77950000
 - 🟢 **bills_raised** — count null → 2; raised null → 63000000
@@ -655,7 +655,7 @@ Informational ("any") metrics remaining: 12
 - 🟢 **pdfs** — last_demand_pdf null → "DM-2627-20767:200"; statement_pdf null → true; statement_rows null → 5
 - 🟢 **documents** — docs null → 4
 - 🟢 **journey** — entries null → 7; last null → "booking.create"; last_has_values null → true
-- 🟢 **notifications** — newest "2026-11-18T11:47:55.551669+00:00" → "2026-11-18T11:48:02.393000+00:00"; unread 2949 → 2960
+- 🟢 **notifications** — newest "2026-11-18T14:51:00.661978+00:00" → "2026-11-18T14:51:07.046396+00:00"; unread 2949 → 2960
 - 🟢 **customer_card** — advance null → 0; billed null → 77950000; due null → 77950000; received null → 0
 - 🟢 **booking_card** — advance null → 0; billed null → 77950000; due null → 77950000; received null → 0
 - 🟢 **project_card** — outstanding 5726127100 → 5804077100
@@ -689,7 +689,7 @@ Informational ("any") metrics remaining: 12
 - 🟢 **project_card** — unchanged
 
 ### booking with discount
-- 🟢 **booking_page** — advance null → 0; agreement null → 415000000; bill null → 77162500; flat null → "8e9ef486-63c7-4592-beb1-b699c52b240d"; outstanding null → 77162500; pending_cheques null → 0; plan null → "b00e6509-91aa-424f-b4f3-122560648d61"; received null → 0; status null → "Active"
+- 🟢 **booking_page** — advance null → 0; agreement null → 415000000; bill null → 77162500; flat null → "034e3170-29fc-4fe2-9c3c-8e4879206101"; outstanding null → 77162500; pending_cheques null → 0; plan null → "b00e6509-91aa-424f-b4f3-122560648d61"; received null → 0; status null → "Active"
 - 🟢 **customer_360** — bill null → 77162500; bookings 0 → 1; received null → 0; status null → "Active"
 - 🟢 **ledger** — jama null → 0; rows null → 5; udhar null → 77162500
 - 🟢 **bills_raised** — count null → 2; raised null → 62250000
@@ -711,13 +711,13 @@ Informational ("any") metrics remaining: 12
 - 🟢 **pdfs** — last_demand_pdf null → "DM-2627-20771:200"; statement_pdf null → true; statement_rows null → 5
 - 🟢 **documents** — docs null → 4
 - 🟢 **journey** — entries null → 7; last null → "booking.create"; last_has_values null → true
-- 🟢 **notifications** — newest "2026-11-18T11:48:04.519393+00:00" → "2026-11-18T11:48:19.379940+00:00"; unread 2973 → 2984
+- 🟢 **notifications** — newest "2026-11-18T14:51:08.689847+00:00" → "2026-11-18T14:51:22.618828+00:00"; unread 2973 → 2984
 - 🟢 **customer_card** — advance null → 0; billed null → 77162500; due null → 77162500; received null → 0
 - 🟢 **booking_card** — advance null → 0; billed null → 77162500; due null → 77162500; received null → 0
 - 🟢 **project_card** — outstanding 5881777100 → 5958939600
 
 ### waiver approved (Account share)
-- 🟢 **booking_page** — outstanding 77950000 → 76900000
+- 🟢 **booking_page** — outstanding 79950000 → 78900000
 - 🟢 **customer_360** — unchanged
 - 🟢 **ledger** — jama 0 → 1050000; rows 6 → 8
 - 🟢 **bills_raised** — unchanged
@@ -725,11 +725,11 @@ Informational ("any") metrics remaining: 12
 - 🟢 **cheque_register** — unchanged
 - 🟢 **roznamcha** — unchanged
 - 🟢 **demand_register** — balance 5401968100 → 5400968100
-- 🟢 **home_widgets** — outstanding 6195326800 → 6194276800
-- 🟢 **home_command** — l:ageing 12073779200 → 12071679200; l:attention 15 → 16; l:inflow_30 3552935000 → 3551935000; w:ageing 12073779200 → 12071679200; w:attention 15 → 16; w:inflow_30 3552935000 → 3551935000
+- 🟢 **home_widgets** — outstanding 6197326800 → 6196276800
+- 🟢 **home_command** — l:ageing 12077779200 → 12075679200; l:attention 15 → 16; l:inflow_30 3552935000 → 3551935000; w:ageing 12077779200 → 12075679200; w:attention 15 → 16; w:inflow_30 3552935000 → 3551935000
 - 🟢 **home_trends** — unchanged
 - 🟢 **collections** — unchanged
-- 🟢 **outstanding** — outstanding 6036889600 → 6035839600
+- 🟢 **outstanding** — outstanding 6038889600 → 6037839600
 - 🟢 **project_statement** — unchanged
 - 🟢 **cancellations** — unchanged
 - 🟢 **hold_register** — unchanged
@@ -740,9 +740,9 @@ Informational ("any") metrics remaining: 12
 - 🟢 **documents** — unchanged
 - 🟢 **journey** — entries 9 → 11; last "demand.create" → "waiver.self_approve"
 - 🟢 **notifications** — unchanged
-- 🟢 **customer_card** — due 77950000 → 76900000
-- 🟢 **booking_card** — due 77950000 → 76900000
-- 🟢 **project_card** — outstanding 6036889600 → 6035839600
+- 🟢 **customer_card** — due 79950000 → 78900000
+- 🟢 **booking_card** — due 79950000 → 78900000
+- 🟢 **project_card** — outstanding 6038889600 → 6037839600
 
 ### waiver requested (pending)
 - 🟢 **booking_page** — unchanged
@@ -767,7 +767,7 @@ Informational ("any") metrics remaining: 12
 - 🟢 **pdfs** — unchanged
 - 🟢 **documents** — unchanged
 - 🟢 **journey** — entries 9 → 10; last "demand.create" → "waiver.request"
-- 🟢 **notifications** — newest "2026-11-18T11:48:30.266983+00:00" → "2026-11-18T11:48:36.619029+00:00"; unread 3013 → 3014
+- 🟢 **notifications** — newest "2026-11-18T14:51:32.232612+00:00" → "2026-11-18T14:51:38.446402+00:00"; unread 3013 → 3014
 - 🟢 **customer_card** — unchanged
 - 🟢 **booking_card** — unchanged
 - 🟢 **project_card** — unchanged
@@ -795,7 +795,7 @@ Informational ("any") metrics remaining: 12
 - 🟢 **pdfs** — unchanged
 - 🟢 **documents** — unchanged
 - 🟢 **journey** — entries 9 → 11; last "demand.create" → "waiver.reject"
-- 🟢 **notifications** — newest "2026-11-18T11:48:39.146796+00:00" → "2026-11-18T11:48:45.279237+00:00"; unread 3028 → 3029
+- 🟢 **notifications** — newest "2026-11-18T14:51:40.395897+00:00" → "2026-11-18T14:51:46.272412+00:00"; unread 3028 → 3029
 - 🟢 **customer_card** — unchanged
 - 🟢 **booking_card** — unchanged
 - 🟢 **project_card** — unchanged

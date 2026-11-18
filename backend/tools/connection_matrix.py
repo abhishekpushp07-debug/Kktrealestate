@@ -1632,6 +1632,9 @@ def _read(api, c, k):
 def _settled(api, c, cap_s=30.0):
     """Baseline = the setup's own effects fully landed (read models + after-commit work): two equal reads in a row."""
     t0, prev = time.monotonic(), None
+    # the setup's queued after-commit work (e.g. 30 flat-price snapshots of the matrix tower) must land before the act:
+    # otherwise the act's own auto letters wait behind it and miss the act's 5 s freshness window (REQ-70)
+    api.post("/admin/ops/after-commit/drain")
     while True:
         cur = {k: _read(api, c, k) for k in SURFACES}
         if cur == prev or time.monotonic() - t0 > cap_s:

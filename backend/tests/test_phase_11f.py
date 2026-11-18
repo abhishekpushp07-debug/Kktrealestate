@@ -140,6 +140,7 @@ def test_cancel_booking_flow(H):
             "agreement_value": 2500000,
             "cash_agreed": 500000,
             "account_agreed": 2000000,
+            "discount_reason": "QA test price",  # REQ-236 (3E): agreed below list needs a reason
             "payment_plan_id": plans[0]["id"] if plans else None,
         },
         headers={**H, "Idempotency-Key": str(uuid.uuid4())},

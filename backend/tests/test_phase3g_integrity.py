@@ -382,3 +382,15 @@ def test_db_refuses_second_live_booking_on_a_sold_flat():
             db.bookings.insert_one(dup, bypass_document_validation=True)
     finally:
         db.bookings.delete_many({"id": dup["id"]})
+
+
+# ---- G-07 follow-up: the read-model repair also rebuilds monthly buckets (trends), e.g. kkt_medium after a lost flush
+def test_recompute_read_models_repairs_stale_monthly_buckets(admin_headers):
+    db = _db()
+    co = db.companies.find_one({}, {"_id": 0, "id": 1})["id"]
+    q = {"company_id": co, "scope": "company", "month": date.today().isoformat()[:7]}
+    _call(admin_headers, "POST", "/admin/recompute-read-models")
+    good = db.monthly_buckets.find_one(q, {"_id": 0, "collections_cash": 1, "collections_account": 1})
+    db.monthly_buckets.update_one(q, {"$inc": {"collections_cash": 777_00}})  # a flush that never landed
+    _call(admin_headers, "POST", "/admin/recompute-read-models")
+    assert db.monthly_buckets.find_one(q, {"_id": 0, "collections_cash": 1, "collections_account": 1}) == good

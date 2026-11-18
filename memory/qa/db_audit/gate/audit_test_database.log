@@ -1,0 +1,8 @@
+test_database: 102 collections, 11.2 s, findings {'Medium': 6}
+  [Medium] UNIQ-OTHER: 39 other keys not DB-enforced (0 duplicates today)
+  [Medium] REF-customer_merges.survivor_id: Broken reference customer_merges.survivor_id→customers: 4/4
+  [Medium] REF-customer_merges.merged_id: Broken reference customer_merges.merged_id→customers: 4/4
+  [Medium] REF-notifications.user_id: Broken reference notifications.user_id→users / customer:<id>→customers: 230/16603
+  [Medium] IDX-COLLSCAN-doc_verifications-Doc verification by : COLLSCAN: Doc verification by code (1080 docs examined)
+  [Medium] IDX-COLLSCAN-job_runs-Job runs latest per : COLLSCAN: Job runs latest per job (6014 docs examined)
+read-only: verified

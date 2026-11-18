@@ -1,6 +1,7 @@
 import os
 
 """Customer Portal: auth (aud=portal), scoped read APIs, service requests, notices, profile. Phase 5."""
+import asyncio
 import secrets
 from datetime import UTC, datetime, timedelta
 
@@ -1540,20 +1541,31 @@ async def portal_bulk_enable(request: Request, user: dict = Depends(require("ser
     """Enable portal for all customers with Active bookings that have no account yet. Temp passwords are returned ONCE."""
     ids = await db.bookings.distinct("customer_id", {"company_id": user["company_id"], "status": "Active"})
     have = set(await db.portal_accounts.distinct("customer_id", {"customer_id": {"$in": ids}}))
-    out = []
+    todo, phones = [], set()
     for c in await db.customers.find(
         {"id": {"$in": [i for i in ids if i not in have]}}, {"_id": 0, "id": 1, "full_name": 1, "phone": 1}
     ).to_list(None):
         phone = (c.get("phone") or "")[-10:]
-        if len(phone) != 10 or await db.portal_accounts.find_one({"login_phone": phone}):
+        if len(phone) != 10 or phone in phones or await db.portal_accounts.find_one({"login_phone": phone}):
             continue
-        temp = _temp_password()
+        phones.add(phone)
+        todo.append((c, phone, _temp_password()))
+    # bcrypt is CPU-bound (~0.2 s each): hash in worker threads (it releases the GIL) so the event loop keeps serving
+    gate = asyncio.Semaphore(8)
+
+    async def _hash(pw):
+        async with gate:
+            return await asyncio.to_thread(hash_password, pw)
+
+    hashes = await asyncio.gather(*(_hash(temp) for _, _, temp in todo))
+    out = []
+    for (c, phone, temp), pw_hash in zip(todo, hashes):
         await db.portal_accounts.insert_one(
             {
                 **base_doc(user, user["company_id"]),
                 "customer_id": c["id"],
                 "login_phone": phone,
-                "password_hash": hash_password(temp),
+                "password_hash": pw_hash,
                 "must_change_password": True,
                 "failed_attempts": 0,
                 "locked_until": None,

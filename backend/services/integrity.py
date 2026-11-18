@@ -109,10 +109,10 @@ async def _plan_findings(bk: dict, today: date) -> list[dict]:
                     "paid_paise": 0,
                 }
             )
-    plan_bills = [d for d in demands if d.get("source") != "manual"]  # a manual bill is Udhar, not a plan order
-    raised_sum = sum(d["total_demand_paise"] for d in plan_bills)
+    # PRE-01 (owner A): a manual bill is part of the order raised, like a plan bill
+    raised_sum = sum(d["total_demand_paise"] for d in demands)
     sm = bk.get("summary") or {}
-    paid_sum = sum(d["total_demand_paise"] for d in plan_bills if d["status"] == "Paid")
+    paid_sum = sum(d["total_demand_paise"] for d in demands if d["status"] == "Paid")
     if sm.get("total_order_raised_paise", 0) != raised_sum and not (
         bk.get("transfers")
         and raised_sum > sm.get("total_order_raised_paise", 0)

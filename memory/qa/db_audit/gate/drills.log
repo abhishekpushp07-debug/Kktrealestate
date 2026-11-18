@@ -1,0 +1,528 @@
+=== setup 15:09:37
+scratch ready 1500
+=== exit 0 15:09:48
+=== races --label final --reps 20 15:09:48
+races_final {
+ "R1 same receipt + same key at once": {
+  "receipts=1 codes=201/201 same_receipt=True": 20,
+  "integrity_bad": 0
+ },
+ "R2 two receipts on one booking at once": {
+  "codes=409/409": 7,
+  "integrity_bad": 0,
+  "codes=409/201": 2,
+  "codes=201/409": 10,
+  "codes=201/201": 1,
+  "examples": []
+ },
+ "R7 receipt during cancellation": {
+  "codes pay/cancel=201/409 accounted=True": 4,
+  "codes pay/cancel=409/200 accounted=True": 4,
+  "codes pay/cancel=201/200 accounted=True": 2,
+  "examples": []
+ },
+ "R8 two ledger rebuilds on one booking at once": {
+  "codes=201/200": 20,
+  "integrity_bad": 0,
+  "examples": []
+ },
+ "R3 two bookings on one flat at once": {
+  "live_bookings=1 codes=409/201": 10,
+  "loser says: Flat A-103 was just taken by another booking": 1,
+  "bookings_total_for_flat": 20,
+  "bills_after": 84,
+  "loser says: Flat A-404 was just taken by another booking": 1,
+  "live_bookings=1 codes=201/409": 10,
+  "loser says: Flat A-602 was just taken by another booking": 1,
+  "loser says: Flat A-604 was just taken by another booking": 1,
+  "loser says: Flat A-703 was just taken by another booking": 1,
+  "loser says: Flat A-802 is Booked": 1,
+  "loser says: Flat B-102 was just taken by another booking": 1,
+  "loser says: Flat B-201 was just taken by another booking": 1,
+  "loser says: Flat B-302 is Booked": 1,
+  "loser says: Flat B-304 was just taken by another booking": 1,
+  "loser says: Flat B-403 was just taken by another booking": 1,
+  "loser says: Flat B-404 was just taken by another booking": 1,
+  "loser says: Flat B-604 was just taken by another booking": 1,
+  "loser says: Flat B-703 was just taken by another booking": 1,
+  "loser says: Flat B-704 was just taken by another booking": 1,
+  "loser says: Flat B-801 was just taken by another booking": 1,
+  "loser says: Flat B-804 was just taken by another booking": 1,
+  "loser says: Flat V1 was just taken by another booking": 1,
+  "loser says: Flat V4 was just taken by another booking": 1,
+  "loser says: Flat V6 was just taken by another booking": 1
+ },
+ "R4 same waiver approved twice at once (+ approve vs reject)": {
+  "codes=409/200 approval_audits=1": 14,
+  "loser says: Already approved": 20,
+  "approve/reject codes=409/200 final=Rejected cn=False": 17,
+  "approve/reject codes=200/409 final=Approved cn=True": 3,
+  "codes=200/409 approval_audits=1": 6
+ },
+ "R5 two waivers approved at once": {
+  "codes=200/200 distinct_cn=True": 20
+ },
+ "R5 duplicate credit-note numbers": 0,
+ "R6 stage completed twice at once": {
+  "codes=200/409 dup_bills=0 dup_gst_parts=0": 4,
+  "bills_raised_total": 165,
+  "bookings_in_towers": 179,
+  "codes=409/200 dup_bills=0 dup_gst_parts=0": 2
+ },
+ "R9 direct duplicate ledger (booking, seq) insert": "refused: DuplicateKeyError",
+ "R10 direct duplicate waiver_number": "refused: DuplicateKeyError",
+ "R10 direct duplicate cn_number": "refused: DuplicateKeyError"
+}
+=== exit 0 15:11:03
+=== stale --label final --reps 10 15:11:03
+stale_final {
+ "reps": 10,
+ "redis": false,
+ "per_surface_seconds": {
+  "Home": [
+   "0.0"
+  ],
+  "Home legacy": [
+   "0.0"
+  ],
+  "Booking page": [
+   "0.0"
+  ],
+  "Customer 360": [
+   "0.0",
+   ">40"
+  ],
+  "Bills raised": [
+   "0.0"
+  ],
+  "Outstanding": [
+   "0.0"
+  ],
+  "Collections": [
+   "0.0"
+  ],
+  "Customer status": [
+   "0.0"
+  ],
+  "Bills vs Collection": [
+   "0.0"
+  ],
+  "Payments list": [
+   "0.0"
+  ],
+  "Dashboard": [
+   "0.0"
+  ]
+ },
+ "rows": [
+  {
+   "action": "receipt",
+   "Home": 0.0,
+   "Home legacy": 0.0,
+   "Booking page": 0.0,
+   "Customer 360": 0.0,
+   "Bills raised": 0.0,
+   "Outstanding": 0.0,
+   "Collections": 0.0,
+   "Customer status": 0.0,
+   "Bills vs Collection": 0.0,
+   "Payments list": 0.0,
+   "Dashboard": 0.0
+  },
+  {
+   "action": "waiver approve",
+   "Home": 0.0,
+   "Home legacy": 0.0,
+   "Booking page": 0.0,
+   "Customer 360": 0.0,
+   "Bills raised": 0.0,
+   "Outstanding": 0.0,
+   "Collections": 0.0,
+   "Customer status": 0.0,
+   "Bills vs Collection": 0.0,
+   "Payments list": 0.0,
+   "Dashboard": 0.0
+  },
+  {
+   "action": "stage complete",
+   "Home": 0.0,
+   "Home legacy": 0.0,
+   "Booking page": 0.0,
+   "Customer 360": 0.0,
+   "Bills raised": 0.0,
+   "Outstanding": 0.0,
+   "Collections": 0.0,
+   "Customer status": 0.0,
+   "Bills vs Collection": 0.0,
+   "Payments list": 0.0,
+   "Dashboard": 0.0
+  },
+  {
+   "action": "receipt",
+   "Home": 0.0,
+   "Home legacy": 0.0,
+   "Booking page": 0.0,
+   "Customer 360": 0.0,
+   "Bills raised": 0.0,
+   "Outstanding": 0.0,
+   "Collections": 0.0,
+   "Customer status": 0.0,
+   "Bills vs Collection": 0.0,
+   "Payments list": 0.0,
+   "Dashboard": 0.0
+  },
+  {
+   "action": "waiver approve",
+   "Home": 0.0,
+   "Home legacy": 0.0,
+   "Booking page": 0.0,
+   "Customer 360": 0.0,
+   "Bills raised": 0.0,
+   "Outstanding": 0.0,
+   "Collections": 0.0,
+   "Customer status": 0.0,
+   "Bills vs Collection": 0.0,
+   "Payments list": 0.0,
+   "Dashboard": 0.0
+  },
+  {
+   "action": "stage complete",
+   "Home": 0.0,
+   "Home legacy": 0.0,
+   "Booking page": 0.0,
+   "Customer 360": 0.0,
+   "Bills raised": 0.0,
+   "Outstanding": 0.0,
+   "Collections": 0.0,
+   "Customer status": 0.0,
+   "Bills vs Collection": 0.0,
+   "Payments list": 0.0,
+   "Dashboard": 0.0
+  },
+  {
+   "action": "receipt",
+   "Home": 0.0,
+   "Home legacy": 0.0,
+   "Booking page": 0.0,
+   "Customer 360": 0.0,
+   "Bills raised": 0.0,
+   "Outstanding": 0.0,
+   "Collections": 0.0,
+   "Customer status": 0.0,
+   "Bills vs Collection": 0.0,
+   "Payments list": 0.0,
+   "Dashboard": 0.0
+  },
+  {
+   "action": "waiver approve",
+   "Home": 0.0,
+   "Home legacy": 0.0,
+   "Booking page": 0.0,
+   "Customer 360": 0.0,
+   "Bills raised": 0.0,
+   "Outstanding": 0.0,
+   "Collections": 0.0,
+   "Customer status": 0.0,
+   "Bills vs Collection": 0.0,
+   "Payments list": 0.0,
+   "Dashboard": 0.0
+  },
+  {
+   "action": "stage complete",
+   "Home": 0.0,
+   "Home legacy": 0.0,
+   "Booking page": 0.0,
+   "Customer 360": 0.0,
+   "Bills raised": 0.0,
+   "Outstanding": 0.0,
+   "Collections": 0.0,
+   "Customer status": 0.0,
+   "Bills vs Collection": 0.0,
+   "Payments list": 0.0,
+   "Dashboard": 0.0
+  },
+  {
+   "action": "receipt",
+   "Home": 0.0,
+   "Home legacy": 0.0,
+   "Booking page": 0.0,
+   "Customer 360": 0.0,
+   "Bills raised": 0.0,
+   "Outstanding": 0.0,
+   "Collections": 0.0,
+   "Customer status": 0.0,
+   "Bills vs Collection": 0.0,
+   "Payments list": 0.0,
+   "Dashboard": 0.0
+  },
+  {
+   "action": "waiver approve",
+   "Home": 0.0,
+   "Home legacy": 0.0,
+   "Booking page": 0.0,
+   "Customer 360": 0.0,
+   "Bills raised": 0.0,
+   "Outstanding": 0.0,
+   "Collections": 0.0,
+   "Customer status": 0.0,
+   "Bills vs Collection": 0.0,
+   "Payments list": 0.0,
+   "Dashboard": 0.0
+  },
+  {
+   "action": "stage complete",
+   "Home": 0.0,
+   "Home legacy": 0.0,
+   "Booking page": 0.0,
+   "Customer 360": 0.0,
+   "Bills raised": 0.0,
+   "Outstanding": 0.0,
+   "Collections": 0.0,
+   "Customer status": 0.0,
+   "Bills vs Collection": 0.0,
+   "Payments list": 0.0,
+
+=== exit 0 15:18:22
+=== stale --label final --reps 10 --redis redis://127.0.0.1:6390/0 15:18:22
+stale_final_redis {
+ "reps": 10,
+ "redis": true,
+ "per_surface_seconds": {
+  "Home": [
+   "0.0"
+  ],
+  "Home legacy": [
+   "0.0"
+  ],
+  "Booking page": [
+   "0.0"
+  ],
+  "Customer 360": [
+   "0.0",
+   ">40"
+  ],
+  "Bills raised": [
+   "0.0"
+  ],
+  "Outstanding": [
+   "0.0"
+  ],
+  "Collections": [
+   "0.0"
+  ],
+  "Customer status": [
+   "0.0"
+  ],
+  "Bills vs Collection": [
+   "0.0"
+  ],
+  "Payments list": [
+   "0.0"
+  ],
+  "Dashboard": [
+   "0.0"
+  ]
+ },
+ "rows": [
+  {
+   "action": "receipt",
+   "Home": 0.0,
+   "Home legacy": 0.0,
+   "Booking page": 0.0,
+   "Customer 360": 0.0,
+   "Bills raised": 0.0,
+   "Outstanding": 0.0,
+   "Collections": 0.0,
+   "Customer status": 0.0,
+   "Bills vs Collection": 0.0,
+   "Payments list": 0.0,
+   "Dashboard": 0.0
+  },
+  {
+   "action": "waiver approve",
+   "Home": 0.0,
+   "Home legacy": 0.0,
+   "Booking page": 0.0,
+   "Customer 360": 0.0,
+   "Bills raised": 0.0,
+   "Outstanding": 0.0,
+   "Collections": 0.0,
+   "Customer status": 0.0,
+   "Bills vs Collection": 0.0,
+   "Payments list": 0.0,
+   "Dashboard": 0.0
+  },
+  {
+   "action": "stage complete",
+   "Home": 0.0,
+   "Home legacy": 0.0,
+   "Booking page": 0.0,
+   "Customer 360": 0.0,
+   "Bills raised": 0.0,
+   "Outstanding": 0.0,
+   "Collections": 0.0,
+   "Customer status": 0.0,
+   "Bills vs Collection": 0.0,
+   "Payments list": 0.0,
+   "Dashboard": 0.0
+  },
+  {
+   "action": "receipt",
+   "Home": 0.0,
+   "Home legacy": 0.0,
+   "Booking page": 0.0,
+   "Customer 360": 0.0,
+   "Bills raised": 0.0,
+   "Outstanding": 0.0,
+   "Collections": 0.0,
+   "Customer status": 0.0,
+   "Bills vs Collection": 0.0,
+   "Payments list": 0.0,
+   "Dashboard": 0.0
+  },
+  {
+   "action": "waiver approve",
+   "Home": 0.0,
+   "Home legacy": 0.0,
+   "Booking page": 0.0,
+   "Customer 360": 0.0,
+   "Bills raised": 0.0,
+   "Outstanding": 0.0,
+   "Collections": 0.0,
+   "Customer status": 0.0,
+   "Bills vs Collection": 0.0,
+   "Payments list": 0.0,
+   "Dashboard": 0.0
+  },
+  {
+   "action": "stage complete",
+   "Home": 0.0,
+   "Home legacy": 0.0,
+   "Booking page": 0.0,
+   "Customer 360": 0.0,
+   "Bills raised": 0.0,
+   "Outstanding": 0.0,
+   "Collections": 0.0,
+   "Customer status": 0.0,
+   "Bills vs Collection": 0.0,
+   "Payments list": 0.0,
+   "Dashboard": 0.0
+  },
+  {
+   "action": "receipt",
+   "Home": 0.0,
+   "Home legacy": 0.0,
+   "Booking page": 0.0,
+   "Customer 360": 0.0,
+   "Bills raised": 0.0,
+   "Outstanding": 0.0,
+   "Collections": 0.0,
+   "Customer status": 0.0,
+   "Bills vs Collection": 0.0,
+   "Payments list": 0.0,
+   "Dashboard": 0.0
+  },
+  {
+   "action": "waiver approve",
+   "Home": 0.0,
+   "Home legacy": 0.0,
+   "Booking page": 0.0,
+   "Customer 360": 0.0,
+   "Bills raised": 0.0,
+   "Outstanding": 0.0,
+   "Collections": 0.0,
+   "Customer status": 0.0,
+   "Bills vs Collection": 0.0,
+   "Payments list": 0.0,
+   "Dashboard": 0.0
+  },
+  {
+   "action": "stage complete",
+   "Home": 0.0,
+   "Home legacy": 0.0,
+   "Booking page": 0.0,
+   "Customer 360": 0.0,
+   "Bills raised": 0.0,
+   "Outstanding": 0.0,
+   "Collections": 0.0,
+   "Customer status": 0.0,
+   "Bills vs Collection": 0.0,
+   "Payments list": 0.0,
+   "Dashboard": 0.0
+  },
+  {
+   "action": "receipt",
+   "Home": 0.0,
+   "Home legacy": 0.0,
+   "Booking page": 0.0,
+   "Customer 360": 0.0,
+   "Bills raised": 0.0,
+   "Outstanding": 0.0,
+   "Collections": 0.0,
+   "Customer status": 0.0,
+   "Bills vs Collection": 0.0,
+   "Payments list": 0.0,
+   "Dashboard": 0.0
+  },
+  {
+   "action": "waiver approve",
+   "Home": 0.0,
+   "Home legacy": 0.0,
+   "Booking page": 0.0,
+   "Customer 360": 0.0,
+   "Bills raised": 0.0,
+   "Outstanding": 0.0,
+   "Collections": 0.0,
+   "Customer status": 0.0,
+   "Bills vs Collection": 0.0,
+   "Payments list": 0.0,
+   "Dashboard": 0.0
+  },
+  {
+   "action": "stage complete",
+   "Home": 0.0,
+   "Home legacy": 0.0,
+   "Booking page": 0.0,
+   "Customer 360": 0.0,
+   "Bills raised": 0.0,
+   "Outstanding": 0.0,
+   "Collections": 0.0,
+   "Customer status": 0.0,
+   "Bills vs Collection": 0.0,
+   "Payments list": 0.0,
+ 
+=== exit 0 15:25:43
+=== startup --label final --reps 10 15:25:43
+startup_final {
+ "start errors=2": 10,
+ "scheduler lease held by one owner=True": 10,
+ "index sets unchanged=True": 10,
+ "job kinds run twice=0": 10
+}
+=== exit 0 15:27:37
+=== dupstart 15:27:37
+dupstart_after {
+ "health": "ok",
+ "bookings_list_status": 200,
+ "home_status": 200,
+ "system_health_rule": {
+  "key": "ledger line (booking + sequence)",
+  "collection": "ledger_entries",
+  "index": "uniq_ledger_seq",
+  "status": "not_applied",
+  "message": "Uniqueness rule not applied \u2014 duplicates found",
+  "examples": [
+   "{'booking_id': '61ea7305-0006-4923-8258-b43b941616cf', 'seq': 1}"
+  ]
+ },
+ "log_names_rule": true,
+ "other_rules": {
+  "uniq_waiver_number": "applied",
+  "uniq_cn_number": "applied",
+  "uniq_refund_number_bucket": "applied",
+  "uniq_live_booking_per_flat": "applied"
+ },
+ "pass": true
+}
+=== exit 0 15:27:41
+DONE

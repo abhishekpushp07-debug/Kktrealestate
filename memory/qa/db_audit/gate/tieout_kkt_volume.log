@@ -1,0 +1,952 @@
+PASS collections FY total == Σ cleared receipts                   report=426472635000 raw=426472635000 
+PASS cheques-in-hand count == Pending payments                    report=922 raw=922 
+PASS cheques-in-hand amount == Σ Pending                          report=26053300000 raw=26053300000 
+PASS cheque register rows == instrument payments                  report=3585 raw=3585 raw by status {'Bounced': 532, 'Cleared': 2131, 'Pending': 922}
+PASS inventory report by_status == flats                          report={'Available': 665, 'Hold': 4, 'Booked':  raw={'Booked': 1498, 'Available': 665, 'Hold 
+PASS home units/available tiles == flats                          report=(2170, 665) raw=(2170, 665) 
+PASS legacy dashboard inventory == flats                          report={'Available': 665, 'Hold': 4, 'Booked':  raw={'Booked': 1498, 'Available': 665, 'Hold 
+PASS outstanding total == Σ booking summary dues                  report=117625132400 raw=117625132400 
+PASS home overdue tile == Σ bookings overdue (definitions.ageing_bands) report=110309905000 raw=110309905000 
+PASS report overdue == Σ bookings overdue                         report=110309905000 raw=110309905000 
+PASS dashboard overdue == report overdue                          report=110309905000 raw=110309905000 
+PASS Outstanding by customer: one row per customer id             report=1490 raw=1490 
+PASS Outstanding by customer Σ net balance == by booking Σ net balance report=7620162400 raw=7620162400 
+PASS Outstanding & Ageing band Not due == Σ bookings band Not due (definitions.ageing_bands) report=7315227400 raw=7315227400 
+PASS Outstanding & Ageing band 0-30 == Σ bookings band 0-30 (definitions.ageing_bands) report=3984348300 raw=3984348300 
+PASS Outstanding & Ageing band 31-60 == Σ bookings band 31-60 (definitions.ageing_bands) report=4220061500 raw=4220061500 
+PASS Outstanding & Ageing band 61-90 == Σ bookings band 61-90 (definitions.ageing_bands) report=4094910700 raw=4094910700 
+PASS Outstanding & Ageing band 90+ == Σ bookings band 90+ (definitions.ageing_bands) report=98010584500 raw=98010584500 
+PASS booking card overdue days == definitions.overdue_days (every live booking) report=1499 raw=1499 
+PASS other-charge parts with bill_day <= due_on                   report=4139 raw=4139 
+PASS GST-with-stage part bill_day == the day of the instalment bill it was billed with report=2720 raw=2720 
+PASS other-charge part due_on == its bill's due, else bill_day + days-to-pay report=4139 raw=4139 
+PASS ageing bands sum == report total outstanding                 report=117625132400 raw=117625132400 
+PASS report bands == Σ booking bands                              report={'Not due': 7315227400, '0-30': 39843483 raw={'Not due': 7315227400, '0-30': 39843483 
+PASS home outstanding tile == Σ booking dues                      report=117625132400 raw=117625132400 
+PASS home outstanding tile == outstanding report due              report=117625132400 raw=117625132400 
+PASS ONE NUMBER: Home outstanding == Outstanding report total     report=117625132400 raw=117625132400 
+PASS ONE NUMBER: Outstanding report total == Σ booking.summary.outstanding_paise report=117625132400 raw=117625132400 
+PASS Home advance held == Σ booking.summary.advance_paise         report=110004970000 raw=110004970000 
+PASS refunds API Paid total == Σ paid refunds                     report=0 raw=0 
+PASS cancellations report refund paid == Σ paid refunds           report=0 raw=0 
+PASS ledger REFUND contra rows == Σ paid refunds (all buckets)    report=0 raw=0 
+PASS bounce charges on bookings == bounce-charge audit rows       report=531 raw=531 
+PASS transferred bookings' flats point back to booking            report=0 raw=0 
+PASS cancelled bookings carry no open demands                     report=0 raw=0 
+PASS demand-vs-collection demanded == Σ non-void demands          report=409719870000 raw=409719870000 
+PASS legacy dashboard collections.month == Σ cleared this month   report=11641100000 raw=11641100000 month=2026-11
+PASS cancellations rows == Cancelled bookings                     report=1 raw=1 
+PASS sales-leads total == leads                                   report=1498 raw=1498 
+PASS Σ cleared cash receipts == booking.summary.cash_paid (all active) report=0 raw=0 count of bookings that differ
+PASS Σ Udhar − Σ Jama == outstanding − advance (every booking)    report=0 raw=0 two-sided ledger law
+PASS manual bills counted in Outstanding (order = plan % + Σ manual) report=0 raw=0 0 with manual bills
+PASS Σ customer-card Due == Σ live booking outstanding            report=117625132400 raw=117625132400 
+PASS Σ customer-card Advance == Σ live booking advance            report=110004970000 raw=110004970000 
+PASS Σ customer-card Overdue == ageing report overdue (definitions.ageing_for_bookings, incl. other charges) report=110309905000 raw=110309905000 
+PASS customer segments partition All (overdue + on track + all clear + advance-only + no booking) report=1975 raw=1975 
+PASS Advance chip == customers holding an advance (raw bookings)  report=884 raw=884 
+PASS KYC pending chip == active customers not Verified (raw)      report=1969 raw=1969 
+PASS customer-card 'agreement pending' == customers with an unsigned live booking (raw) report=0 raw=0 
+PASS GGV banner 'booked or sold' == tower chart == raw flats      report=(174, 174) raw=(174, 174) 
+PASS V04 banner 'booked or sold' == tower chart == raw flats      report=(255, 255) raw=(255, 255) 
+PASS V05 banner 'booked or sold' == tower chart == raw flats      report=(335, 335) raw=(335, 335) 
+PASS V03 banner 'booked or sold' == tower chart == raw flats      report=(260, 260) raw=(260, 260) 
+PASS V06 banner 'booked or sold' == tower chart == raw flats      report=(274, 274) raw=(274, 274) 
+PASS SGH banner 'booked or sold' == tower chart == raw flats      report=(201, 201) raw=(201, 201) 
+PASS Σ project-card Collected == Σ live booking Jama − waived     report=427837735000 raw=427837735000 
+PASS Σ project-card Outstanding == Σ live booking outstanding     report=117625132400 raw=117625132400 
+PASS booking-card Due == booking outstanding, one plan segment per instalment report=0 raw=0 200 active bookings
+PASS plan-timeline row states == booking-card plan segments       report=0 raw=0 25 bookings
+PASS /bookings segment counts sum == list total                   report=1500 raw=1500 
+PASS /projects segment counts sum == list total                   report=6 raw=6 
+PASS Home month Cash·Account·Other == Σ allocation parts          report={'Cash': 3333200000, 'Account': 83079000 raw={'Cash': 3333200000, 'Account': 83079000 
+PASS Home month total == Cash + Account + Other                   report=11641100000 raw=11641100000 
+PASS trends current month split == Σ allocation parts             report={'Cash': 3333200000, 'Account': 83079000 raw={'Cash': 3333200000, 'Account': 83079000 
+PASS collections-v2 (this month, by bucket) == Σ allocation parts report={'Cash': 3333200000, 'Account': 83079000 raw={'Cash': 3333200000, 'Account': 83079000 
+PASS collections FY cash/account/other == Σ allocation parts      report={'Cash': 116529400000, 'Account': 309886 raw={'Cash': 116529400000, 'Account': 309886 
+PASS carried: opening + billed in period − received − waived in period == closing report=7620162400 raw=7620162400 
+PASS bridge: received by payment date == Collections net received (receipt basis) report=223411500000 raw=223411500000 
+PASS bridge: by payment date − not live − dated in, cleared after + dated before, cleared in + refunds == carried received report=425123200000 raw=425123200000 
+PASS bridge from 2025-04-01: by clearance == carried received     report=427837735000 raw=427837735000 
+PASS bridge from 2026-11-02: by clearance == carried received     report=424507200000 raw=424507200000 
+PASS carried: closing == Outstanding report net balance (today)   report=7620162400 raw=7620162400 
+PASS formula: Bills vs Collection cash + account billed == total billed report=409719870000 raw=409719870000 
+PASS bridge: Bills vs Collection instalment bills → all bills == Outstanding bill raised report=435457897400 raw=435457897400 
+PASS formula: Advances cash + account == total advance            report=110004970000 raw=110004970000 
+PASS formula: Advances total == Outstanding report advance held   report=110004970000 raw=110004970000 
+PASS formula: Cheques cleared + bounced + pending == register amount report=103632100000 raw=103632100000 
+PASS formula: Bank-wise sum of banks == total                     report=176536600000 raw=176536600000 
+PASS formula: Bank-wise cleared + pending == total                report=176536600000 raw=176536600000 
+PASS Home due ageing == Outstanding report ageing (per band)      report={'Not due': 7315227400, '0-30': 39843483 raw={'Not due': 7315227400, '0-30': 39843483 
+PASS Home due ageing total == report Outstanding                  report=117625132400 raw=117625132400 
+PASS Home ageing (today) loads                                    report=True raw=True 
+PASS Home ageing (today) /reports/outstanding-v2 ageing[bucket=Not due].amount_paise report=7315227400 raw=7315227400 {}
+PASS Home ageing (today) /reports/outstanding-v2 ageing[bucket=0-30].amount_paise report=3984348300 raw=3984348300 {}
+PASS Home ageing (today) /reports/outstanding-v2 ageing[bucket=31-60].amount_paise report=4220061500 raw=4220061500 {}
+PASS Home ageing (today) /reports/outstanding-v2 ageing[bucket=61-90].amount_paise report=4094910700 raw=4094910700 {}
+PASS Home ageing (today) /reports/outstanding-v2 ageing[bucket=90+].amount_paise report=98010584500 raw=98010584500 {}
+PASS Home ageing (today) /reports/outstanding-v2 totals.outstanding_paise report=117625132400 raw=117625132400 {}
+PASS Home money_today (today) loads                               report=True raw=True 
+PASS Home money_today (today) /reports/collections-v2 totals.cash_paise report=0 raw=0 {'from_date': '2026-11-18', 'to_date': '2026-11-18'}
+PASS Home money_today (today) /reports/collections-v2 totals.account_paise report=0 raw=0 {'from_date': '2026-11-18', 'to_date': '2026-11-18'}
+PASS Home money_today (today) /reports/collections-v2 totals.other_paise report=0 raw=0 {'from_date': '2026-11-18', 'to_date': '2026-11-18'}
+PASS Home money_today (today) /reports/collections-v2 totals.total_paise report=0 raw=0 {'from_date': '2026-11-18', 'to_date': '2026-11-18'}
+PASS Home money_today (today) /payments/summary Pending.amount_paise report=26053300000 raw=26053300000 {'status': 'Pending'}
+PASS Home due_vs_received (today) loads                           report=True raw=True 
+PASS Home due_vs_received (today) /demands/register totals.total_paise report=968455000 raw=968455000 {'basis': 'due', 'date_from': '2026-11-18', 'date_to': '2026
+PASS Home due_vs_received (today) /reports/collections-v2 totals.total_paise report=0 raw=0 {'from_date': '2026-11-18', 'to_date': '2026-11-18'}
+PASS Home call_today (today) loads                                report=True raw=True 
+PASS Home call_today (today) /leads total                         report=3 raw=3 {'due_today': True}
+PASS Home call_today (today) /site-visits total                   report=2 raw=2 {'date_from': '2026-11-18', 'date_to': '2026-11-18', 'status
+PASS Home inflow_30 (today) loads                                 report=True raw=True 
+PASS Home inflow_30 (today) /demands/register totals.balance_paise report=1462995000 raw=1462995000 {'basis': 'due', 'date_from': '2026-11-19', 'date_to': '2026
+PASS Home inflow_30 (today) /payments/summary Pending.amount_paise report=26053300000 raw=26053300000 {'status': 'Pending'}
+PASS Home next_milestone (today) loads                            report=True raw=True 
+PASS Home next_milestone (today) /blocks/54e7ef57-ef1c-4639-8ae3-abd23bf0ad59/stages/9d1a8b0e-a1c9-4ef3-8e56-307caa1ab918/preview total_paise report=1095798000 raw=1095798000 {}
+PASS Home next_milestone (today) /blocks/1ad93271-5523-463e-b221-aaed913103bc/stages/2f0b3522-f968-4d8d-9ef0-e8357bf82b70/preview total_paise report=336257400 raw=336257400 {}
+PASS Home next_milestone (today) /blocks/3c011f05-4a65-438c-8cc9-b79f27c27b03/stages/cd8192a1-753a-47a1-91be-8e54178741f4/preview total_paise report=1215875300 raw=1215875300 {}
+PASS Home next_milestone (today) /blocks/15139c22-d8e1-4c64-bb84-39794cae33d5/stages/93065151-96a7-45e9-94fd-da5122ad6eaf/preview total_paise report=993308100 raw=993308100 {}
+PASS Home inventory (today) loads                                 report=True raw=True 
+PASS Home inventory (today) /flats total                          report=6 raw=6 {'block_id': '54e7ef57-ef1c-4639-8ae3-abd23bf0ad59', 'status
+PASS Home inventory (today) /flats total                          report=2 raw=2 {'block_id': '54e7ef57-ef1c-4639-8ae3-abd23bf0ad59', 'status
+PASS Home inventory (today) /flats total                          report=23 raw=23 {'block_id': '54e7ef57-ef1c-4639-8ae3-abd23bf0ad59', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '54e7ef57-ef1c-4639-8ae3-abd23bf0ad59', 'status
+PASS Home inventory (today) /flats total                          report=1 raw=1 {'block_id': '54e7ef57-ef1c-4639-8ae3-abd23bf0ad59', 'status
+PASS Home inventory (today) /flats total                          report=21 raw=21 {'block_id': '098bcefc-102a-4dcc-a8d9-23034c619390', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '098bcefc-102a-4dcc-a8d9-23034c619390', 'status
+PASS Home inventory (today) /flats total                          report=63 raw=63 {'block_id': '098bcefc-102a-4dcc-a8d9-23034c619390', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '098bcefc-102a-4dcc-a8d9-23034c619390', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '098bcefc-102a-4dcc-a8d9-23034c619390', 'status
+PASS Home inventory (today) /flats total                          report=26 raw=26 {'block_id': 'a3d899a6-4c2f-49f5-9e36-fd4a87baea54', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': 'a3d899a6-4c2f-49f5-9e36-fd4a87baea54', 'status
+PASS Home inventory (today) /flats total                          report=58 raw=58 {'block_id': 'a3d899a6-4c2f-49f5-9e36-fd4a87baea54', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': 'a3d899a6-4c2f-49f5-9e36-fd4a87baea54', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': 'a3d899a6-4c2f-49f5-9e36-fd4a87baea54', 'status
+PASS Home inventory (today) /flats total                          report=17 raw=17 {'block_id': '533a8a68-1a30-47c3-9521-8219d2ea8368', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '533a8a68-1a30-47c3-9521-8219d2ea8368', 'status
+PASS Home inventory (today) /flats total                          report=31 raw=31 {'block_id': '533a8a68-1a30-47c3-9521-8219d2ea8368', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '533a8a68-1a30-47c3-9521-8219d2ea8368', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '533a8a68-1a30-47c3-9521-8219d2ea8368', 'status
+PASS Home inventory (today) /flats total                          report=8 raw=8 {'block_id': 'dbb72375-e060-4cb2-a2c2-86452c833cd8', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': 'dbb72375-e060-4cb2-a2c2-86452c833cd8', 'status
+PASS Home inventory (today) /flats total                          report=48 raw=48 {'block_id': 'dbb72375-e060-4cb2-a2c2-86452c833cd8', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': 'dbb72375-e060-4cb2-a2c2-86452c833cd8', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': 'dbb72375-e060-4cb2-a2c2-86452c833cd8', 'status
+PASS Home inventory (today) /flats total                          report=11 raw=11 {'block_id': '1ad93271-5523-463e-b221-aaed913103bc', 'status
+PASS Home inventory (today) /flats total                          report=1 raw=1 {'block_id': '1ad93271-5523-463e-b221-aaed913103bc', 'status
+PASS Home inventory (today) /flats total                          report=19 raw=19 {'block_id': '1ad93271-5523-463e-b221-aaed913103bc', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '1ad93271-5523-463e-b221-aaed913103bc', 'status
+PASS Home inventory (today) /flats total                          report=1 raw=1 {'block_id': '1ad93271-5523-463e-b221-aaed913103bc', 'status
+PASS Home inventory (today) /flats total                          report=18 raw=18 {'block_id': '5f0dcf2d-5177-4335-9472-9816acb8d7c9', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '5f0dcf2d-5177-4335-9472-9816acb8d7c9', 'status
+PASS Home inventory (today) /flats total                          report=38 raw=38 {'block_id': '5f0dcf2d-5177-4335-9472-9816acb8d7c9', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '5f0dcf2d-5177-4335-9472-9816acb8d7c9', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '5f0dcf2d-5177-4335-9472-9816acb8d7c9', 'status
+PASS Home inventory (today) /flats total                          report=29 raw=29 {'block_id': '5a1c2f6a-95db-47f4-8e03-63b7c6d00ba0', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '5a1c2f6a-95db-47f4-8e03-63b7c6d00ba0', 'status
+PASS Home inventory (today) /flats total                          report=55 raw=55 {'block_id': '5a1c2f6a-95db-47f4-8e03-63b7c6d00ba0', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '5a1c2f6a-95db-47f4-8e03-63b7c6d00ba0', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '5a1c2f6a-95db-47f4-8e03-63b7c6d00ba0', 'status
+PASS Home inventory (today) /flats total                          report=22 raw=22 {'block_id': 'dc04eeb7-7c37-4cac-b51f-7d6de5d4ade0', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': 'dc04eeb7-7c37-4cac-b51f-7d6de5d4ade0', 'status
+PASS Home inventory (today) /flats total                          report=34 raw=34 {'block_id': 'dc04eeb7-7c37-4cac-b51f-7d6de5d4ade0', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': 'dc04eeb7-7c37-4cac-b51f-7d6de5d4ade0', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': 'dc04eeb7-7c37-4cac-b51f-7d6de5d4ade0', 'status
+PASS Home inventory (today) /flats total                          report=24 raw=24 {'block_id': 'c99a5ec1-8e6a-4269-b421-93067b393a6b', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': 'c99a5ec1-8e6a-4269-b421-93067b393a6b', 'status
+PASS Home inventory (today) /flats total                          report=48 raw=48 {'block_id': 'c99a5ec1-8e6a-4269-b421-93067b393a6b', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': 'c99a5ec1-8e6a-4269-b421-93067b393a6b', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': 'c99a5ec1-8e6a-4269-b421-93067b393a6b', 'status
+PASS Home inventory (today) /flats total                          report=15 raw=15 {'block_id': '3c011f05-4a65-438c-8cc9-b79f27c27b03', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '3c011f05-4a65-438c-8cc9-b79f27c27b03', 'status
+PASS Home inventory (today) /flats total                          report=41 raw=41 {'block_id': '3c011f05-4a65-438c-8cc9-b79f27c27b03', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '3c011f05-4a65-438c-8cc9-b79f27c27b03', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '3c011f05-4a65-438c-8cc9-b79f27c27b03', 'status
+PASS Home inventory (today) /flats total                          report=15 raw=15 {'block_id': '0ef057d2-a8db-487d-8102-6557238fc451', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '0ef057d2-a8db-487d-8102-6557238fc451', 'status
+PASS Home inventory (today) /flats total                          report=33 raw=33 {'block_id': '0ef057d2-a8db-487d-8102-6557238fc451', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '0ef057d2-a8db-487d-8102-6557238fc451', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '0ef057d2-a8db-487d-8102-6557238fc451', 'status
+PASS Home inventory (today) /flats total                          report=13 raw=13 {'block_id': '74878fd8-2678-47b1-8690-b9dbec5d1aeb', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '74878fd8-2678-47b1-8690-b9dbec5d1aeb', 'status
+PASS Home inventory (today) /flats total                          report=43 raw=43 {'block_id': '74878fd8-2678-47b1-8690-b9dbec5d1aeb', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '74878fd8-2678-47b1-8690-b9dbec5d1aeb', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '74878fd8-2678-47b1-8690-b9dbec5d1aeb', 'status
+PASS Home inventory (today) /flats total                          report=19 raw=19 {'block_id': 'b69c932a-4f99-4951-ab69-9b7076984a94', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': 'b69c932a-4f99-4951-ab69-9b7076984a94', 'status
+PASS Home inventory (today) /flats total                          report=65 raw=65 {'block_id': 'b69c932a-4f99-4951-ab69-9b7076984a94', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': 'b69c932a-4f99-4951-ab69-9b7076984a94', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': 'b69c932a-4f99-4951-ab69-9b7076984a94', 'status
+PASS Home inventory (today) /flats total                          report=11 raw=11 {'block_id': '189ccda5-106b-4e4d-ba15-08bb52028405', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '189ccda5-106b-4e4d-ba15-08bb52028405', 'status
+PASS Home inventory (today) /flats total                          report=37 raw=37 {'block_id': '189ccda5-106b-4e4d-ba15-08bb52028405', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '189ccda5-106b-4e4d-ba15-08bb52028405', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '189ccda5-106b-4e4d-ba15-08bb52028405', 'status
+PASS Home inventory (today) /flats total                          report=25 raw=25 {'block_id': '9570c628-a196-4019-a401-95aa0ed8d7b3', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '9570c628-a196-4019-a401-95aa0ed8d7b3', 'status
+PASS Home inventory (today) /flats total                          report=47 raw=47 {'block_id': '9570c628-a196-4019-a401-95aa0ed8d7b3', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '9570c628-a196-4019-a401-95aa0ed8d7b3', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '9570c628-a196-4019-a401-95aa0ed8d7b3', 'status
+PASS Home inventory (today) /flats total                          report=27 raw=27 {'block_id': '2d49d389-2892-4215-847f-e912369dd264', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '2d49d389-2892-4215-847f-e912369dd264', 'status
+PASS Home inventory (today) /flats total                          report=37 raw=37 {'block_id': '2d49d389-2892-4215-847f-e912369dd264', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '2d49d389-2892-4215-847f-e912369dd264', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '2d49d389-2892-4215-847f-e912369dd264', 'status
+PASS Home inventory (today) /flats total                          report=20 raw=20 {'block_id': '863b4e42-b839-4d39-b976-03abd604ef14', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '863b4e42-b839-4d39-b976-03abd604ef14', 'status
+PASS Home inventory (today) /flats total                          report=44 raw=44 {'block_id': '863b4e42-b839-4d39-b976-03abd604ef14', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '863b4e42-b839-4d39-b976-03abd604ef14', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '863b4e42-b839-4d39-b976-03abd604ef14', 'status
+PASS Home inventory (today) /flats total                          report=27 raw=27 {'block_id': 'db6e96b3-89b5-491f-b6e1-54f7d8bf22fe', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': 'db6e96b3-89b5-491f-b6e1-54f7d8bf22fe', 'status
+PASS Home inventory (today) /flats total                          report=57 raw=57 {'block_id': 'db6e96b3-89b5-491f-b6e1-54f7d8bf22fe', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': 'db6e96b3-89b5-491f-b6e1-54f7d8bf22fe', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': 'db6e96b3-89b5-491f-b6e1-54f7d8bf22fe', 'status
+PASS Home inventory (today) /flats total                          report=32 raw=32 {'block_id': '444118cd-10c0-465c-939d-1d454bc0935a', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '444118cd-10c0-465c-939d-1d454bc0935a', 'status
+PASS Home inventory (today) /flats total                          report=52 raw=52 {'block_id': '444118cd-10c0-465c-939d-1d454bc0935a', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '444118cd-10c0-465c-939d-1d454bc0935a', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '444118cd-10c0-465c-939d-1d454bc0935a', 'status
+PASS Home inventory (today) /flats total                          report=18 raw=18 {'block_id': 'd045c80e-5e6d-4eca-ae71-48c4782e72b7', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': 'd045c80e-5e6d-4eca-ae71-48c4782e72b7', 'status
+PASS Home inventory (today) /flats total                          report=54 raw=54 {'block_id': 'd045c80e-5e6d-4eca-ae71-48c4782e72b7', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': 'd045c80e-5e6d-4eca-ae71-48c4782e72b7', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': 'd045c80e-5e6d-4eca-ae71-48c4782e72b7', 'status
+PASS Home inventory (today) /flats total                          report=16 raw=16 {'block_id': '40c9cf79-0614-480d-9a5d-5d8ad7112056', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '40c9cf79-0614-480d-9a5d-5d8ad7112056', 'status
+PASS Home inventory (today) /flats total                          report=32 raw=32 {'block_id': '40c9cf79-0614-480d-9a5d-5d8ad7112056', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '40c9cf79-0614-480d-9a5d-5d8ad7112056', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '40c9cf79-0614-480d-9a5d-5d8ad7112056', 'status
+PASS Home inventory (today) /flats total                          report=15 raw=15 {'block_id': '301e60d8-2bc5-4e49-8c3f-a4c93b7db799', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '301e60d8-2bc5-4e49-8c3f-a4c93b7db799', 'status
+PASS Home inventory (today) /flats total                          report=57 raw=57 {'block_id': '301e60d8-2bc5-4e49-8c3f-a4c93b7db799', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '301e60d8-2bc5-4e49-8c3f-a4c93b7db799', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '301e60d8-2bc5-4e49-8c3f-a4c93b7db799', 'status
+PASS Home inventory (today) /flats total                          report=29 raw=29 {'block_id': '028178a1-9e91-4ef2-a0f4-81b861cff2e6', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '028178a1-9e91-4ef2-a0f4-81b861cff2e6', 'status
+PASS Home inventory (today) /flats total                          report=43 raw=43 {'block_id': '028178a1-9e91-4ef2-a0f4-81b861cff2e6', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '028178a1-9e91-4ef2-a0f4-81b861cff2e6', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '028178a1-9e91-4ef2-a0f4-81b861cff2e6', 'status
+PASS Home inventory (today) /flats total                          report=18 raw=18 {'block_id': '876ad65a-9a64-4b87-aa3c-0e4cdd33d869', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '876ad65a-9a64-4b87-aa3c-0e4cdd33d869', 'status
+PASS Home inventory (today) /flats total                          report=38 raw=38 {'block_id': '876ad65a-9a64-4b87-aa3c-0e4cdd33d869', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '876ad65a-9a64-4b87-aa3c-0e4cdd33d869', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '876ad65a-9a64-4b87-aa3c-0e4cdd33d869', 'status
+PASS Home inventory (today) /flats total                          report=20 raw=20 {'block_id': '1ebe58a6-145b-4d87-8258-667374b9ced8', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '1ebe58a6-145b-4d87-8258-667374b9ced8', 'status
+PASS Home inventory (today) /flats total                          report=44 raw=44 {'block_id': '1ebe58a6-145b-4d87-8258-667374b9ced8', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '1ebe58a6-145b-4d87-8258-667374b9ced8', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '1ebe58a6-145b-4d87-8258-667374b9ced8', 'status
+PASS Home inventory (today) /flats total                          report=15 raw=15 {'block_id': 'fe4ba088-a863-4714-bd44-9dc910de22ee', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': 'fe4ba088-a863-4714-bd44-9dc910de22ee', 'status
+PASS Home inventory (today) /flats total                          report=25 raw=25 {'block_id': 'fe4ba088-a863-4714-bd44-9dc910de22ee', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': 'fe4ba088-a863-4714-bd44-9dc910de22ee', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': 'fe4ba088-a863-4714-bd44-9dc910de22ee', 'status
+PASS Home inventory (today) /flats total                          report=29 raw=29 {'block_id': '40e0f3fe-3127-4773-9846-7bcb5f988e85', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '40e0f3fe-3127-4773-9846-7bcb5f988e85', 'status
+PASS Home inventory (today) /flats total                          report=43 raw=43 {'block_id': '40e0f3fe-3127-4773-9846-7bcb5f988e85', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '40e0f3fe-3127-4773-9846-7bcb5f988e85', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '40e0f3fe-3127-4773-9846-7bcb5f988e85', 'status
+PASS Home inventory (today) /flats total                          report=12 raw=12 {'block_id': 'cb4e04de-85a4-46f5-b045-14cb005c5136', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': 'cb4e04de-85a4-46f5-b045-14cb005c5136', 'status
+PASS Home inventory (today) /flats total                          report=36 raw=36 {'block_id': 'cb4e04de-85a4-46f5-b045-14cb005c5136', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': 'cb4e04de-85a4-46f5-b045-14cb005c5136', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': 'cb4e04de-85a4-46f5-b045-14cb005c5136', 'status
+PASS Home inventory (today) /flats total                          report=16 raw=16 {'block_id': '3d853765-2bb9-44ef-af0a-dc00bb4fdc95', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '3d853765-2bb9-44ef-af0a-dc00bb4fdc95', 'status
+PASS Home inventory (today) /flats total                          report=24 raw=24 {'block_id': '3d853765-2bb9-44ef-af0a-dc00bb4fdc95', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '3d853765-2bb9-44ef-af0a-dc00bb4fdc95', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '3d853765-2bb9-44ef-af0a-dc00bb4fdc95', 'status
+PASS Home inventory (today) /flats total                          report=22 raw=22 {'block_id': '70431e71-e251-4ad2-9a16-9610d3d4502a', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '70431e71-e251-4ad2-9a16-9610d3d4502a', 'status
+PASS Home inventory (today) /flats total                          report=62 raw=62 {'block_id': '70431e71-e251-4ad2-9a16-9610d3d4502a', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '70431e71-e251-4ad2-9a16-9610d3d4502a', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '70431e71-e251-4ad2-9a16-9610d3d4502a', 'status
+PASS Home inventory (today) /flats total                          report=22 raw=22 {'block_id': '7c166715-0820-4544-85eb-3595c5f1a31b', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '7c166715-0820-4544-85eb-3595c5f1a31b', 'status
+PASS Home inventory (today) /flats total                          report=62 raw=62 {'block_id': '7c166715-0820-4544-85eb-3595c5f1a31b', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '7c166715-0820-4544-85eb-3595c5f1a31b', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '7c166715-0820-4544-85eb-3595c5f1a31b', 'status
+PASS Home inventory (today) /flats total                          report=20 raw=20 {'block_id': '843f2bed-5c96-48f5-a5aa-db70f1652b4b', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '843f2bed-5c96-48f5-a5aa-db70f1652b4b', 'status
+PASS Home inventory (today) /flats total                          report=52 raw=52 {'block_id': '843f2bed-5c96-48f5-a5aa-db70f1652b4b', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '843f2bed-5c96-48f5-a5aa-db70f1652b4b', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '843f2bed-5c96-48f5-a5aa-db70f1652b4b', 'status
+PASS Home inventory (today) /flats total                          report=21 raw=21 {'block_id': '8fbf569f-1d24-4957-a474-ba0fed6afc68', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '8fbf569f-1d24-4957-a474-ba0fed6afc68', 'status
+PASS Home inventory (today) /flats total                          report=43 raw=43 {'block_id': '8fbf569f-1d24-4957-a474-ba0fed6afc68', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '8fbf569f-1d24-4957-a474-ba0fed6afc68', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '8fbf569f-1d24-4957-a474-ba0fed6afc68', 'status
+PASS Home inventory (today) /flats total                          report=1 raw=1 {'block_id': '90433c6e-cf0e-4706-81cc-b491fca605da', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '90433c6e-cf0e-4706-81cc-b491fca605da', 'status
+PASS Home inventory (today) /flats total                          report=4 raw=4 {'block_id': '90433c6e-cf0e-4706-81cc-b491fca605da', 'status
+PASS Home inventory (today) /flats total                          report=1 raw=1 {'block_id': '90433c6e-cf0e-4706-81cc-b491fca605da', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '90433c6e-cf0e-4706-81cc-b491fca605da', 'status
+PASS Home inventory (today) /flats total                          report=5 raw=5 {'block_id': '15139c22-d8e1-4c64-bb84-39794cae33d5', 'status
+PASS Home inventory (today) /flats total                          report=1 raw=1 {'block_id': '15139c22-d8e1-4c64-bb84-39794cae33d5', 'status
+PASS Home inventory (today) /flats total                          report=6 raw=6 {'block_id': '15139c22-d8e1-4c64-bb84-39794cae33d5', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '15139c22-d8e1-4c64-bb84-39794cae33d5', 'status
+PASS Home inventory (today) /flats total                          report=0 raw=0 {'block_id': '15139c22-d8e1-4c64-bb84-39794cae33d5', 'status
+PASS Home flat_status (today) loads                               report=True raw=True 
+PASS Home construction (today) loads                              report=True raw=True 
+PASS Home pipeline (today) loads                                  report=True raw=True 
+PASS Home pipeline (today) /leads total                           report=0 raw=0 {'created_from': '2026-11-18', 'created_to': '2026-11-18'}
+PASS Home pipeline (today) /site-visits total                     report=0 raw=0 {'date_from': '2026-11-18', 'date_to': '2026-11-18', 'status
+PASS Home pipeline (today) /bookings total                        report=0 raw=0 {'date_from': '2026-11-18', 'date_to': '2026-11-18', 'status
+PASS Home pipeline (today) /leads total                           report=0 raw=0 {'created_from': '2026-11-18', 'created_to': '2026-11-18', '
+PASS Home attention (today) loads                                 report=True raw=True 
+PASS Home attention (today) /flats total                          report=0 raw=0 {'hold_expiring': True}
+PASS Home attention (today) /payments/summary Bounced.count       report=261 raw=261 {'status': 'Bounced', 'unreplaced': True}
+PASS Home attention (today) /demands/register totals.count        report=774 raw=774 {'stale_days': 30}
+PASS Home ageing (month) loads                                    report=True raw=True 
+PASS Home ageing (month) /reports/outstanding-v2 ageing[bucket=Not due].amount_paise report=7315227400 raw=7315227400 {}
+PASS Home ageing (month) /reports/outstanding-v2 ageing[bucket=0-30].amount_paise report=3984348300 raw=3984348300 {}
+PASS Home ageing (month) /reports/outstanding-v2 ageing[bucket=31-60].amount_paise report=4220061500 raw=4220061500 {}
+PASS Home ageing (month) /reports/outstanding-v2 ageing[bucket=61-90].amount_paise report=4094910700 raw=4094910700 {}
+PASS Home ageing (month) /reports/outstanding-v2 ageing[bucket=90+].amount_paise report=98010584500 raw=98010584500 {}
+PASS Home ageing (month) /reports/outstanding-v2 totals.outstanding_paise report=117625132400 raw=117625132400 {}
+PASS Home money_today (month) loads                               report=True raw=True 
+PASS Home money_today (month) /reports/collections-v2 totals.cash_paise report=0 raw=0 {'from_date': '2026-11-18', 'to_date': '2026-11-18'}
+PASS Home money_today (month) /reports/collections-v2 totals.account_paise report=0 raw=0 {'from_date': '2026-11-18', 'to_date': '2026-11-18'}
+PASS Home money_today (month) /reports/collections-v2 totals.other_paise report=0 raw=0 {'from_date': '2026-11-18', 'to_date': '2026-11-18'}
+PASS Home money_today (month) /reports/collections-v2 totals.total_paise report=0 raw=0 {'from_date': '2026-11-18', 'to_date': '2026-11-18'}
+PASS Home money_today (month) /payments/summary Pending.amount_paise report=26053300000 raw=26053300000 {'status': 'Pending'}
+PASS Home due_vs_received (month) loads                           report=True raw=True 
+PASS Home due_vs_received (month) /demands/register totals.total_paise report=14172930000 raw=14172930000 {'basis': 'due', 'date_from': '2026-11-01', 'date_to': '2026
+PASS Home due_vs_received (month) /reports/collections-v2 totals.total_paise report=11641100000 raw=11641100000 {'from_date': '2026-11-01', 'to_date': '2026-11-30'}
+PASS Home call_today (month) loads                                report=True raw=True 
+PASS Home call_today (month) /leads total                         report=3 raw=3 {'due_today': True}
+PASS Home call_today (month) /site-visits total                   report=2 raw=2 {'date_from': '2026-11-18', 'date_to': '2026-11-18', 'status
+PASS Home inflow_30 (month) loads                                 report=True raw=True 
+PASS Home inflow_30 (month) /demands/register totals.balance_paise report=1462995000 raw=1462995000 {'basis': 'due', 'date_from': '2026-11-19', 'date_to': '2026
+PASS Home inflow_30 (month) /payments/summary Pending.amount_paise report=26053300000 raw=26053300000 {'status': 'Pending'}
+PASS Home next_milestone (month) loads                            report=True raw=True 
+PASS Home next_milestone (month) /blocks/54e7ef57-ef1c-4639-8ae3-abd23bf0ad59/stages/9d1a8b0e-a1c9-4ef3-8e56-307caa1ab918/preview total_paise report=1095798000 raw=1095798000 {}
+PASS Home next_milestone (month) /blocks/1ad93271-5523-463e-b221-aaed913103bc/stages/2f0b3522-f968-4d8d-9ef0-e8357bf82b70/preview total_paise report=336257400 raw=336257400 {}
+PASS Home next_milestone (month) /blocks/3c011f05-4a65-438c-8cc9-b79f27c27b03/stages/cd8192a1-753a-47a1-91be-8e54178741f4/preview total_paise report=1215875300 raw=1215875300 {}
+PASS Home next_milestone (month) /blocks/15139c22-d8e1-4c64-bb84-39794cae33d5/stages/93065151-96a7-45e9-94fd-da5122ad6eaf/preview total_paise report=993308100 raw=993308100 {}
+PASS Home inventory (month) loads                                 report=True raw=True 
+PASS Home inventory (month) /flats total                          report=6 raw=6 {'block_id': '54e7ef57-ef1c-4639-8ae3-abd23bf0ad59', 'status
+PASS Home inventory (month) /flats total                          report=2 raw=2 {'block_id': '54e7ef57-ef1c-4639-8ae3-abd23bf0ad59', 'status
+PASS Home inventory (month) /flats total                          report=23 raw=23 {'block_id': '54e7ef57-ef1c-4639-8ae3-abd23bf0ad59', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '54e7ef57-ef1c-4639-8ae3-abd23bf0ad59', 'status
+PASS Home inventory (month) /flats total                          report=1 raw=1 {'block_id': '54e7ef57-ef1c-4639-8ae3-abd23bf0ad59', 'status
+PASS Home inventory (month) /flats total                          report=21 raw=21 {'block_id': '098bcefc-102a-4dcc-a8d9-23034c619390', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '098bcefc-102a-4dcc-a8d9-23034c619390', 'status
+PASS Home inventory (month) /flats total                          report=63 raw=63 {'block_id': '098bcefc-102a-4dcc-a8d9-23034c619390', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '098bcefc-102a-4dcc-a8d9-23034c619390', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '098bcefc-102a-4dcc-a8d9-23034c619390', 'status
+PASS Home inventory (month) /flats total                          report=26 raw=26 {'block_id': 'a3d899a6-4c2f-49f5-9e36-fd4a87baea54', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': 'a3d899a6-4c2f-49f5-9e36-fd4a87baea54', 'status
+PASS Home inventory (month) /flats total                          report=58 raw=58 {'block_id': 'a3d899a6-4c2f-49f5-9e36-fd4a87baea54', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': 'a3d899a6-4c2f-49f5-9e36-fd4a87baea54', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': 'a3d899a6-4c2f-49f5-9e36-fd4a87baea54', 'status
+PASS Home inventory (month) /flats total                          report=17 raw=17 {'block_id': '533a8a68-1a30-47c3-9521-8219d2ea8368', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '533a8a68-1a30-47c3-9521-8219d2ea8368', 'status
+PASS Home inventory (month) /flats total                          report=31 raw=31 {'block_id': '533a8a68-1a30-47c3-9521-8219d2ea8368', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '533a8a68-1a30-47c3-9521-8219d2ea8368', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '533a8a68-1a30-47c3-9521-8219d2ea8368', 'status
+PASS Home inventory (month) /flats total                          report=8 raw=8 {'block_id': 'dbb72375-e060-4cb2-a2c2-86452c833cd8', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': 'dbb72375-e060-4cb2-a2c2-86452c833cd8', 'status
+PASS Home inventory (month) /flats total                          report=48 raw=48 {'block_id': 'dbb72375-e060-4cb2-a2c2-86452c833cd8', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': 'dbb72375-e060-4cb2-a2c2-86452c833cd8', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': 'dbb72375-e060-4cb2-a2c2-86452c833cd8', 'status
+PASS Home inventory (month) /flats total                          report=11 raw=11 {'block_id': '1ad93271-5523-463e-b221-aaed913103bc', 'status
+PASS Home inventory (month) /flats total                          report=1 raw=1 {'block_id': '1ad93271-5523-463e-b221-aaed913103bc', 'status
+PASS Home inventory (month) /flats total                          report=19 raw=19 {'block_id': '1ad93271-5523-463e-b221-aaed913103bc', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '1ad93271-5523-463e-b221-aaed913103bc', 'status
+PASS Home inventory (month) /flats total                          report=1 raw=1 {'block_id': '1ad93271-5523-463e-b221-aaed913103bc', 'status
+PASS Home inventory (month) /flats total                          report=18 raw=18 {'block_id': '5f0dcf2d-5177-4335-9472-9816acb8d7c9', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '5f0dcf2d-5177-4335-9472-9816acb8d7c9', 'status
+PASS Home inventory (month) /flats total                          report=38 raw=38 {'block_id': '5f0dcf2d-5177-4335-9472-9816acb8d7c9', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '5f0dcf2d-5177-4335-9472-9816acb8d7c9', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '5f0dcf2d-5177-4335-9472-9816acb8d7c9', 'status
+PASS Home inventory (month) /flats total                          report=29 raw=29 {'block_id': '5a1c2f6a-95db-47f4-8e03-63b7c6d00ba0', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '5a1c2f6a-95db-47f4-8e03-63b7c6d00ba0', 'status
+PASS Home inventory (month) /flats total                          report=55 raw=55 {'block_id': '5a1c2f6a-95db-47f4-8e03-63b7c6d00ba0', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '5a1c2f6a-95db-47f4-8e03-63b7c6d00ba0', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '5a1c2f6a-95db-47f4-8e03-63b7c6d00ba0', 'status
+PASS Home inventory (month) /flats total                          report=22 raw=22 {'block_id': 'dc04eeb7-7c37-4cac-b51f-7d6de5d4ade0', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': 'dc04eeb7-7c37-4cac-b51f-7d6de5d4ade0', 'status
+PASS Home inventory (month) /flats total                          report=34 raw=34 {'block_id': 'dc04eeb7-7c37-4cac-b51f-7d6de5d4ade0', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': 'dc04eeb7-7c37-4cac-b51f-7d6de5d4ade0', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': 'dc04eeb7-7c37-4cac-b51f-7d6de5d4ade0', 'status
+PASS Home inventory (month) /flats total                          report=24 raw=24 {'block_id': 'c99a5ec1-8e6a-4269-b421-93067b393a6b', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': 'c99a5ec1-8e6a-4269-b421-93067b393a6b', 'status
+PASS Home inventory (month) /flats total                          report=48 raw=48 {'block_id': 'c99a5ec1-8e6a-4269-b421-93067b393a6b', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': 'c99a5ec1-8e6a-4269-b421-93067b393a6b', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': 'c99a5ec1-8e6a-4269-b421-93067b393a6b', 'status
+PASS Home inventory (month) /flats total                          report=15 raw=15 {'block_id': '3c011f05-4a65-438c-8cc9-b79f27c27b03', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '3c011f05-4a65-438c-8cc9-b79f27c27b03', 'status
+PASS Home inventory (month) /flats total                          report=41 raw=41 {'block_id': '3c011f05-4a65-438c-8cc9-b79f27c27b03', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '3c011f05-4a65-438c-8cc9-b79f27c27b03', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '3c011f05-4a65-438c-8cc9-b79f27c27b03', 'status
+PASS Home inventory (month) /flats total                          report=15 raw=15 {'block_id': '0ef057d2-a8db-487d-8102-6557238fc451', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '0ef057d2-a8db-487d-8102-6557238fc451', 'status
+PASS Home inventory (month) /flats total                          report=33 raw=33 {'block_id': '0ef057d2-a8db-487d-8102-6557238fc451', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '0ef057d2-a8db-487d-8102-6557238fc451', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '0ef057d2-a8db-487d-8102-6557238fc451', 'status
+PASS Home inventory (month) /flats total                          report=13 raw=13 {'block_id': '74878fd8-2678-47b1-8690-b9dbec5d1aeb', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '74878fd8-2678-47b1-8690-b9dbec5d1aeb', 'status
+PASS Home inventory (month) /flats total                          report=43 raw=43 {'block_id': '74878fd8-2678-47b1-8690-b9dbec5d1aeb', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '74878fd8-2678-47b1-8690-b9dbec5d1aeb', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '74878fd8-2678-47b1-8690-b9dbec5d1aeb', 'status
+PASS Home inventory (month) /flats total                          report=19 raw=19 {'block_id': 'b69c932a-4f99-4951-ab69-9b7076984a94', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': 'b69c932a-4f99-4951-ab69-9b7076984a94', 'status
+PASS Home inventory (month) /flats total                          report=65 raw=65 {'block_id': 'b69c932a-4f99-4951-ab69-9b7076984a94', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': 'b69c932a-4f99-4951-ab69-9b7076984a94', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': 'b69c932a-4f99-4951-ab69-9b7076984a94', 'status
+PASS Home inventory (month) /flats total                          report=11 raw=11 {'block_id': '189ccda5-106b-4e4d-ba15-08bb52028405', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '189ccda5-106b-4e4d-ba15-08bb52028405', 'status
+PASS Home inventory (month) /flats total                          report=37 raw=37 {'block_id': '189ccda5-106b-4e4d-ba15-08bb52028405', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '189ccda5-106b-4e4d-ba15-08bb52028405', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '189ccda5-106b-4e4d-ba15-08bb52028405', 'status
+PASS Home inventory (month) /flats total                          report=25 raw=25 {'block_id': '9570c628-a196-4019-a401-95aa0ed8d7b3', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '9570c628-a196-4019-a401-95aa0ed8d7b3', 'status
+PASS Home inventory (month) /flats total                          report=47 raw=47 {'block_id': '9570c628-a196-4019-a401-95aa0ed8d7b3', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '9570c628-a196-4019-a401-95aa0ed8d7b3', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '9570c628-a196-4019-a401-95aa0ed8d7b3', 'status
+PASS Home inventory (month) /flats total                          report=27 raw=27 {'block_id': '2d49d389-2892-4215-847f-e912369dd264', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '2d49d389-2892-4215-847f-e912369dd264', 'status
+PASS Home inventory (month) /flats total                          report=37 raw=37 {'block_id': '2d49d389-2892-4215-847f-e912369dd264', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '2d49d389-2892-4215-847f-e912369dd264', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '2d49d389-2892-4215-847f-e912369dd264', 'status
+PASS Home inventory (month) /flats total                          report=20 raw=20 {'block_id': '863b4e42-b839-4d39-b976-03abd604ef14', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '863b4e42-b839-4d39-b976-03abd604ef14', 'status
+PASS Home inventory (month) /flats total                          report=44 raw=44 {'block_id': '863b4e42-b839-4d39-b976-03abd604ef14', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '863b4e42-b839-4d39-b976-03abd604ef14', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '863b4e42-b839-4d39-b976-03abd604ef14', 'status
+PASS Home inventory (month) /flats total                          report=27 raw=27 {'block_id': 'db6e96b3-89b5-491f-b6e1-54f7d8bf22fe', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': 'db6e96b3-89b5-491f-b6e1-54f7d8bf22fe', 'status
+PASS Home inventory (month) /flats total                          report=57 raw=57 {'block_id': 'db6e96b3-89b5-491f-b6e1-54f7d8bf22fe', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': 'db6e96b3-89b5-491f-b6e1-54f7d8bf22fe', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': 'db6e96b3-89b5-491f-b6e1-54f7d8bf22fe', 'status
+PASS Home inventory (month) /flats total                          report=32 raw=32 {'block_id': '444118cd-10c0-465c-939d-1d454bc0935a', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '444118cd-10c0-465c-939d-1d454bc0935a', 'status
+PASS Home inventory (month) /flats total                          report=52 raw=52 {'block_id': '444118cd-10c0-465c-939d-1d454bc0935a', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '444118cd-10c0-465c-939d-1d454bc0935a', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '444118cd-10c0-465c-939d-1d454bc0935a', 'status
+PASS Home inventory (month) /flats total                          report=18 raw=18 {'block_id': 'd045c80e-5e6d-4eca-ae71-48c4782e72b7', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': 'd045c80e-5e6d-4eca-ae71-48c4782e72b7', 'status
+PASS Home inventory (month) /flats total                          report=54 raw=54 {'block_id': 'd045c80e-5e6d-4eca-ae71-48c4782e72b7', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': 'd045c80e-5e6d-4eca-ae71-48c4782e72b7', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': 'd045c80e-5e6d-4eca-ae71-48c4782e72b7', 'status
+PASS Home inventory (month) /flats total                          report=16 raw=16 {'block_id': '40c9cf79-0614-480d-9a5d-5d8ad7112056', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '40c9cf79-0614-480d-9a5d-5d8ad7112056', 'status
+PASS Home inventory (month) /flats total                          report=32 raw=32 {'block_id': '40c9cf79-0614-480d-9a5d-5d8ad7112056', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '40c9cf79-0614-480d-9a5d-5d8ad7112056', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '40c9cf79-0614-480d-9a5d-5d8ad7112056', 'status
+PASS Home inventory (month) /flats total                          report=15 raw=15 {'block_id': '301e60d8-2bc5-4e49-8c3f-a4c93b7db799', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '301e60d8-2bc5-4e49-8c3f-a4c93b7db799', 'status
+PASS Home inventory (month) /flats total                          report=57 raw=57 {'block_id': '301e60d8-2bc5-4e49-8c3f-a4c93b7db799', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '301e60d8-2bc5-4e49-8c3f-a4c93b7db799', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '301e60d8-2bc5-4e49-8c3f-a4c93b7db799', 'status
+PASS Home inventory (month) /flats total                          report=29 raw=29 {'block_id': '028178a1-9e91-4ef2-a0f4-81b861cff2e6', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '028178a1-9e91-4ef2-a0f4-81b861cff2e6', 'status
+PASS Home inventory (month) /flats total                          report=43 raw=43 {'block_id': '028178a1-9e91-4ef2-a0f4-81b861cff2e6', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '028178a1-9e91-4ef2-a0f4-81b861cff2e6', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '028178a1-9e91-4ef2-a0f4-81b861cff2e6', 'status
+PASS Home inventory (month) /flats total                          report=18 raw=18 {'block_id': '876ad65a-9a64-4b87-aa3c-0e4cdd33d869', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '876ad65a-9a64-4b87-aa3c-0e4cdd33d869', 'status
+PASS Home inventory (month) /flats total                          report=38 raw=38 {'block_id': '876ad65a-9a64-4b87-aa3c-0e4cdd33d869', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '876ad65a-9a64-4b87-aa3c-0e4cdd33d869', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '876ad65a-9a64-4b87-aa3c-0e4cdd33d869', 'status
+PASS Home inventory (month) /flats total                          report=20 raw=20 {'block_id': '1ebe58a6-145b-4d87-8258-667374b9ced8', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '1ebe58a6-145b-4d87-8258-667374b9ced8', 'status
+PASS Home inventory (month) /flats total                          report=44 raw=44 {'block_id': '1ebe58a6-145b-4d87-8258-667374b9ced8', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '1ebe58a6-145b-4d87-8258-667374b9ced8', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '1ebe58a6-145b-4d87-8258-667374b9ced8', 'status
+PASS Home inventory (month) /flats total                          report=15 raw=15 {'block_id': 'fe4ba088-a863-4714-bd44-9dc910de22ee', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': 'fe4ba088-a863-4714-bd44-9dc910de22ee', 'status
+PASS Home inventory (month) /flats total                          report=25 raw=25 {'block_id': 'fe4ba088-a863-4714-bd44-9dc910de22ee', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': 'fe4ba088-a863-4714-bd44-9dc910de22ee', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': 'fe4ba088-a863-4714-bd44-9dc910de22ee', 'status
+PASS Home inventory (month) /flats total                          report=29 raw=29 {'block_id': '40e0f3fe-3127-4773-9846-7bcb5f988e85', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '40e0f3fe-3127-4773-9846-7bcb5f988e85', 'status
+PASS Home inventory (month) /flats total                          report=43 raw=43 {'block_id': '40e0f3fe-3127-4773-9846-7bcb5f988e85', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '40e0f3fe-3127-4773-9846-7bcb5f988e85', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '40e0f3fe-3127-4773-9846-7bcb5f988e85', 'status
+PASS Home inventory (month) /flats total                          report=12 raw=12 {'block_id': 'cb4e04de-85a4-46f5-b045-14cb005c5136', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': 'cb4e04de-85a4-46f5-b045-14cb005c5136', 'status
+PASS Home inventory (month) /flats total                          report=36 raw=36 {'block_id': 'cb4e04de-85a4-46f5-b045-14cb005c5136', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': 'cb4e04de-85a4-46f5-b045-14cb005c5136', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': 'cb4e04de-85a4-46f5-b045-14cb005c5136', 'status
+PASS Home inventory (month) /flats total                          report=16 raw=16 {'block_id': '3d853765-2bb9-44ef-af0a-dc00bb4fdc95', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '3d853765-2bb9-44ef-af0a-dc00bb4fdc95', 'status
+PASS Home inventory (month) /flats total                          report=24 raw=24 {'block_id': '3d853765-2bb9-44ef-af0a-dc00bb4fdc95', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '3d853765-2bb9-44ef-af0a-dc00bb4fdc95', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '3d853765-2bb9-44ef-af0a-dc00bb4fdc95', 'status
+PASS Home inventory (month) /flats total                          report=22 raw=22 {'block_id': '70431e71-e251-4ad2-9a16-9610d3d4502a', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '70431e71-e251-4ad2-9a16-9610d3d4502a', 'status
+PASS Home inventory (month) /flats total                          report=62 raw=62 {'block_id': '70431e71-e251-4ad2-9a16-9610d3d4502a', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '70431e71-e251-4ad2-9a16-9610d3d4502a', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '70431e71-e251-4ad2-9a16-9610d3d4502a', 'status
+PASS Home inventory (month) /flats total                          report=22 raw=22 {'block_id': '7c166715-0820-4544-85eb-3595c5f1a31b', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '7c166715-0820-4544-85eb-3595c5f1a31b', 'status
+PASS Home inventory (month) /flats total                          report=62 raw=62 {'block_id': '7c166715-0820-4544-85eb-3595c5f1a31b', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '7c166715-0820-4544-85eb-3595c5f1a31b', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '7c166715-0820-4544-85eb-3595c5f1a31b', 'status
+PASS Home inventory (month) /flats total                          report=20 raw=20 {'block_id': '843f2bed-5c96-48f5-a5aa-db70f1652b4b', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '843f2bed-5c96-48f5-a5aa-db70f1652b4b', 'status
+PASS Home inventory (month) /flats total                          report=52 raw=52 {'block_id': '843f2bed-5c96-48f5-a5aa-db70f1652b4b', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '843f2bed-5c96-48f5-a5aa-db70f1652b4b', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '843f2bed-5c96-48f5-a5aa-db70f1652b4b', 'status
+PASS Home inventory (month) /flats total                          report=21 raw=21 {'block_id': '8fbf569f-1d24-4957-a474-ba0fed6afc68', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '8fbf569f-1d24-4957-a474-ba0fed6afc68', 'status
+PASS Home inventory (month) /flats total                          report=43 raw=43 {'block_id': '8fbf569f-1d24-4957-a474-ba0fed6afc68', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '8fbf569f-1d24-4957-a474-ba0fed6afc68', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '8fbf569f-1d24-4957-a474-ba0fed6afc68', 'status
+PASS Home inventory (month) /flats total                          report=1 raw=1 {'block_id': '90433c6e-cf0e-4706-81cc-b491fca605da', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '90433c6e-cf0e-4706-81cc-b491fca605da', 'status
+PASS Home inventory (month) /flats total                          report=4 raw=4 {'block_id': '90433c6e-cf0e-4706-81cc-b491fca605da', 'status
+PASS Home inventory (month) /flats total                          report=1 raw=1 {'block_id': '90433c6e-cf0e-4706-81cc-b491fca605da', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '90433c6e-cf0e-4706-81cc-b491fca605da', 'status
+PASS Home inventory (month) /flats total                          report=5 raw=5 {'block_id': '15139c22-d8e1-4c64-bb84-39794cae33d5', 'status
+PASS Home inventory (month) /flats total                          report=1 raw=1 {'block_id': '15139c22-d8e1-4c64-bb84-39794cae33d5', 'status
+PASS Home inventory (month) /flats total                          report=6 raw=6 {'block_id': '15139c22-d8e1-4c64-bb84-39794cae33d5', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '15139c22-d8e1-4c64-bb84-39794cae33d5', 'status
+PASS Home inventory (month) /flats total                          report=0 raw=0 {'block_id': '15139c22-d8e1-4c64-bb84-39794cae33d5', 'status
+PASS Home flat_status (month) loads                               report=True raw=True 
+PASS Home construction (month) loads                              report=True raw=True 
+PASS Home pipeline (month) loads                                  report=True raw=True 
+PASS Home pipeline (month) /leads total                           report=1498 raw=1498 {'created_from': '2026-11-01', 'created_to': '2026-11-30'}
+PASS Home pipeline (month) /site-visits total                     report=2 raw=2 {'date_from': '2026-11-01', 'date_to': '2026-11-30', 'status
+PASS Home pipeline (month) /bookings total                        report=0 raw=0 {'date_from': '2026-11-01', 'date_to': '2026-11-30', 'status
+PASS Home pipeline (month) /leads total                           report=1 raw=1 {'created_from': '2026-11-01', 'created_to': '2026-11-30', '
+PASS Home attention (month) loads                                 report=True raw=True 
+PASS Home attention (month) /flats total                          report=0 raw=0 {'hold_expiring': True}
+PASS Home attention (month) /payments/summary Bounced.count       report=261 raw=261 {'status': 'Bounced', 'unreplaced': True}
+PASS Home attention (month) /demands/register totals.count        report=774 raw=774 {'stale_days': 30}
+PASS Home ageing (fy) loads                                       report=True raw=True 
+PASS Home ageing (fy) /reports/outstanding-v2 ageing[bucket=Not due].amount_paise report=7315227400 raw=7315227400 {}
+PASS Home ageing (fy) /reports/outstanding-v2 ageing[bucket=0-30].amount_paise report=3984348300 raw=3984348300 {}
+PASS Home ageing (fy) /reports/outstanding-v2 ageing[bucket=31-60].amount_paise report=4220061500 raw=4220061500 {}
+PASS Home ageing (fy) /reports/outstanding-v2 ageing[bucket=61-90].amount_paise report=4094910700 raw=4094910700 {}
+PASS Home ageing (fy) /reports/outstanding-v2 ageing[bucket=90+].amount_paise report=98010584500 raw=98010584500 {}
+PASS Home ageing (fy) /reports/outstanding-v2 totals.outstanding_paise report=117625132400 raw=117625132400 {}
+PASS Home money_today (fy) loads                                  report=True raw=True 
+PASS Home money_today (fy) /reports/collections-v2 totals.cash_paise report=0 raw=0 {'from_date': '2026-11-18', 'to_date': '2026-11-18'}
+PASS Home money_today (fy) /reports/collections-v2 totals.account_paise report=0 raw=0 {'from_date': '2026-11-18', 'to_date': '2026-11-18'}
+PASS Home money_today (fy) /reports/collections-v2 totals.other_paise report=0 raw=0 {'from_date': '2026-11-18', 'to_date': '2026-11-18'}
+PASS Home money_today (fy) /reports/collections-v2 totals.total_paise report=0 raw=0 {'from_date': '2026-11-18', 'to_date': '2026-11-18'}
+PASS Home money_today (fy) /payments/summary Pending.amount_paise report=26053300000 raw=26053300000 {'status': 'Pending'}
+PASS Home due_vs_received (fy) loads                              report=True raw=True 
+PASS Home due_vs_received (fy) /demands/register totals.total_paise report=118160735000 raw=118160735000 {'basis': 'due', 'date_from': '2026-04-01', 'date_to': '2027
+PASS Home due_vs_received (fy) /reports/collections-v2 totals.total_paise report=223411500000 raw=223411500000 {'from_date': '2026-04-01', 'to_date': '2027-03-31'}
+PASS Home call_today (fy) loads                                   report=True raw=True 
+PASS Home call_today (fy) /leads total                            report=3 raw=3 {'due_today': True}
+PASS Home call_today (fy) /site-visits total                      report=2 raw=2 {'date_from': '2026-11-18', 'date_to': '2026-11-18', 'status
+PASS Home inflow_30 (fy) loads                                    report=True raw=True 
+PASS Home inflow_30 (fy) /demands/register totals.balance_paise   report=1462995000 raw=1462995000 {'basis': 'due', 'date_from': '2026-11-19', 'date_to': '2026
+PASS Home inflow_30 (fy) /payments/summary Pending.amount_paise   report=26053300000 raw=26053300000 {'status': 'Pending'}
+PASS Home next_milestone (fy) loads                               report=True raw=True 
+PASS Home next_milestone (fy) /blocks/54e7ef57-ef1c-4639-8ae3-abd23bf0ad59/stages/9d1a8b0e-a1c9-4ef3-8e56-307caa1ab918/preview total_paise report=1095798000 raw=1095798000 {}
+PASS Home next_milestone (fy) /blocks/1ad93271-5523-463e-b221-aaed913103bc/stages/2f0b3522-f968-4d8d-9ef0-e8357bf82b70/preview total_paise report=336257400 raw=336257400 {}
+PASS Home next_milestone (fy) /blocks/3c011f05-4a65-438c-8cc9-b79f27c27b03/stages/cd8192a1-753a-47a1-91be-8e54178741f4/preview total_paise report=1215875300 raw=1215875300 {}
+PASS Home next_milestone (fy) /blocks/15139c22-d8e1-4c64-bb84-39794cae33d5/stages/93065151-96a7-45e9-94fd-da5122ad6eaf/preview total_paise report=993308100 raw=993308100 {}
+PASS Home inventory (fy) loads                                    report=True raw=True 
+PASS Home inventory (fy) /flats total                             report=6 raw=6 {'block_id': '54e7ef57-ef1c-4639-8ae3-abd23bf0ad59', 'status
+PASS Home inventory (fy) /flats total                             report=2 raw=2 {'block_id': '54e7ef57-ef1c-4639-8ae3-abd23bf0ad59', 'status
+PASS Home inventory (fy) /flats total                             report=23 raw=23 {'block_id': '54e7ef57-ef1c-4639-8ae3-abd23bf0ad59', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '54e7ef57-ef1c-4639-8ae3-abd23bf0ad59', 'status
+PASS Home inventory (fy) /flats total                             report=1 raw=1 {'block_id': '54e7ef57-ef1c-4639-8ae3-abd23bf0ad59', 'status
+PASS Home inventory (fy) /flats total                             report=21 raw=21 {'block_id': '098bcefc-102a-4dcc-a8d9-23034c619390', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '098bcefc-102a-4dcc-a8d9-23034c619390', 'status
+PASS Home inventory (fy) /flats total                             report=63 raw=63 {'block_id': '098bcefc-102a-4dcc-a8d9-23034c619390', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '098bcefc-102a-4dcc-a8d9-23034c619390', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '098bcefc-102a-4dcc-a8d9-23034c619390', 'status
+PASS Home inventory (fy) /flats total                             report=26 raw=26 {'block_id': 'a3d899a6-4c2f-49f5-9e36-fd4a87baea54', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': 'a3d899a6-4c2f-49f5-9e36-fd4a87baea54', 'status
+PASS Home inventory (fy) /flats total                             report=58 raw=58 {'block_id': 'a3d899a6-4c2f-49f5-9e36-fd4a87baea54', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': 'a3d899a6-4c2f-49f5-9e36-fd4a87baea54', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': 'a3d899a6-4c2f-49f5-9e36-fd4a87baea54', 'status
+PASS Home inventory (fy) /flats total                             report=17 raw=17 {'block_id': '533a8a68-1a30-47c3-9521-8219d2ea8368', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '533a8a68-1a30-47c3-9521-8219d2ea8368', 'status
+PASS Home inventory (fy) /flats total                             report=31 raw=31 {'block_id': '533a8a68-1a30-47c3-9521-8219d2ea8368', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '533a8a68-1a30-47c3-9521-8219d2ea8368', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '533a8a68-1a30-47c3-9521-8219d2ea8368', 'status
+PASS Home inventory (fy) /flats total                             report=8 raw=8 {'block_id': 'dbb72375-e060-4cb2-a2c2-86452c833cd8', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': 'dbb72375-e060-4cb2-a2c2-86452c833cd8', 'status
+PASS Home inventory (fy) /flats total                             report=48 raw=48 {'block_id': 'dbb72375-e060-4cb2-a2c2-86452c833cd8', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': 'dbb72375-e060-4cb2-a2c2-86452c833cd8', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': 'dbb72375-e060-4cb2-a2c2-86452c833cd8', 'status
+PASS Home inventory (fy) /flats total                             report=11 raw=11 {'block_id': '1ad93271-5523-463e-b221-aaed913103bc', 'status
+PASS Home inventory (fy) /flats total                             report=1 raw=1 {'block_id': '1ad93271-5523-463e-b221-aaed913103bc', 'status
+PASS Home inventory (fy) /flats total                             report=19 raw=19 {'block_id': '1ad93271-5523-463e-b221-aaed913103bc', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '1ad93271-5523-463e-b221-aaed913103bc', 'status
+PASS Home inventory (fy) /flats total                             report=1 raw=1 {'block_id': '1ad93271-5523-463e-b221-aaed913103bc', 'status
+PASS Home inventory (fy) /flats total                             report=18 raw=18 {'block_id': '5f0dcf2d-5177-4335-9472-9816acb8d7c9', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '5f0dcf2d-5177-4335-9472-9816acb8d7c9', 'status
+PASS Home inventory (fy) /flats total                             report=38 raw=38 {'block_id': '5f0dcf2d-5177-4335-9472-9816acb8d7c9', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '5f0dcf2d-5177-4335-9472-9816acb8d7c9', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '5f0dcf2d-5177-4335-9472-9816acb8d7c9', 'status
+PASS Home inventory (fy) /flats total                             report=29 raw=29 {'block_id': '5a1c2f6a-95db-47f4-8e03-63b7c6d00ba0', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '5a1c2f6a-95db-47f4-8e03-63b7c6d00ba0', 'status
+PASS Home inventory (fy) /flats total                             report=55 raw=55 {'block_id': '5a1c2f6a-95db-47f4-8e03-63b7c6d00ba0', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '5a1c2f6a-95db-47f4-8e03-63b7c6d00ba0', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '5a1c2f6a-95db-47f4-8e03-63b7c6d00ba0', 'status
+PASS Home inventory (fy) /flats total                             report=22 raw=22 {'block_id': 'dc04eeb7-7c37-4cac-b51f-7d6de5d4ade0', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': 'dc04eeb7-7c37-4cac-b51f-7d6de5d4ade0', 'status
+PASS Home inventory (fy) /flats total                             report=34 raw=34 {'block_id': 'dc04eeb7-7c37-4cac-b51f-7d6de5d4ade0', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': 'dc04eeb7-7c37-4cac-b51f-7d6de5d4ade0', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': 'dc04eeb7-7c37-4cac-b51f-7d6de5d4ade0', 'status
+PASS Home inventory (fy) /flats total                             report=24 raw=24 {'block_id': 'c99a5ec1-8e6a-4269-b421-93067b393a6b', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': 'c99a5ec1-8e6a-4269-b421-93067b393a6b', 'status
+PASS Home inventory (fy) /flats total                             report=48 raw=48 {'block_id': 'c99a5ec1-8e6a-4269-b421-93067b393a6b', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': 'c99a5ec1-8e6a-4269-b421-93067b393a6b', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': 'c99a5ec1-8e6a-4269-b421-93067b393a6b', 'status
+PASS Home inventory (fy) /flats total                             report=15 raw=15 {'block_id': '3c011f05-4a65-438c-8cc9-b79f27c27b03', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '3c011f05-4a65-438c-8cc9-b79f27c27b03', 'status
+PASS Home inventory (fy) /flats total                             report=41 raw=41 {'block_id': '3c011f05-4a65-438c-8cc9-b79f27c27b03', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '3c011f05-4a65-438c-8cc9-b79f27c27b03', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '3c011f05-4a65-438c-8cc9-b79f27c27b03', 'status
+PASS Home inventory (fy) /flats total                             report=15 raw=15 {'block_id': '0ef057d2-a8db-487d-8102-6557238fc451', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '0ef057d2-a8db-487d-8102-6557238fc451', 'status
+PASS Home inventory (fy) /flats total                             report=33 raw=33 {'block_id': '0ef057d2-a8db-487d-8102-6557238fc451', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '0ef057d2-a8db-487d-8102-6557238fc451', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '0ef057d2-a8db-487d-8102-6557238fc451', 'status
+PASS Home inventory (fy) /flats total                             report=13 raw=13 {'block_id': '74878fd8-2678-47b1-8690-b9dbec5d1aeb', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '74878fd8-2678-47b1-8690-b9dbec5d1aeb', 'status
+PASS Home inventory (fy) /flats total                             report=43 raw=43 {'block_id': '74878fd8-2678-47b1-8690-b9dbec5d1aeb', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '74878fd8-2678-47b1-8690-b9dbec5d1aeb', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '74878fd8-2678-47b1-8690-b9dbec5d1aeb', 'status
+PASS Home inventory (fy) /flats total                             report=19 raw=19 {'block_id': 'b69c932a-4f99-4951-ab69-9b7076984a94', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': 'b69c932a-4f99-4951-ab69-9b7076984a94', 'status
+PASS Home inventory (fy) /flats total                             report=65 raw=65 {'block_id': 'b69c932a-4f99-4951-ab69-9b7076984a94', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': 'b69c932a-4f99-4951-ab69-9b7076984a94', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': 'b69c932a-4f99-4951-ab69-9b7076984a94', 'status
+PASS Home inventory (fy) /flats total                             report=11 raw=11 {'block_id': '189ccda5-106b-4e4d-ba15-08bb52028405', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '189ccda5-106b-4e4d-ba15-08bb52028405', 'status
+PASS Home inventory (fy) /flats total                             report=37 raw=37 {'block_id': '189ccda5-106b-4e4d-ba15-08bb52028405', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '189ccda5-106b-4e4d-ba15-08bb52028405', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '189ccda5-106b-4e4d-ba15-08bb52028405', 'status
+PASS Home inventory (fy) /flats total                             report=25 raw=25 {'block_id': '9570c628-a196-4019-a401-95aa0ed8d7b3', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '9570c628-a196-4019-a401-95aa0ed8d7b3', 'status
+PASS Home inventory (fy) /flats total                             report=47 raw=47 {'block_id': '9570c628-a196-4019-a401-95aa0ed8d7b3', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '9570c628-a196-4019-a401-95aa0ed8d7b3', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '9570c628-a196-4019-a401-95aa0ed8d7b3', 'status
+PASS Home inventory (fy) /flats total                             report=27 raw=27 {'block_id': '2d49d389-2892-4215-847f-e912369dd264', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '2d49d389-2892-4215-847f-e912369dd264', 'status
+PASS Home inventory (fy) /flats total                             report=37 raw=37 {'block_id': '2d49d389-2892-4215-847f-e912369dd264', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '2d49d389-2892-4215-847f-e912369dd264', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '2d49d389-2892-4215-847f-e912369dd264', 'status
+PASS Home inventory (fy) /flats total                             report=20 raw=20 {'block_id': '863b4e42-b839-4d39-b976-03abd604ef14', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '863b4e42-b839-4d39-b976-03abd604ef14', 'status
+PASS Home inventory (fy) /flats total                             report=44 raw=44 {'block_id': '863b4e42-b839-4d39-b976-03abd604ef14', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '863b4e42-b839-4d39-b976-03abd604ef14', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '863b4e42-b839-4d39-b976-03abd604ef14', 'status
+PASS Home inventory (fy) /flats total                             report=27 raw=27 {'block_id': 'db6e96b3-89b5-491f-b6e1-54f7d8bf22fe', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': 'db6e96b3-89b5-491f-b6e1-54f7d8bf22fe', 'status
+PASS Home inventory (fy) /flats total                             report=57 raw=57 {'block_id': 'db6e96b3-89b5-491f-b6e1-54f7d8bf22fe', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': 'db6e96b3-89b5-491f-b6e1-54f7d8bf22fe', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': 'db6e96b3-89b5-491f-b6e1-54f7d8bf22fe', 'status
+PASS Home inventory (fy) /flats total                             report=32 raw=32 {'block_id': '444118cd-10c0-465c-939d-1d454bc0935a', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '444118cd-10c0-465c-939d-1d454bc0935a', 'status
+PASS Home inventory (fy) /flats total                             report=52 raw=52 {'block_id': '444118cd-10c0-465c-939d-1d454bc0935a', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '444118cd-10c0-465c-939d-1d454bc0935a', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '444118cd-10c0-465c-939d-1d454bc0935a', 'status
+PASS Home inventory (fy) /flats total                             report=18 raw=18 {'block_id': 'd045c80e-5e6d-4eca-ae71-48c4782e72b7', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': 'd045c80e-5e6d-4eca-ae71-48c4782e72b7', 'status
+PASS Home inventory (fy) /flats total                             report=54 raw=54 {'block_id': 'd045c80e-5e6d-4eca-ae71-48c4782e72b7', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': 'd045c80e-5e6d-4eca-ae71-48c4782e72b7', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': 'd045c80e-5e6d-4eca-ae71-48c4782e72b7', 'status
+PASS Home inventory (fy) /flats total                             report=16 raw=16 {'block_id': '40c9cf79-0614-480d-9a5d-5d8ad7112056', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '40c9cf79-0614-480d-9a5d-5d8ad7112056', 'status
+PASS Home inventory (fy) /flats total                             report=32 raw=32 {'block_id': '40c9cf79-0614-480d-9a5d-5d8ad7112056', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '40c9cf79-0614-480d-9a5d-5d8ad7112056', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '40c9cf79-0614-480d-9a5d-5d8ad7112056', 'status
+PASS Home inventory (fy) /flats total                             report=15 raw=15 {'block_id': '301e60d8-2bc5-4e49-8c3f-a4c93b7db799', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '301e60d8-2bc5-4e49-8c3f-a4c93b7db799', 'status
+PASS Home inventory (fy) /flats total                             report=57 raw=57 {'block_id': '301e60d8-2bc5-4e49-8c3f-a4c93b7db799', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '301e60d8-2bc5-4e49-8c3f-a4c93b7db799', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '301e60d8-2bc5-4e49-8c3f-a4c93b7db799', 'status
+PASS Home inventory (fy) /flats total                             report=29 raw=29 {'block_id': '028178a1-9e91-4ef2-a0f4-81b861cff2e6', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '028178a1-9e91-4ef2-a0f4-81b861cff2e6', 'status
+PASS Home inventory (fy) /flats total                             report=43 raw=43 {'block_id': '028178a1-9e91-4ef2-a0f4-81b861cff2e6', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '028178a1-9e91-4ef2-a0f4-81b861cff2e6', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '028178a1-9e91-4ef2-a0f4-81b861cff2e6', 'status
+PASS Home inventory (fy) /flats total                             report=18 raw=18 {'block_id': '876ad65a-9a64-4b87-aa3c-0e4cdd33d869', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '876ad65a-9a64-4b87-aa3c-0e4cdd33d869', 'status
+PASS Home inventory (fy) /flats total                             report=38 raw=38 {'block_id': '876ad65a-9a64-4b87-aa3c-0e4cdd33d869', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '876ad65a-9a64-4b87-aa3c-0e4cdd33d869', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '876ad65a-9a64-4b87-aa3c-0e4cdd33d869', 'status
+PASS Home inventory (fy) /flats total                             report=20 raw=20 {'block_id': '1ebe58a6-145b-4d87-8258-667374b9ced8', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '1ebe58a6-145b-4d87-8258-667374b9ced8', 'status
+PASS Home inventory (fy) /flats total                             report=44 raw=44 {'block_id': '1ebe58a6-145b-4d87-8258-667374b9ced8', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '1ebe58a6-145b-4d87-8258-667374b9ced8', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '1ebe58a6-145b-4d87-8258-667374b9ced8', 'status
+PASS Home inventory (fy) /flats total                             report=15 raw=15 {'block_id': 'fe4ba088-a863-4714-bd44-9dc910de22ee', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': 'fe4ba088-a863-4714-bd44-9dc910de22ee', 'status
+PASS Home inventory (fy) /flats total                             report=25 raw=25 {'block_id': 'fe4ba088-a863-4714-bd44-9dc910de22ee', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': 'fe4ba088-a863-4714-bd44-9dc910de22ee', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': 'fe4ba088-a863-4714-bd44-9dc910de22ee', 'status
+PASS Home inventory (fy) /flats total                             report=29 raw=29 {'block_id': '40e0f3fe-3127-4773-9846-7bcb5f988e85', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '40e0f3fe-3127-4773-9846-7bcb5f988e85', 'status
+PASS Home inventory (fy) /flats total                             report=43 raw=43 {'block_id': '40e0f3fe-3127-4773-9846-7bcb5f988e85', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '40e0f3fe-3127-4773-9846-7bcb5f988e85', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '40e0f3fe-3127-4773-9846-7bcb5f988e85', 'status
+PASS Home inventory (fy) /flats total                             report=12 raw=12 {'block_id': 'cb4e04de-85a4-46f5-b045-14cb005c5136', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': 'cb4e04de-85a4-46f5-b045-14cb005c5136', 'status
+PASS Home inventory (fy) /flats total                             report=36 raw=36 {'block_id': 'cb4e04de-85a4-46f5-b045-14cb005c5136', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': 'cb4e04de-85a4-46f5-b045-14cb005c5136', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': 'cb4e04de-85a4-46f5-b045-14cb005c5136', 'status
+PASS Home inventory (fy) /flats total                             report=16 raw=16 {'block_id': '3d853765-2bb9-44ef-af0a-dc00bb4fdc95', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '3d853765-2bb9-44ef-af0a-dc00bb4fdc95', 'status
+PASS Home inventory (fy) /flats total                             report=24 raw=24 {'block_id': '3d853765-2bb9-44ef-af0a-dc00bb4fdc95', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '3d853765-2bb9-44ef-af0a-dc00bb4fdc95', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '3d853765-2bb9-44ef-af0a-dc00bb4fdc95', 'status
+PASS Home inventory (fy) /flats total                             report=22 raw=22 {'block_id': '70431e71-e251-4ad2-9a16-9610d3d4502a', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '70431e71-e251-4ad2-9a16-9610d3d4502a', 'status
+PASS Home inventory (fy) /flats total                             report=62 raw=62 {'block_id': '70431e71-e251-4ad2-9a16-9610d3d4502a', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '70431e71-e251-4ad2-9a16-9610d3d4502a', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '70431e71-e251-4ad2-9a16-9610d3d4502a', 'status
+PASS Home inventory (fy) /flats total                             report=22 raw=22 {'block_id': '7c166715-0820-4544-85eb-3595c5f1a31b', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '7c166715-0820-4544-85eb-3595c5f1a31b', 'status
+PASS Home inventory (fy) /flats total                             report=62 raw=62 {'block_id': '7c166715-0820-4544-85eb-3595c5f1a31b', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '7c166715-0820-4544-85eb-3595c5f1a31b', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '7c166715-0820-4544-85eb-3595c5f1a31b', 'status
+PASS Home inventory (fy) /flats total                             report=20 raw=20 {'block_id': '843f2bed-5c96-48f5-a5aa-db70f1652b4b', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '843f2bed-5c96-48f5-a5aa-db70f1652b4b', 'status
+PASS Home inventory (fy) /flats total                             report=52 raw=52 {'block_id': '843f2bed-5c96-48f5-a5aa-db70f1652b4b', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '843f2bed-5c96-48f5-a5aa-db70f1652b4b', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '843f2bed-5c96-48f5-a5aa-db70f1652b4b', 'status
+PASS Home inventory (fy) /flats total                             report=21 raw=21 {'block_id': '8fbf569f-1d24-4957-a474-ba0fed6afc68', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '8fbf569f-1d24-4957-a474-ba0fed6afc68', 'status
+PASS Home inventory (fy) /flats total                             report=43 raw=43 {'block_id': '8fbf569f-1d24-4957-a474-ba0fed6afc68', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '8fbf569f-1d24-4957-a474-ba0fed6afc68', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '8fbf569f-1d24-4957-a474-ba0fed6afc68', 'status
+PASS Home inventory (fy) /flats total                             report=1 raw=1 {'block_id': '90433c6e-cf0e-4706-81cc-b491fca605da', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '90433c6e-cf0e-4706-81cc-b491fca605da', 'status
+PASS Home inventory (fy) /flats total                             report=4 raw=4 {'block_id': '90433c6e-cf0e-4706-81cc-b491fca605da', 'status
+PASS Home inventory (fy) /flats total                             report=1 raw=1 {'block_id': '90433c6e-cf0e-4706-81cc-b491fca605da', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '90433c6e-cf0e-4706-81cc-b491fca605da', 'status
+PASS Home inventory (fy) /flats total                             report=5 raw=5 {'block_id': '15139c22-d8e1-4c64-bb84-39794cae33d5', 'status
+PASS Home inventory (fy) /flats total                             report=1 raw=1 {'block_id': '15139c22-d8e1-4c64-bb84-39794cae33d5', 'status
+PASS Home inventory (fy) /flats total                             report=6 raw=6 {'block_id': '15139c22-d8e1-4c64-bb84-39794cae33d5', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '15139c22-d8e1-4c64-bb84-39794cae33d5', 'status
+PASS Home inventory (fy) /flats total                             report=0 raw=0 {'block_id': '15139c22-d8e1-4c64-bb84-39794cae33d5', 'status
+PASS Home flat_status (fy) loads                                  report=True raw=True 
+PASS Home construction (fy) loads                                 report=True raw=True 
+PASS Home pipeline (fy) loads                                     report=True raw=True 
+PASS Home pipeline (fy) /leads total                              report=1498 raw=1498 {'created_from': '2026-04-01', 'created_to': '2027-03-31'}
+PASS Home pipeline (fy) /site-visits total                        report=2 raw=2 {'date_from': '2026-04-01', 'date_to': '2027-03-31', 'status
+PASS Home pipeline (fy) /bookings total                           report=357 raw=357 {'date_from': '2026-04-01', 'date_to': '2027-03-31', 'status
+PASS Home pipeline (fy) /leads total                              report=1 raw=1 {'created_from': '2026-04-01', 'created_to': '2027-03-31', '
+PASS Home attention (fy) loads                                    report=True raw=True 
+PASS Home attention (fy) /flats total                             report=0 raw=0 {'hold_expiring': True}
+PASS Home attention (fy) /payments/summary Bounced.count          report=261 raw=261 {'status': 'Bounced', 'unreplaced': True}
+PASS Home attention (fy) /demands/register totals.count           report=774 raw=774 {'stale_days': 30}
+PASS Home Overdue by age total == report Outstanding (ONE number) report=117625132400 raw=117625132400 
+PASS Home Money today == Σ today's allocation parts               report=0 raw=0 
+PASS report [collections-v2] net Jama (receipt basis, all time) == Σ cleared receipts report= raw= tools/tieout_reports.py
+PASS report [collections-v2] net Jama == Σ ledger Jama rows (receipts + reversals) report= raw= tools/tieout_reports.py
+PASS report [collections-v2] FY total (receipt basis) == raw payments by receipt date report= raw= tools/tieout_reports.py
+PASS report [collections-v2] basis label present (receipt)        report= raw= tools/tieout_reports.py
+PASS report [collections-v2] FY total (clearance basis) == raw payments by clearance date report= raw= tools/tieout_reports.py
+PASS report [collections-v2] basis label present (clearance)      report= raw= tools/tieout_reports.py
+PASS report [collections-v2] receipt basis == legacy collections (payment_date, Cleared) report= raw= tools/tieout_reports.py
+PASS report [collections-v2] Σ by project == total (total_paise)  report= raw= tools/tieout_reports.py
+PASS report [collections-v2] Σ by block == total (total_paise)    report= raw= tools/tieout_reports.py
+PASS report [collections-v2] Σ by bucket == total (total_paise)   report= raw= tools/tieout_reports.py
+PASS report [collections-v2] Σ by mode == total (total_paise)     report= raw= tools/tieout_reports.py
+PASS report [collections-v2] Σ by bank == total (total_paise)     report= raw= tools/tieout_reports.py
+PASS report [collections-v2] Σ by rm == total (total_paise)       report= raw= tools/tieout_reports.py
+PASS report [collections-v2] Σ by day == total (total_paise)      report= raw= tools/tieout_reports.py
+PASS report [outstanding-v2] outstanding == Σ definitions.outstanding(summary) report= raw= tools/tieout_reports.py
+PASS report [outstanding-v2] advance held == Σ definitions.advance report= raw= tools/tieout_reports.py
+PASS report [outstanding-v2] net == outstanding − advance == Σ Udhar − Σ Jama (received + waived) report= raw= tools/tieout_reports.py
+PASS report [outstanding-v2] per booking: report net == ledger net == summary net; report outstanding == summary outstanding report= raw= tools/tieout_reports.py
+PASS report [outstanding-v2] outstanding == Home outstanding tile report= raw= tools/tieout_reports.py
+PASS report [outstanding-v2] bands Σ == outstanding               report= raw= tools/tieout_reports.py
+PASS report [outstanding-v2] report bands == Σ definitions.ageing_bands report= raw= tools/tieout_reports.py
+PASS report [outstanding-v2] Σ by customer == total (outstanding_paise) report= raw= tools/tieout_reports.py
+PASS report [outstanding-v2] Σ by customer == total (net_balance_paise) report= raw= tools/tieout_reports.py
+PASS report [outstanding-v2] Σ by project == total (outstanding_paise) report= raw= tools/tieout_reports.py
+PASS report [outstanding-v2] Σ by project == total (net_balance_paise) report= raw= tools/tieout_reports.py
+PASS report [outstanding-v2] Σ by block == total (outstanding_paise) report= raw= tools/tieout_reports.py
+PASS report [outstanding-v2] Σ by block == total (net_balance_paise) report= raw= tools/tieout_reports.py
+PASS report [demand-vs-collection] demanded == Σ non-void demands report= raw= tools/tieout_reports.py
+PASS report [demand-vs-collection] collected == Σ demand.paid     report= raw= tools/tieout_reports.py
+PASS report [cash-vs-account] cash raised == Σ summary.cash_order_raised report= raw= tools/tieout_reports.py
+PASS report [cash-vs-account] account received == Σ summary.account_paid report= raw= tools/tieout_reports.py
+PASS report [cash-vs-account] cash agreed == Σ booking.cash_agreed report= raw= tools/tieout_reports.py
+PASS report [cash-vs-account] Σ by project == total (cash_balance_paise) report= raw= tools/tieout_reports.py
+PASS report [cash-vs-account] Σ by block == total (cash_balance_paise) report= raw= tools/tieout_reports.py
+PASS report [cheques] rows == cheque/DD payments                  report= raw= tools/tieout_reports.py
+PASS report [cheques] amount == Σ instrument amounts              report= raw= tools/tieout_reports.py
+PASS report [receivables-forecast] Σ forecast + Σ raised == Σ agreement (live bookings) report= raw= tools/tieout_reports.py
+PASS report [receivables-forecast] per booking: forecast == agreement − raised report= raw= tools/tieout_reports.py
+PASS report [receivables-forecast] Σ by project == total (expected_paise) report= raw= tools/tieout_reports.py
+PASS report [receivables-forecast] Σ by block == total (expected_paise) report= raw= tools/tieout_reports.py
+PASS report [receivables-forecast] Σ by booking == total (expected_paise) report= raw= tools/tieout_reports.py
+PASS report [receivables-forecast] Σ by stage == total (expected_paise) report= raw= tools/tieout_reports.py
+PASS report [receivables-forecast] Σ by month == total (expected_paise) report= raw= tools/tieout_reports.py
+PASS report [receivables-forecast] default grouping is tower → stage when no planned dates report= raw= tools/tieout_reports.py
+PASS report [receivables-forecast] stage grouping: one row per tower·stage, Σ == total report= raw= tools/tieout_reports.py
+PASS report [cancellations] rows == Cancelled bookings            report= raw= tools/tieout_reports.py
+PASS report [cancellations] refund paid == Σ paid refunds         report= raw= tools/tieout_reports.py
+PASS report [cancellations] ledger REFUND rows == Σ paid refunds  report= raw= tools/tieout_reports.py
+PASS report [bank-receipts] cleared == Σ non-cash cleared         report= raw= tools/tieout_reports.py
+PASS report [bank-receipts] pending == Σ non-cash pending         report= raw= tools/tieout_reports.py
+PASS report [other-charges] demanded == Σ other_charges.demanded  report= raw= tools/tieout_reports.py
+PASS report [other-charges] collected == Σ other_charges.(paid − waived) report= raw= tools/tieout_reports.py
+PASS report [other-charges] collected == Σ Other ledger Jama (OTHER_CHARGE_PAYMENT + Other reversals/refunds) report= raw= tools/tieout_reports.py
+PASS report [other-charges] Σ by project == total (demanded_paise) report= raw= tools/tieout_reports.py
+PASS report [other-charges] Σ by booking == total (demanded_paise) report= raw= tools/tieout_reports.py
+PASS report [roznamcha-summary] cash received == Σ cleared CASH receipts report= raw= tools/tieout_reports.py
+PASS report [roznamcha-summary] deposits == Σ contra DEPOSIT      report= raw= tools/tieout_reports.py
+PASS report [roznamcha-summary] closing == opening + cash in − deposits + withdrawals − cash refunds report= raw= tools/tieout_reports.py
+PASS report [roznamcha-summary] Σ by month == range total (cash in) report= raw= tools/tieout_reports.py
+PASS report [roznamcha-summary] monthly closing == daily closing  report= raw= tools/tieout_reports.py
+PASS report [inventory] units by status == flats                  report= raw= tools/tieout_reports.py
+PASS report [inventory] sold value == Σ price of booked/sold flats report= raw= tools/tieout_reports.py
+PASS report [sales-leads] leads == leads collection               report= raw= tools/tieout_reports.py
+PASS report [sales-leads] converted == Converted leads            report= raw= tools/tieout_reports.py
+PASS report [site-visits] visits == site_visits                   report= raw= tools/tieout_reports.py
+PASS report [site-visits] completed == Completed visits           report= raw= tools/tieout_reports.py
+PASS report [site-visits] Σ by project == total (scheduled)       report= raw= tools/tieout_reports.py
+PASS report [site-visits] Σ by month == total (scheduled)         report= raw= tools/tieout_reports.py
+PASS report [sales-team] sold value == Σ live agreement values    report= raw= tools/tieout_reports.py
+PASS report [sales-team] collections == Σ cleared receipts of live bookings report= raw= tools/tieout_reports.py
+PASS report [sales-team] overdue == outstanding report overdue    report= raw= tools/tieout_reports.py
+PASS report [construction-vs-plan] stage rows == Σ stages of active towers report= raw= tools/tieout_reports.py
+PASS report [construction-vs-plan] stage demands == Σ ON_STAGE/ON_POSSESSION demands report= raw= tools/tieout_reports.py
+PASS report [construction-vs-plan] subtotals == Σ their stage rows (demanded) report= raw= tools/tieout_reports.py
+PASS report [construction-vs-plan] no tower name with leading/trailing space report= raw= tools/tieout_reports.py
+PASS report [construction-vs-plan] GET /payments/demands honours block_id report= raw= tools/tieout_reports.py
+PASS report [service-sla] tickets == service_requests             report= raw= tools/tieout_reports.py
+PASS report [activity] audit actions == audit_logs (live log)     report= raw= tools/tieout_reports.py
+PASS report [data-quality] open demands on cancelled bookings == 0 (integrity) report= raw= tools/tieout_reports.py
+PASS report [data-quality] towers without stage plan excludes inactive towers report= raw= tools/tieout_reports.py
+PASS report [data-quality] payment plans not summing 100 == 0     report= raw= tools/tieout_reports.py
+PASS report [data-quality] integrity report ok                    report= raw= tools/tieout_reports.py
+PASS report [customer-status] Σ Account dues + Σ Cash dues == instalment outstanding report= raw= tools/tieout_reports.py
+PASS report [customer-status] rows == live bookings               report= raw= tools/tieout_reports.py
+PASS report [customer-status] Σ bills raised == Σ Cash + Account order raised report= raw= tools/tieout_reports.py
+PASS report [customer-status] formula: raised − received − waived + advance == dues report= raw= tools/tieout_reports.py
+PASS report [customer-status] final status kind == customer card, every booking report= raw= tools/tieout_reports.py
+PASS report [customer-status] overdue days == customer card, every booking report= raw= tools/tieout_reports.py
+PASS report [customer-status] ledger share state today == booking summary (as-of path) report= raw= tools/tieout_reports.py
+PASS report [customer-status] as of 2026-03-31: instalment net dues == ledger rows on that day report= raw= tools/tieout_reports.py
+PASS report [customer-status] as of 2026-03-31 instalment net + other-charge net == carried from before at 2026-04-01 report= raw= tools/tieout_reports.py
+PASS report [customer-status] Σ project subtotals == total dues   report= raw= tools/tieout_reports.py
+PASS report [customer-status] Σ tower subtotals == project subtotal report= raw= tools/tieout_reports.py
+PASS report [customer-ageing] Σ bands == Σ total due              report= raw= tools/tieout_reports.py
+PASS report [customer-ageing] Σ total due == Σ outstanding (definitions) of live bookings report= raw= tools/tieout_reports.py
+PASS report [customer-ageing] rows == live bookings with dues     report= raw= tools/tieout_reports.py
+PASS report [customer-ageing] Σ total due == Outstanding & ageing report total report= raw= tools/tieout_reports.py
+PASS report [customer-status] formula bridge: total due == Overdue & ageing total due report= raw= tools/tieout_reports.py
+PASS report [advance-holders] Σ advance == Σ booking advance (definitions) report= raw= tools/tieout_reports.py
+PASS report [call-list] Σ due == ageing Σ total due               report= raw= tools/tieout_reports.py
+PASS report [call-list] Σ overdue == ageing Σ overdue             report= raw= tools/tieout_reports.py
+PASS report [call-list] sorted oldest first                       report= raw= tools/tieout_reports.py
+PASS report [kyc-pending] agreement pending == live bookings without signed agreement report= raw= tools/tieout_reports.py
+PASS report [payment-behaviour] customers == customers with live bookings report= raw= tools/tieout_reports.py
+PASS report [payment-behaviour] on time ≤ bills due on every row  report= raw= tools/tieout_reports.py
+PASS report [customer-directory] rows == customers (not deleted)  report= raw= tools/tieout_reports.py
+PASS report [cancelled-customers] Σ refund payable == Σ cancellation refund report= raw= tools/tieout_reports.py
+PASS report [cancelled-customers] Σ refund paid == Σ refunds paid on cancelled bookings report= raw= tools/tieout_reports.py
+PASS report [customer-statement] bills − received − waived == Σ last running balance report= raw= tools/tieout_reports.py
+PASS report [customer-statement] Σ bills == Σ booking Udhar       report= raw= tools/tieout_reports.py
+PASS report [collections] new sheet == collections-v2 (group_by=month): 5 money totals report= raw= tools/tieout_reports.py
+PASS report [collections] new sheet == collections-v2 (group_by=receipt): 5 money totals report= raw= tools/tieout_reports.py
+PASS report [day-book] new sheet == roznamcha-summary (group_by=month): 5 money totals report= raw= tools/tieout_reports.py
+PASS report [day-book] new sheet == roznamcha-summary (group_by=day): 5 money totals report= raw= tools/tieout_reports.py
+PASS report [bank-receipts] new sheet == bank-receipts: 3 money totals report= raw= tools/tieout_reports.py
+PASS report [cheques] new sheet == cheques: 1 money totals        report= raw= tools/tieout_reports.py
+PASS report [bills-vs-collection] new sheet == demand-vs-collection: 4 money totals report= raw= tools/tieout_reports.py
+PASS report [outstanding] new sheet == outstanding-v2 (group_by=project): 7 money totals report= raw= tools/tieout_reports.py
+PASS report [outstanding] new sheet == outstanding-v2 (group_by=booking): 7 money totals report= raw= tools/tieout_reports.py
+PASS report [cash-vs-account] new sheet == cash-vs-account (group_by=project): 8 money totals report= raw= tools/tieout_reports.py
+PASS report [cash-vs-account] new sheet == cash-vs-account (group_by=booking): 8 money totals report= raw= tools/tieout_reports.py
+PASS report [other-charges] new sheet == other-charges (group_by=charge): 4 money totals report= raw= tools/tieout_reports.py
+PASS report [other-charges] new sheet == other-charges (group_by=booking): 4 money totals report= raw= tools/tieout_reports.py
+PASS report [receivables-forecast] new sheet == receivables-forecast (group_by=stage): 3 money totals report= raw= tools/tieout_reports.py
+PASS report [receivables-forecast] new sheet == receivables-forecast (group_by=booking): 3 money totals report= raw= tools/tieout_reports.py
+PASS report [waivers] new sheet == waiver-register: 2 money totals report= raw= tools/tieout_reports.py
+PASS report [outstanding] filtered by one project == existing report filtered the same way report= raw= tools/tieout_reports.py
+PASS report [collections] period 2026-04-01…2026-09-30 == existing report same period report= raw= tools/tieout_reports.py
+PASS report [booking-register] Σ agreement value (Active + Completed) == bookings collection report= raw= tools/tieout_reports.py
+PASS report [sales-summary] Σ bookings this FY == booking register (not cancelled) this FY report= raw= tools/tieout_reports.py
+PASS report [sales-summary] Σ agreement value this FY == booking register this FY report= raw= tools/tieout_reports.py
+PASS report [discount-register] Σ discount (all dates) == existing Discount register report= raw= tools/tieout_reports.py
+PASS report [discount-register] Σ discount (all dates) == booking register discount (Active + Completed) report= raw= tools/tieout_reports.py
+PASS report [plan-position] Σ bills raised == Customer status     report= raw= tools/tieout_reports.py
+PASS report [plan-position] Σ received == Customer status Account + Cash received report= raw= tools/tieout_reports.py
+PASS report [agreements] signed + pending == live bookings        report= raw= tools/tieout_reports.py
+PASS report [agreements] signed == live bookings with an accepted plan report= raw= tools/tieout_reports.py
+PASS report [cancellations] Σ refund payable == existing Cancellations report report= raw= tools/tieout_reports.py
+PASS report [cancellations] Σ refund paid == existing Cancellations report report= raw= tools/tieout_reports.py
+PASS report [transfers] changes == transfers + revisions + price events on bookings + plan changes in audit log (bookings that exist) report= raw= tools/tieout_reports.py
+PASS report [sales-team] Σ sold (all dates) == existing Sales team report report= raw= tools/tieout_reports.py
+PASS report [sales-team] Σ bookings (all dates) == existing Sales team report report= raw= tools/tieout_reports.py
+PASS report [realised-rate] Σ agreement value == Plan & stage position report= raw= tools/tieout_reports.py
+PASS report [realised-rate] Σ list − Σ agreement == Σ discount    report= raw= tools/tieout_reports.py
+PASS report [booking-health] Σ overdue == Customer status overdue report= raw= tools/tieout_reports.py
+PASS report [booking-health] Σ total due == Customer status total due report= raw= tools/tieout_reports.py
+PASS report [booking-health] healthy + watch + at risk == live bookings report= raw= tools/tieout_reports.py
+PASS report [project-statement] SGH Σ bill raised == existing Project statement report= raw= tools/tieout_reports.py
+PASS report [project-statement] SGH Σ received == existing Project statement report= raw= tools/tieout_reports.py
+PASS report [project-statement] SGH Σ balance signed == existing Project statement report= raw= tools/tieout_reports.py
+PASS report [inventory-status] Available flats (real layer) == existing Inventory control report= raw= tools/tieout_reports.py
+PASS report [inventory-status] Hold flats (real layer) == existing Inventory control report= raw= tools/tieout_reports.py
+PASS report [inventory-status] Blocked flats (real layer) == existing Inventory control report= raw= tools/tieout_reports.py
+PASS report [inventory-status] Booked flats (real layer) == existing Inventory control report= raw= tools/tieout_reports.py
+PASS report [inventory-status] Sold flats (real layer) == existing Inventory control report= raw= tools/tieout_reports.py
+PASS report [inventory-status] Available flats for a display-layer viewer == shown-as available in Inventory control report= raw= tools/tieout_reports.py
+PASS report [inventory-status] Hold flats for a display-layer viewer == shown-as hold in Inventory control report= raw= tools/tieout_reports.py
+PASS report [inventory-status] Sold flats for a display-layer viewer == shown-as sold in Inventory control report= raw= tools/tieout_reports.py
+PASS report [inventory-status] display-layer viewer sees no Booked / Blocked report= raw= tools/tieout_reports.py
+PASS report [stacking-plan] cells == flats in Inventory status    report= raw= tools/tieout_reports.py
+PASS report [price-list] Σ list price of available flats == existing Inventory available value report= raw= tools/tieout_reports.py
+PASS report [price-list] unsold == available + hold in Inventory status report= raw= tools/tieout_reports.py
+PASS report [hold-register] active holds == flats on Hold in the flats master report= raw= tools/tieout_reports.py
+PASS report [hold-register] holds == existing Hold register active holds report= raw= tools/tieout_reports.py
+PASS report [hold-register] lapsing within 48 h == existing Hold register expiring report= raw= tools/tieout_reports.py
+PASS report [inventory-status] Available flats for Sales (display layer) == shown-as available in Inventory control report= raw= tools/tieout_reports.py
+PASS report [inventory-status] Hold flats for Sales (display layer) == shown-as hold in Inventory control report= raw= tools/tieout_reports.py
+PASS report [inventory-status] Sold flats for Sales (display layer) == shown-as sold in Inventory control report= raw= tools/tieout_reports.py
+PASS report [landowner] landowner units == existing Landowner share report= raw= tools/tieout_reports.py
+PASS report [landowner] masked units == existing Masked inventory report= raw= tools/tieout_reports.py
+PASS report [parking] Allotted slots == parking slots master      report= raw= tools/tieout_reports.py
+PASS report [parking] Available slots == parking slots master     report= raw= tools/tieout_reports.py
+PASS report [construction-vs-plan] Σ demanded == existing Construction vs plan report= raw= tools/tieout_reports.py
+PASS report [construction-vs-plan] Σ collected == existing Construction vs plan report= raw= tools/tieout_reports.py
+PASS report [construction-vs-plan] Σ balance == existing Construction vs plan report= raw= tools/tieout_reports.py
+PASS report [stage-bills] Σ bills raised == Customer status       report= raw= tools/tieout_reports.py
+PASS report [stage-bills] Σ received == Customer status Account + Cash report= raw= tools/tieout_reports.py
+PASS report [stage-bills] Σ instalment dues == Customer status    report= raw= tools/tieout_reports.py
+PASS report [sales-velocity] Σ unsold == Inventory status available + hold report= raw= tools/tieout_reports.py
+PASS report [sales-velocity] Σ booked in the last 12 months == booking register same window report= raw= tools/tieout_reports.py
+PASS report [lead-funnel] New (this FY) == existing Sales & leads funnel report= raw= tools/tieout_reports.py
+PASS report [lead-funnel] Contacted (this FY) == existing Sales & leads funnel report= raw= tools/tieout_reports.py
+PASS report [lead-funnel] Site Visit Scheduled (this FY) == existing Sales & leads funnel report= raw= tools/tieout_reports.py
+PASS report [lead-funnel] Site Visit Done (this FY) == existing Sales & leads funnel report= raw= tools/tieout_reports.py
+PASS report [lead-funnel] Negotiation (this FY) == existing Sales & leads funnel report= raw= tools/tieout_reports.py
+PASS report [lead-funnel] Converted (this FY) == existing Sales & leads funnel report= raw= tools/tieout_reports.py
+PASS report [lead-funnel] Lost (this FY) == existing Sales & leads funnel report= raw= tools/tieout_reports.py
+PASS report [lead-funnel] Σ leads (this FY) == existing Sales & leads report= raw= tools/tieout_reports.py
+PASS report [source-performance] Website leads / converted == existing Sales & leads report= raw= tools/tieout_reports.py
+PASS report [source-performance] Walk-in leads / converted == existing Sales & leads report= raw= tools/tieout_reports.py
+PASS report [source-performance] Referral leads / converted == existing Sales & leads report= raw= tools/tieout_reports.py
+PASS report [source-performance] Broker leads / converted == existing Sales & leads report= raw= tools/tieout_reports.py
+PASS report [source-performance] Campaign leads / converted == existing Sales & leads report= raw= tools/tieout_reports.py
+PASS report [lead-register] leads == leads master (live)          report= raw= tools/tieout_reports.py
+PASS report [follow-ups] overdue == existing Sales & leads follow-ups overdue (all dates) report= raw= tools/tieout_reports.py
+PASS report [visit-register] completed / no-show / cancelled (this FY) == existing Site visit conversion report= raw= tools/tieout_reports.py
+PASS report [visit-register] visits (this FY) == existing scheduled report= raw= tools/tieout_reports.py
+PASS report [visit-register] booked after visit (this FY) == existing converted report= raw= tools/tieout_reports.py
+PASS report [visit-conversion] scheduled / completed / booked == existing Site visit conversion report= raw= tools/tieout_reports.py
+PASS report [lost-leads] lost == leads master status Lost         report= raw= tools/tieout_reports.py
+PASS report [response-time] responded + not yet == leads this FY (Lead funnel) report= raw= tools/tieout_reports.py
+PASS report [lead-ageing] open leads == leads master open stages  report= raw= tools/tieout_reports.py
+PASS report [team-pipeline] Σ open == Lead ageing open leads      report= raw= tools/tieout_reports.py
+PASS report [team-pipeline] Σ follow-ups overdue == Follow-ups overdue report= raw= tools/tieout_reports.py
+PASS report [response-time] average first response (this FY) == existing Sales & leads avg_response_hours report= raw= tools/tieout_reports.py
+PASS report [service-sla] requests / open / resolved == existing Service requests & SLA report= raw= tools/tieout_reports.py
+PASS report [bank-receipts] Collections == Bank-wise total − pending + cash receipts − reversals (this FY, to the paisa) report= raw= tools/tieout_reports.py
+PASS report [bank-receipts] bridge has no unexplained remainder   report= raw= tools/tieout_reports.py
+PASS report [bills-vs-collection] bill raised − on cancelled/transferred ± transfer adjustments == Customer status bills raised report= raw= tools/tieout_reports.py
+PASS report [customer-status] Customer status bridge line == Bills vs Collection bridge report= raw= tools/tieout_reports.py
+PASS Phase I report tie-outs all PASS                             report=True raw=True 210 report ties
+0 failed

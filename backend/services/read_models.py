@@ -450,7 +450,14 @@ async def recompute_all() -> dict:
         await refresh_customer(c["id"])
         cu += 1
     await refresh_dashboards()
-    out = {"blocks": bl, "projects": pr, "customers": cu, "ms": int((clock.now() - t0).total_seconds() * 1000)}
+    from services import trends as _trends
+
+    # monthly_buckets are a read model too: a flush lost before 3G (G-07) left them stale until this repair
+    cos = set(await db.companies.distinct("id"))
+    pids = set(await db.projects.distinct("id"))
+    await _trends.on_dirty(pids, set(), cos)
+    out = {"blocks": bl, "projects": pr, "customers": cu, "trend_scopes": len(cos) + len(pids)}
+    out["ms"] = int((clock.now() - t0).total_seconds() * 1000)
     await db.settings.update_one({"key": "read_models_v1"}, {"$set": {"value": now_iso()}}, upsert=True)
     return out
 

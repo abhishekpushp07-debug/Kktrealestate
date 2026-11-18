@@ -349,6 +349,23 @@ def main(base):
             bad2 += 1
     tie("Σ Udhar − Σ Jama == outstanding − advance (every booking)", 0, bad2, "two-sided ledger law")
 
+    # PRE-01 (owner A): every manual bill is in the order raised (→ Outstanding), per share, on every live booking
+    from services.money import pct_of
+
+    bad3 = 0
+    live_ids = db.demands.distinct("booking_id", {"company_id": cid, "trigger_type": "MANUAL", "voided": {"$ne": True}})
+    for b in db.bookings.find({"id": {"$in": live_ids}, "status": {"$in": ["Active", "Completed"]}}):
+        s, pct = b.get("summary") or {}, b.get("raised_percent", b.get("construction_percent", 0))
+        man = list(db.demands.find({"booking_id": b["id"], "trigger_type": "MANUAL", "voided": {"$ne": True}}))
+        for k in ("cash", "account"):
+            if s.get(f"{k}_order_raised_paise", 0) - pct_of(b[f"{k}_agreed_paise"], pct) != sum(
+                d.get(f"{k}_demand_paise", 0) for d in man
+            ):
+                bad3 += 1
+    tie(
+        "manual bills counted in Outstanding (order = plan % + Σ manual)", 0, bad3, f"{len(live_ids)} with manual bills"
+    )
+
     # 3L cards: every card figure == the same definition summed straight from the bookings
     live_q = {"company_id": cid, "status": {"$in": ["Active", "Completed"]}}
     raw_due = sum(
