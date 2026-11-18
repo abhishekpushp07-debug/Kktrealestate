@@ -268,6 +268,13 @@ async def set_current_stage(
     user: dict = Depends(require_any("construction.stage.update", "construction.update.complete")),
 ):
     """Mark `stage_id` (and all earlier pending stages) Completed; raise plan installments for Active bookings."""
+    from services.booking_lock import booking_lock
+
+    async with booking_lock(f"tower:{block_id}"):  # 3G: the same stage completed twice at once → the second sees "already completed"
+        return await _set_current_stage(block_id, body, request, user)
+
+
+async def _set_current_stage(block_id: str, body: StageSetIn, request: Request, user: dict):
     block = await get_or_404(db.blocks, block_id, "Block", {"company_id": user["company_id"]})
     ensure_project_access(user, block["project_id"])
     stages = await ensure_block_stages(block)

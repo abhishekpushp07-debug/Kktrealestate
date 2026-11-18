@@ -26,6 +26,8 @@ BUSINESS_KEYS = [
     # a Mixed payout keeps one number across its per-bucket rows (parent = Cash, children = Account / Other)
     ("refund number", "refunds", [("refund_number", ASCENDING), ("bucket", ASCENDING)], "uniq_refund_number_bucket", None),
     ("ledger line (booking + sequence)", "ledger_entries", [("booking_id", ASCENDING), ("seq", ASCENDING)], "uniq_ledger_seq", None),
+    # Phase K's index covers Active only; a Completed (sold) booking keeps its flat too
+    ("one live booking per flat", "bookings", [("flat_id", ASCENDING)], "uniq_live_booking_per_flat", {"status": {"$in": ["Active", "Completed"]}}),
 ]
 NOT_APPLIED = "Uniqueness rule not applied — duplicates found"
 

@@ -1,0 +1,36 @@
+(trapped) error reading bcrypt version
+Traceback (most recent call last):
+  File "/root/.venv/lib/python3.11/site-packages/passlib/handlers/bcrypt.py", line 620, in _load_backend_mixin
+    version = _bcrypt.__about__.__version__
+              ^^^^^^^^^^^^^^^^^
+AttributeError: module 'bcrypt' has no attribute '__about__'
+index audit_logs.id skipped: An existing index has the same name as the requested index. When index names are not specified, they are auto generated 
+[startup] indexes ensured in 0.10s
+UoW mode: ordered-writes+compensation
+KKT backend serving after 0.11s (uow=ordered-writes+compensation); background startup tasks running
+[startup] another replica holds the startup lease; skipping migrations here
+{"request_id": "3d30577ddb3d467b", "method": "GET", "path": "/api/health", "status": 200, "duration_ms": 2.3, "user_id": null}
+{"request_id": "15b4cf3953ad44c9", "method": "POST", "path": "/api/auth/login", "status": 200, "duration_ms": 529.7, "user_id": null, "slow": true}
+{"request_id": "efbb85c6c11743cd", "method": "POST", "path": "/api/admin/hard-purge", "status": 200, "duration_ms": 66.7, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "9216d23f5ff34d04", "method": "POST", "path": "/api/auth/login", "status": 200, "duration_ms": 208.3, "user_id": null}
+{"request_id": "37845d80fdfb49f1", "method": "POST", "path": "/api/admin/ops/after-commit/drain", "status": 200, "duration_ms": 2.1, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "030de31c657a4fc4", "method": "POST", "path": "/api/admin/ops/after-commit/drain", "status": 200, "duration_ms": 2.4, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "d34710c4852249f0", "method": "POST", "path": "/api/admin/ops/after-commit/drain", "status": 200, "duration_ms": 2.4, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "4b3aae5985e3454f", "method": "GET", "path": "/api/projects", "status": 200, "duration_ms": 13.5, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "00db8611742147ab", "method": "GET", "path": "/api/master/block-types", "status": 200, "duration_ms": 6.4, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "9db6d5093d774adb", "method": "GET", "path": "/api/master/flat-types", "status": 200, "duration_ms": 7.3, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "7393abd3759546db", "method": "POST", "path": "/api/blocks", "status": 201, "duration_ms": 54.2, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "f6dc38deb7ad435e", "method": "GET", "path": "/api/master/payment-plans", "status": 200, "duration_ms": 8.5, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "ba3b8f367b3245ec", "method": "POST", "path": "/api/payment-plan-assignments", "status": 201, "duration_ms": 24.5, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "1695dcbffbcc4a5b", "method": "GET", "path": "/api/flats", "status": 200, "duration_ms": 7.0, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "f74a080215204f72", "method": "PATCH", "path": "/api/flats/b676747d-dbfa-46b9-bbf1-b7bc2d9b2c62/pricing", "status": 200, "duration_ms": 19.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "c65b74a0c1914c3a", "method": "GET", "path": "/api/flats/b676747d-dbfa-46b9-bbf1-b7bc2d9b2c62", "status": 200, "duration_ms": 11.7, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "246ffc3b2fbb4116", "method": "POST", "path": "/api/customers", "status": 201, "duration_ms": 26.1, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "5220ddabbe594859", "method": "GET", "path": "/api/projects/8e4ef80c-0ce8-4fe6-8c46-7b552afe0d8a/blocks/ada3a760-4ad6-4857-9a01-1a6ff1cf7af4/payment-plans", "status": 200, "duration_ms": 8.0, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+raw access to ledger_entries: ledger projection rebuild
+raw access to ledger_entries: ledger projection rebuild
+{"request_id": "228969f77b8b4980", "method": "POST", "path": "/api/bookings", "status": 201, "duration_ms": 127.4, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+raw access to ledger_entries: ledger projection rebuild
+{"request_id": "bdb200fbdefa4d59", "method": "POST", "path": "/api/waivers", "status": 201, "duration_ms": 42.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "351036ce1b6f4caf", "method": "POST", "path": "/api/waivers/44aa6ede-24da-477e-82e1-a3a6d6c967f4/approve", "status": 409, "duration_ms": 7.2, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "4a5e1de7e2214da2", "method": "POST", "path": "/api/waivers/44aa6ede-24da-477e-82e1-a3a6d6c967f4/approve", "status": 409, "duration_ms": 12.7, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
