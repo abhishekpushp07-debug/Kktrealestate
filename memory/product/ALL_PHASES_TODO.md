@@ -43,6 +43,7 @@ Language with the owner: Hinglish / simple English, non-technical.
 | e2e_tester on the phase journeys | all pass, 0 blocked |
 | Master rule (F-43 wording) | no one-off value forced through a master; every master carries its logic |
 | Multi-company awareness | every new collection / query / number / file carries `company_id` from Phase 4 on; new code written before Phase 4 is ready for it |
+| DB integrity audit (from 3G) | `python -m tools.db_audit --db <db>` on preview (backend stopped), `kkt_medium`, `kkt_volume`: prints "read-only: verified", 0 Critical / 0 High; race drills `python -m tools.db_audit_drills races` and 2-process stale drill 0 s (throw-away copy only) |
 
 ---
 

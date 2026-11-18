@@ -77,7 +77,9 @@ def scope_key(user: dict) -> str:
 # writes that never change business figures (sign-ins, reminders, generated PDFs, messages) don't move the stamp
 import re as _re  # noqa: E402
 
-_NOISE = _re.compile(r"^(reminder\.|document\.generated|message\.|notification\.|auth\.|login|report\.|export\.|session\.)")
+_NOISE = _re.compile(
+    r"^(reminder\.|document\.generated|message\.|notification\.|auth\.|login|report\.|export\.|session\.)"
+)
 
 
 async def data_stamp() -> str:
@@ -98,7 +100,6 @@ async def cached(key: str, ttl: float, compute, stamped: bool = False):
     Otherwise (3G) the shared data stamp is appended here, so every cached read is cross-replica safe."""
     if not stamped:
         key = f"{key}|{await data_stamp()}"
-        stamped = True
     use_redis = os.environ.get("REDIS_URL")
     if use_redis:
         from services import cache

@@ -56,7 +56,15 @@ FINDINGS: list[dict] = []
 
 def finding(fid, sev, title, evidence, scenario="", fix="", status=""):
     FINDINGS.append(
-        {"id": fid, "severity": sev, "title": title, "evidence": evidence, "scenario": scenario, "fix": fix, "status": status}
+        {
+            "id": fid,
+            "severity": sev,
+            "title": title,
+            "evidence": evidence,
+            "scenario": scenario,
+            "fix": fix,
+            "status": status,
+        }
     )
 
 
@@ -116,10 +124,14 @@ def inventory(db) -> dict:
             "indexes": st.get("nindexes", 0),
             "index_mb": round(st.get("totalIndexSize", 0) / 1e6, 2),
             "validator": bool(opts.get("validator")),
-            "validation": f"{opts.get('validationLevel', '-')}/{opts.get('validationAction', '-')}" if opts.get("validator") else "-",
+            "validation": f"{opts.get('validationLevel', '-')}/{opts.get('validationAction', '-')}"
+            if opts.get("validator")
+            else "-",
             "money_fields": sorted(k for k in keys if k.endswith("_paise"))[:30],
             "date_fields": sorted(k for k in keys if k.endswith(("_at", "_date", "_on")) or k in ("date", "at"))[:20],
-            "company_id_pct": round(100 * db[c].count_documents({"company_id": {"$exists": True}}) / n, 1) if n else None,
+            "company_id_pct": round(100 * db[c].count_documents({"company_id": {"$exists": True}}) / n, 1)
+            if n
+            else None,
         }
     return out
 
@@ -129,16 +141,15 @@ def shapes(db, inv) -> dict:
     for c, meta in inv.items():
         if not meta["count"]:
             continue
-        docs = list(db[c].aggregate([{"$sample": {"size": SAMPLE}}])) if meta["count"] > SAMPLE else list(db[c].find({}))
+        docs = (
+            list(db[c].aggregate([{"$sample": {"size": SAMPLE}}])) if meta["count"] > SAMPLE else list(db[c].find({}))
+        )
         pres, kinds = Counter(), defaultdict(Counter)
         for d in docs:
             for k, v in flatten(d):
                 pres[k] += 1
                 kinds[k][kind_of(v)] += 1
-        out[c] = {
-            k: {"pct": round(100 * pres[k] / len(docs), 1), "types": dict(kinds[k])}
-            for k in sorted(pres)
-        }
+        out[c] = {k: {"pct": round(100 * pres[k] / len(docs), 1), "types": dict(kinds[k])} for k in sorted(pres)}
     return out
 
 
@@ -153,11 +164,25 @@ def shape_findings(sh):
             if len(stry) > 1 or (stry and ("date" in t)):
                 time_mixed.append(f"{c}.{f} {m['types']}")
     if money_bad:
-        finding("SHAPE-MONEY", "High", "Money fields stored with a non-integer type", money_bad[:40],
-                "A float/str paise value breaks exact sums", "Coerce to int paise at write; repair", "")
+        finding(
+            "SHAPE-MONEY",
+            "High",
+            "Money fields stored with a non-integer type",
+            money_bad[:40],
+            "A float/str paise value breaks exact sums",
+            "Coerce to int paise at write; repair",
+            "",
+        )
     if time_mixed:
-        finding("SHAPE-TIME", "Low", f"{len(time_mixed)} fields mix timestamp formats", time_mixed[:40],
-                "Sorting/filtering by string compares mixed formats", "Normalise at write; one-off repair", "listed for Phase 3I")
+        finding(
+            "SHAPE-TIME",
+            "Low",
+            f"{len(time_mixed)} fields mix timestamp formats",
+            time_mixed[:40],
+            "Sorting/filtering by string compares mixed formats",
+            "Normalise at write; one-off repair",
+            "listed for Phase 3I",
+        )
     return {"money_non_int": money_bad, "time_mixed": time_mixed}
 
 
@@ -176,12 +201,27 @@ UNIQUE_KEYS = [
     ("flat per tower", "flats", ["block_id", "flat_number"], {}),
     ("parking slot per project", "parking_slots", ["project_id", "number"], {}),
     ("one live booking per flat", "bookings", ["flat_id"], {"status": {"$in": LIVE}}),
-    ("one active instalment per booking + seq", "demands", ["booking_id", "installment_seq"], {"voided": False, "installment_seq": {"$type": "int"}}),
-    ("one default active plan assignment per tower", "payment_plan_assignments", ["project_id", "block_id"], {"is_active": True, "is_default": True}),
+    (
+        "one active instalment per booking + seq",
+        "demands",
+        ["booking_id", "installment_seq"],
+        {"voided": False, "installment_seq": {"$type": "int"}},
+    ),
+    (
+        "one default active plan assignment per tower",
+        "payment_plan_assignments",
+        ["project_id", "block_id"],
+        {"is_active": True, "is_default": True},
+    ),
     ("idempotency key per user", "idempotency_keys", ["user_id", "key"], {}),
     ("receipt idempotency key", "payments", ["idempotency_key"], {"idempotency_key": {"$type": "string"}}),
     ("active customer phone", "customers", ["company_id", "phone"], {"is_active": True}),
-    ("generated document number", "generated_documents", ["number"], {"number": {"$regex": r"\d"}}),  # labels like "Cost sheet" are not serials
+    (
+        "generated document number",
+        "generated_documents",
+        ["number"],
+        {"number": {"$regex": r"\d"}},
+    ),  # labels like "Cost sheet" are not serials
     ("project code per company", "projects", ["company_id", "code"], {}),
     ("tower code per project", "blocks", ["project_id", "code"], {}),
     ("lead number", "leads", ["lead_number"], {"lead_number": {"$type": "string"}}),
@@ -218,43 +258,88 @@ def uniqueness(db, cols) -> list:
     out = []
     for label, coll, fields, flt in UNIQUE_KEYS:
         if coll not in cols:
-            out.append({"key": label, "collection": coll, "fields": fields, "enforced": "n/a (no collection)", "duplicates": 0})
+            out.append(
+                {"key": label, "collection": coll, "fields": fields, "enforced": "n/a (no collection)", "duplicates": 0}
+            )
             continue
         n, ex = dups(db, coll, fields, flt)
-        out.append({"key": label, "collection": coll, "fields": fields, "enforced": enforced(db, coll, fields, flt), "duplicates": n, "examples": ex})
+        out.append(
+            {
+                "key": label,
+                "collection": coll,
+                "fields": fields,
+                "enforced": enforced(db, coll, fields, flt),
+                "duplicates": n,
+                "examples": ex,
+            }
+        )
     for c in cols:  # every `id` field must be unique
         if db[c].find_one({"id": {"$exists": True}}, {"_id": 1}) is None:
             continue
         n, ex = dups(db, c, ["id"], {})
         e = enforced(db, c, ["id"], {})
         if n or e == "no":
-            out.append({"key": f"{c}.id", "collection": c, "fields": ["id"], "enforced": e, "duplicates": n, "examples": ex})
+            out.append(
+                {"key": f"{c}.id", "collection": c, "fields": ["id"], "enforced": e, "duplicates": n, "examples": ex}
+            )
     return out
 
 
 def uniqueness_findings(rows, db_name):
     for r in rows:
         if r["duplicates"]:
-            finding(f"UNIQ-DUP-{r['collection']}-{'_'.join(r['fields'])}", "Critical",
-                    f"{r['duplicates']} duplicate {r['key']} values", r.get("examples"), "Two records share one business key",
-                    "Repair duplicates; add a unique index", "")
-    money_keys = {"receipt number", "demand (bill) number", "waiver number", "credit-note number", "refund number",
-                  "ledger line booking + seq", "one live booking per flat", "booking number"}
+            finding(
+                f"UNIQ-DUP-{r['collection']}-{'_'.join(r['fields'])}",
+                "Critical",
+                f"{r['duplicates']} duplicate {r['key']} values",
+                r.get("examples"),
+                "Two records share one business key",
+                "Repair duplicates; add a unique index",
+                "",
+            )
+    money_keys = {
+        "receipt number",
+        "demand (bill) number",
+        "waiver number",
+        "credit-note number",
+        "refund number",
+        "ledger line booking + seq",
+        "one live booking per flat",
+        "booking number",
+    }
     miss = [r["key"] for r in rows if r["enforced"] == "no" and r["key"] in money_keys]
     if miss:
-        finding("UNIQ-NOT-ENFORCED", "High", "Money business keys not enforced by the database: " + ", ".join(miss),
-                {"db": db_name, "keys": miss},
-                "A race or retry can write a second record with the same number (only application code prevents it)",
-                "Unique (partial where needed) indexes, created safely at startup (skip + System Health on duplicates)", "")
-    other = [f"{r['collection']}.{'+'.join(r['fields'])}" for r in rows if r["enforced"] == "no" and r["key"] not in money_keys]
+        finding(
+            "UNIQ-NOT-ENFORCED",
+            "High",
+            "Money business keys not enforced by the database: " + ", ".join(miss),
+            {"db": db_name, "keys": miss},
+            "A race or retry can write a second record with the same number (only application code prevents it)",
+            "Unique (partial where needed) indexes, created safely at startup (skip + System Health on duplicates)",
+            "",
+        )
+    other = [
+        f"{r['collection']}.{'+'.join(r['fields'])}"
+        for r in rows
+        if r["enforced"] == "no" and r["key"] not in money_keys
+    ]
     if other:
-        finding("UNIQ-OTHER", "Medium", f"{len(other)} other keys not DB-enforced (0 duplicates today)", other,
-                "Same-key rows possible under a race", "Unique indexes", "listed for Phase 3I")
+        finding(
+            "UNIQ-OTHER",
+            "Medium",
+            f"{len(other)} other keys not DB-enforced (0 duplicates today)",
+            other,
+            "Same-key rows possible under a race",
+            "Unique indexes",
+            "listed for Phase 3I",
+        )
 
 
 # ---------------------------------------------------------------- references
 def idset(db, coll, f="id", flt=None):
-    return {d.get(f) for d in db[coll].find(flt or {}, {f: 1, "_id": 0})} if coll in db.list_collection_names() else set()
+    return (
+        {d.get(f) for d in db[coll].find(flt or {}, {f: 1, "_id": 0})} if coll in db.list_collection_names() else set()
+    )
 
 
 def references(db) -> dict:
@@ -262,7 +347,9 @@ def references(db) -> dict:
                                       "users", "payment_plans", "leads", "waivers", "refunds")}  # fmt: skip
     lines = {}
     for b in db.bookings.find({}, {"_id": 0, "id": 1, "other_charges.line_id": 1, "pricing.charges.line_id": 1}):
-        s = {x.get("line_id") for x in b.get("other_charges") or []} | {x.get("line_id") for x in (b.get("pricing") or {}).get("charges") or []}
+        s = {x.get("line_id") for x in b.get("other_charges") or []} | {
+            x.get("line_id") for x in (b.get("pricing") or {}).get("charges") or []
+        }
         lines[b["id"]] = s
     receipts = idset(db, "payments", "receipt_number")
     demand_nos = idset(db, "demands", "demand_number")
@@ -307,20 +394,44 @@ def references(db) -> dict:
     path("payments.booking_id→bookings", "payments", "booking_id", ids["bookings"])
     path("payments.customer_id→customers", "payments", "customer_id", ids["customers"])
     path("payments.allocations[].demand_id→demands", "payments", "demand_id", ids["demands"], array="allocations")
-    path("payments.allocations[].line_id→booking charge line", "payments", "line_id",
-         lambda d, v: v in lines.get(d.get("booking_id"), set()), array="allocations")
-    path("payments.other_charge_line_id→booking charge line", "payments", "other_charge_line_id",
-         lambda d, v: v in lines.get(d.get("booking_id"), set()), {"other_charge_line_id": {"$type": "string"}})
+    path(
+        "payments.allocations[].line_id→booking charge line",
+        "payments",
+        "line_id",
+        lambda d, v: v in lines.get(d.get("booking_id"), set()),
+        array="allocations",
+    )
+    path(
+        "payments.other_charge_line_id→booking charge line",
+        "payments",
+        "other_charge_line_id",
+        lambda d, v: v in lines.get(d.get("booking_id"), set()),
+        {"other_charge_line_id": {"$type": "string"}},
+    )
     path("demands.booking_id→bookings", "demands", "booking_id", ids["bookings"])
     path("demands.customer_id→customers", "demands", "customer_id", ids["customers"])
     path("ledger_entries.booking_id→bookings", "ledger_entries", "booking_id", ids["bookings"])
-    path("ledger_entries.ref(receipt)→payments", "ledger_entries", "ref", receipts | demand_nos | cns | refund_nos,
-         {"ref": {"$type": "string"}})
+    path(
+        "ledger_entries.ref(receipt)→payments",
+        "ledger_entries",
+        "ref",
+        receipts | demand_nos | cns | refund_nos,
+        {"ref": {"$type": "string"}},
+    )
     path("waivers.booking_id→bookings", "waivers", "booking_id", ids["bookings"])
-    path("waivers.target.line_id→booking charge line", "waivers", "target.line_id",
-         lambda d, v: v in lines.get(d.get("booking_id"), set()))
-    path("waivers.entries[].line_id→booking charge line", "waivers", "line_id",
-         lambda d, v: v in lines.get(d.get("booking_id"), set()), array="entries")
+    path(
+        "waivers.target.line_id→booking charge line",
+        "waivers",
+        "target.line_id",
+        lambda d, v: v in lines.get(d.get("booking_id"), set()),
+    )
+    path(
+        "waivers.entries[].line_id→booking charge line",
+        "waivers",
+        "line_id",
+        lambda d, v: v in lines.get(d.get("booking_id"), set()),
+        array="entries",
+    )
     path("refunds.booking_id→bookings", "refunds", "booking_id", ids["bookings"])
     path("refunds.customer_id→customers", "refunds", "customer_id", ids["customers"])
     path("flats.project_id→projects", "flats", "project_id", ids["projects"])
@@ -334,21 +445,49 @@ def references(db) -> dict:
     path("customer_summaries.customer_id→customers", "customer_summaries", "customer_id", ids["customers"])
     path("project_summaries.project_id→projects", "project_summaries", "project_id", ids["projects"])
     path("block_summaries.block_id→blocks", "block_summaries", "block_id", ids["blocks"])
-    path("monthly_buckets.scope_id(project)→projects", "monthly_buckets", "scope_id", ids["projects"], {"scope": "project"})
-    path("monthly_buckets.scope_id(customer)→customers", "monthly_buckets", "scope_id", ids["customers"], {"scope": "customer"})
+    path(
+        "monthly_buckets.scope_id(project)→projects",
+        "monthly_buckets",
+        "scope_id",
+        ids["projects"],
+        {"scope": "project"},
+    )
+    path(
+        "monthly_buckets.scope_id(customer)→customers",
+        "monthly_buckets",
+        "scope_id",
+        ids["customers"],
+        {"scope": "customer"},
+    )
     path("leads.customer_id→customers", "leads", "customer_id", ids["customers"])
     path("site_visits.lead_id→leads", "site_visits", "lead_id", ids["leads"])
     path("generated_documents.booking_id→bookings", "generated_documents", "booking_id", ids["bookings"])
     path("documents.booking_id→bookings", "documents", "booking_id", ids["bookings"])
-    path("notifications.user_id→users / customer:<id>→customers", "notifications", "user_id",
-         lambda d, v: v[9:] in ids["customers"] if str(v).startswith("customer:") else v in ids["users"])
-    path("payment_plan_assignments.payment_plan_id→payment_plans", "payment_plan_assignments", "payment_plan_id", ids["payment_plans"])
+    path(
+        "notifications.user_id→users / customer:<id>→customers",
+        "notifications",
+        "user_id",
+        lambda d, v: v[9:] in ids["customers"] if str(v).startswith("customer:") else v in ids["users"],
+    )
+    path(
+        "payment_plan_assignments.payment_plan_id→payment_plans",
+        "payment_plan_assignments",
+        "payment_plan_id",
+        ids["payment_plans"],
+    )
     money_paths = {k for k in out if k.split(".")[0] in ("payments", "demands", "ledger_entries", "waivers", "refunds")}
     for k, v in out.items():
         if v.split("/")[0] != "0":
             sev = "Critical" if k in money_paths else "Medium"
-            finding(f"REF-{k.split('→')[0]}", sev, f"Broken reference {k}: {v}", broken_ex.get(k),
-                    "A record points at something that does not exist", "Investigate ids; repair or document", "")
+            finding(
+                f"REF-{k.split('→')[0]}",
+                sev,
+                f"Broken reference {k}: {v}",
+                broken_ex.get(k),
+                "A record points at something that does not exist",
+                "Investigate ids; repair or document",
+                "",
+            )
     return {"paths": out, "examples": broken_ex}
 
 
@@ -367,7 +506,9 @@ def money(db) -> dict:
                 "block_id": 1, "cancellation": 1, "booking_number": 1, "other_charges": 1})}  # fmt: skip
     res["bookings_checked"] = len(bookings)
     for b in bookings.values():
-        if (b.get("cash_agreed_paise") or 0) + (b.get("account_agreed_paise") or 0) != (b.get("agreement_value_paise") or 0):
+        if (b.get("cash_agreed_paise") or 0) + (b.get("account_agreed_paise") or 0) != (
+            b.get("agreement_value_paise") or 0
+        ):
             bad("cash+account != agreement", b["id"], {"bk": b.get("booking_number")})
         for oc in b.get("other_charges") or []:
             if (oc.get("paid_paise") or 0) > (oc.get("demanded_paise") or 0) + 0:
@@ -397,7 +538,9 @@ def money(db) -> dict:
             bad("Reversed without reversal record", p["id"])
     # demands
     alloc_to = defaultdict(int)
-    for p in db.payments.find({"status": "Cleared", "allocations.demand_id": {"$exists": True}}, {"_id": 0, "allocations": 1}):
+    for p in db.payments.find(
+        {"status": "Cleared", "allocations.demand_id": {"$exists": True}}, {"_id": 0, "allocations": 1}
+    ):
         for x in p["allocations"]:
             if x.get("demand_id"):
                 alloc_to[x["demand_id"]] += x.get("amount_paise") or 0
@@ -410,8 +553,9 @@ def money(db) -> dict:
             bad("bill cash+account != total", d["id"])
         pp = d.get("paid_parts")
         if pp:
-            if pp["cash_paid_paise"] + pp["cash_open_paise"] != d.get("cash_demand_paise") or \
-               pp["account_paid_paise"] + pp["account_open_paise"] != d.get("account_demand_paise"):
+            if pp["cash_paid_paise"] + pp["cash_open_paise"] != d.get("cash_demand_paise") or pp[
+                "account_paid_paise"
+            ] + pp["account_open_paise"] != d.get("account_demand_paise"):
                 bad("paid_parts do not add up to the bill", d["id"])
             if pp["cash_paid_paise"] + pp["account_paid_paise"] != paid:
                 bad("paid_parts != paid", d["id"])
@@ -459,7 +603,9 @@ def money(db) -> dict:
             if not w.get("cn_number"):
                 bad("approved waiver without credit note", w["id"])
             # GST credit lines (gst: true) ride on top of the waived amount (gst_note) — the waived amount is the rest
-            if sum(x.get("amount_paise") or 0 for x in w.get("entries") or [] if not x.get("gst")) != w.get("amount_paise"):
+            if sum(x.get("amount_paise") or 0 for x in w.get("entries") or [] if not x.get("gst")) != w.get(
+                "amount_paise"
+            ):
                 bad("waiver entries != amount", w["id"])
     for r in db.refunds.find({}, {"_id": 0}):
         res["refunds_checked"] += 1
@@ -469,37 +615,70 @@ def money(db) -> dict:
             bad("refund > money received", r["id"], {"no": r.get("refund_number")})
     # read models
     live = [b for b in bookings.values() if b.get("status") in LIVE and b.get("summary")]
-    by = {"customer_id": defaultdict(lambda: Counter()), "project_id": defaultdict(lambda: Counter()), "block_id": defaultdict(lambda: Counter())}
+    by = {
+        "customer_id": defaultdict(lambda: Counter()),
+        "project_id": defaultdict(lambda: Counter()),
+        "block_id": defaultdict(lambda: Counter()),
+    }
     for b in live:
         for k in by:
             by[k][b.get(k)]["outstanding"] += b["summary"].get("outstanding_paise") or 0
             by[k][b.get(k)]["bookings"] += 1
-    for coll, key in (("customer_summaries", "customer_id"), ("project_summaries", "project_id"), ("block_summaries", "block_id")):
+    for coll, key in (
+        ("customer_summaries", "customer_id"),
+        ("project_summaries", "project_id"),
+        ("block_summaries", "block_id"),
+    ):
         n = 0
         for s in db[coll].find({}, {"_id": 0, key: 1, "outstanding": 1, "bookings": 1, "computed_at": 1}):
             n += 1
             want = by[key].get(s[key], Counter())
             got = (s.get("outstanding") or {}).get("total_paise") or 0
             if got != want["outstanding"]:
-                bad(f"{coll}.outstanding != Σ live booking outstanding", s[key], {"stored": got, "recomputed": want["outstanding"]})
+                bad(
+                    f"{coll}.outstanding != Σ live booking outstanding",
+                    s[key],
+                    {"stored": got, "recomputed": want["outstanding"]},
+                )
         res[f"{coll}_checked"] = n
-    snap = db.dashboard_snapshots.find_one({"scope_hash": {"$exists": True}}, {"_id": 0, "payload.totals": 1, "company_id": 1, "scope": 1, "scope_hash": 1},
-                                           sort=[("computed_at", -1)])
+    snap = db.dashboard_snapshots.find_one(
+        {"scope_hash": {"$exists": True}},
+        {"_id": 0, "payload.totals": 1, "company_id": 1, "scope": 1, "scope_hash": 1},
+        sort=[("computed_at", -1)],
+    )
     if snap:
         tot = sum(b["summary"].get("outstanding_paise") or 0 for b in live)
         got = ((snap.get("payload") or {}).get("totals") or {}).get("outstanding_paise")
         res["dashboard_outstanding_stored"], res["dashboard_outstanding_recomputed"] = got, tot
         if got is not None and got != tot and not snap.get("scope"):
-            bad("dashboard_snapshots total outstanding != Σ live bookings", snap.get("scope_hash"), {"stored": got, "recomputed": tot})
-    mb = list(db.monthly_buckets.aggregate([{"$match": {"scope": "company"}}, {"$group": {"_id": None, "c": {"$sum": "$collections"}, "b": {"$sum": "$bookings"}}}]))
+            bad(
+                "dashboard_snapshots total outstanding != Σ live bookings",
+                snap.get("scope_hash"),
+                {"stored": got, "recomputed": tot},
+            )
+    mb = list(
+        db.monthly_buckets.aggregate(
+            [
+                {"$match": {"scope": "company"}},
+                {"$group": {"_id": None, "c": {"$sum": "$collections"}, "b": {"$sum": "$bookings"}}},
+            ]
+        )
+    )
     if mb:
         res["monthly_buckets_company_bookings"] = mb[0]["b"]
         res["bookings_total_nonloadtest"] = db.bookings.count_documents({"load_test": {"$ne": True}})
     issues = {k: v for k, v in res.items() if not k.endswith(("_checked", "_stored", "_recomputed")) and k not in
               ("monthly_buckets_company_bookings", "bookings_total_nonloadtest")}  # fmt: skip
     for k, v in issues.items():
-        finding(f"MONEY-{re.sub(r'[^A-Za-z]+', '-', k)[:40]}", "Critical", f"{v} × {k}", ex.get(k),
-                "A stored money figure disagrees with its source records", "Investigate; rebuild via audited path", "")
+        finding(
+            f"MONEY-{re.sub(r'[^A-Za-z]+', '-', k)[:40]}",
+            "Critical",
+            f"{v} × {k}",
+            ex.get(k),
+            "A stored money figure disagrees with its source records",
+            "Investigate; rebuild via audited path",
+            "",
+        )
     return {"counts": dict(res), "examples": dict(ex)}
 
 
@@ -514,7 +693,9 @@ def states(db) -> dict:
             ex[name].append(eid)
 
     live_by_flat = defaultdict(list)
-    for b in db.bookings.find({}, {"_id": 0, "id": 1, "flat_id": 1, "status": 1, "booking_date": 1, "cancellation": 1, "customer_id": 1}):
+    for b in db.bookings.find(
+        {}, {"_id": 0, "id": 1, "flat_id": 1, "status": 1, "booking_date": 1, "cancellation": 1, "customer_id": 1}
+    ):
         if b.get("status") in LIVE:
             live_by_flat[b.get("flat_id")].append(b["id"])
         if b.get("status") == "Cancelled" and not b.get("cancellation"):
@@ -530,7 +711,14 @@ def states(db) -> dict:
         if has and f.get("booking_id") and f["booking_id"] not in live_by_flat[f["id"]]:
             bad("flat.booking_id is not its live booking", f["id"])
     cancelled = idset(db, "bookings", "id", {"status": "Cancelled"})
-    for d in db.demands.find({"booking_id": {"$in": list(cancelled)}, "status": {"$in": ["Open", "Partially Paid"]}, "voided": {"$ne": True}}, {"_id": 0, "id": 1}):
+    for d in db.demands.find(
+        {
+            "booking_id": {"$in": list(cancelled)},
+            "status": {"$in": ["Open", "Partially Paid"]},
+            "voided": {"$ne": True},
+        },
+        {"_id": 0, "id": 1},
+    ):
         bad("open bill on a cancelled booking", d["id"])
     for p in db.payments.find({"booking_id": {"$in": list(cancelled)}, "status": "Pending"}, {"_id": 0, "id": 1}):
         bad("cheque pending on a cancelled booking", p["id"])
@@ -542,21 +730,37 @@ def states(db) -> dict:
     merged = idset(db, "customers", "id", {"merged_into": {"$exists": True, "$ne": None}})
     for b in db.bookings.find({"customer_id": {"$in": list(merged)}, "status": {"$in": LIVE}}, {"_id": 0, "id": 1}):
         bad("merged customer still owns a live booking", b["id"])
-    for p in db.payments.find({"status": "Cleared", "cleared_at": {"$exists": True}}, {"_id": 0, "id": 1, "cleared_at": 1, "payment_date": 1, "bounced_at": 1}):
+    for p in db.payments.find(
+        {"status": "Cleared", "cleared_at": {"$exists": True}},
+        {"_id": 0, "id": 1, "cleared_at": 1, "payment_date": 1, "bounced_at": 1},
+    ):
         if p.get("bounced_at"):
             bad("Cleared receipt carries bounced_at", p["id"])
     for k, v in res.items():
         sev = "Medium" if k == "Hold without expiry" else "High"  # a stale hold blocks a sale, never misstates money
-        finding(f"STATE-{re.sub(r'[^A-Za-z]+', '-', k)[:40]}", sev, f"{v} × {k}", ex.get(k),
-                "Two records disagree on the state of the same thing", "Investigate and repair through audited path", "")
+        finding(
+            f"STATE-{re.sub(r'[^A-Za-z]+', '-', k)[:40]}",
+            sev,
+            f"{v} × {k}",
+            ex.get(k),
+            "Two records disagree on the state of the same thing",
+            "Investigate and repair through audited path",
+            "",
+        )
     return {"counts": dict(res), "examples": dict(ex)}
 
 
 def chronology(db) -> dict:
     res = Counter()
     ex = defaultdict(list)
-    bdate = {b["id"]: (b.get("booking_date") or "")[:10] for b in db.bookings.find({}, {"_id": 0, "id": 1, "booking_date": 1})}
-    canc = {b["id"]: (b.get("cancellation") or {}).get("at") for b in db.bookings.find({"status": "Cancelled"}, {"_id": 0, "id": 1, "cancellation.at": 1})}
+    bdate = {
+        b["id"]: (b.get("booking_date") or "")[:10]
+        for b in db.bookings.find({}, {"_id": 0, "id": 1, "booking_date": 1})
+    }
+    canc = {
+        b["id"]: (b.get("cancellation") or {}).get("at")
+        for b in db.bookings.find({"status": "Cancelled"}, {"_id": 0, "id": 1, "cancellation.at": 1})
+    }
 
     def bad(name, eid):
         res[name] += 1
@@ -569,7 +773,9 @@ def chronology(db) -> dict:
             bad("bill dated before its booking", d["id"])
         if d.get("due_date") and d.get("demand_date") and d["due_date"][:10] < d["demand_date"][:10]:
             bad("bill due before it was raised", d["id"])
-    for p in db.payments.find({}, {"_id": 0, "id": 1, "payment_date": 1, "cleared_at": 1, "bounced_at": 1, "status": 1}):
+    for p in db.payments.find(
+        {}, {"_id": 0, "id": 1, "payment_date": 1, "cleared_at": 1, "bounced_at": 1, "status": 1}
+    ):
         pd = (p.get("payment_date") or "")[:10]
         if p.get("cleared_at") and p["cleared_at"][:10] < pd and p.get("status") == "Cleared":
             # cleared_at is UTC; IST date may be a day later — allow 1 day
@@ -580,7 +786,15 @@ def chronology(db) -> dict:
         if c and r.get("created_at") and r["created_at"] < c[:19]:
             bad("refund before cancellation", r["id"])
     for k, v in res.items():
-        finding(f"TIME-{re.sub(r'[^A-Za-z]+', '-', k)[:40]}", "Medium", f"{v} × {k}", ex.get(k), "Dates out of order", "Investigate", "")
+        finding(
+            f"TIME-{re.sub(r'[^A-Za-z]+', '-', k)[:40]}",
+            "Medium",
+            f"{v} × {k}",
+            ex.get(k),
+            "Dates out of order",
+            "Investigate",
+            "",
+        )
     return {"counts": dict(res), "examples": dict(ex)}
 
 
@@ -592,10 +806,24 @@ HOT_QUERIES = [
     ("Booking page ledger", "ledger_entries", {"booking_id": "$B"}, [("seq", 1)]),
     ("Customer 360 bookings", "bookings", {"customer_id": "$U"}, [("booking_date", -1)]),
     ("Customer 360 receipts", "payments", {"customer_id": "$U"}, None),
-    ("Bills raised list (open)", "demands", {"company_id": "$C", "voided": False, "status": {"$in": ["Open", "Partially Paid"]}}, [("due_date", 1)]),
+    (
+        "Bills raised list (open)",
+        "demands",
+        {"company_id": "$C", "voided": False, "status": {"$in": ["Open", "Partially Paid"]}},
+        [("due_date", 1)],
+    ),
     ("Payments list", "payments", {"company_id": "$C", "status": "Cleared"}, [("payment_date", -1), ("id", 1)]),
     ("Cheques in hand", "payments", {"company_id": "$C", "status": "Pending"}, None),
-    ("Collections FY", "payments", {"company_id": "$C", "status": {"$in": ["Cleared", "Reversed"]}, "payment_date": {"$gte": "2026-04-01", "$lte": "2027-03-31"}}, None),
+    (
+        "Collections FY",
+        "payments",
+        {
+            "company_id": "$C",
+            "status": {"$in": ["Cleared", "Reversed"]},
+            "payment_date": {"$gte": "2026-04-01", "$lte": "2027-03-31"},
+        },
+        None,
+    ),
     ("Refunds paid in period", "refunds", {"company_id": "$C", "paid_date": {"$gte": "2026-04-01"}}, None),
     ("Waivers of a booking", "waivers", {"booking_id": "$B"}, None),
     ("Waivers pending (approvals)", "waivers", {"company_id": "$C", "status": "Pending"}, None),
@@ -612,13 +840,23 @@ HOT_QUERIES = [
     ("Holds to expire", "flats", {"status": "Hold", "hold.expires_at": {"$lt": "2099"}}, None),
     ("Notifications unread", "notifications", {"user_id": "$US", "read": False}, [("created_at", -1)]),
     ("Login events recent", "login_events", {"email": "x@y"}, [("created_at", -1)]),
-    ("Other-charge parts due", "bookings", {"company_id": "$C", "other_charges.demand_history.due_on": {"$lte": "2026-12-31"}}, None),
+    (
+        "Other-charge parts due",
+        "bookings",
+        {"company_id": "$C", "other_charges.demand_history.due_on": {"$lte": "2026-12-31"}},
+        None,
+    ),
     ("Monthly buckets company", "monthly_buckets", {"company_id": "$C", "scope": "company"}, None),
 ]
 
 
 def explain_hot(db) -> list:
-    b = db.bookings.find_one({"status": "Active"}, {"_id": 0, "id": 1, "customer_id": 1, "company_id": 1, "block_id": 1}) or {}
+    b = (
+        db.bookings.find_one(
+            {"status": "Active"}, {"_id": 0, "id": 1, "customer_id": 1, "company_id": 1, "block_id": 1}
+        )
+        or {}
+    )
     w = db.waivers.find_one({"cn_number": {"$type": "string"}}, {"_id": 0, "cn_number": 1}) or {}
     r = db.refunds.find_one({}, {"_id": 0, "refund_number": 1}) or {}
     u = db.users.find_one({}, {"_id": 0, "id": 1}) or {}
@@ -646,10 +884,21 @@ def explain_hot(db) -> list:
         ixn = re.findall(r'"indexName": "([^"]+)"', plan)
         ret = es["nReturned"]
         exd = es["totalDocsExamined"]
-        out.append({"query": name, "collection": coll, "stages": "/".join(dict.fromkeys(stages)), "index": ",".join(ixn) or "-",
-                    "returned": ret, "docs_examined": exd, "keys_examined": es["totalKeysExamined"],
-                    "ms": es["executionTimeMillis"], "collscan": "COLLSCAN" in stages, "in_memory_sort": "SORT" in stages,
-                    "ratio": round(exd / max(ret, 1), 1)})
+        out.append(
+            {
+                "query": name,
+                "collection": coll,
+                "stages": "/".join(dict.fromkeys(stages)),
+                "index": ",".join(ixn) or "-",
+                "returned": ret,
+                "docs_examined": exd,
+                "keys_examined": es["totalKeysExamined"],
+                "ms": es["executionTimeMillis"],
+                "collscan": "COLLSCAN" in stages,
+                "in_memory_sort": "SORT" in stages,
+                "ratio": round(exd / max(ret, 1), 1),
+            }
+        )
     return out
 
 
@@ -673,7 +922,12 @@ def index_review(db, inv) -> dict:
             if any("text" in str(v) for _, v in ka):
                 continue
             for bname, kb in keys.items():
-                if bname != a and len(kb) > len(ka) and kb[: len(ka)] == ka and not ixs[bname].get("partialFilterExpression"):
+                if (
+                    bname != a
+                    and len(kb) > len(ka)
+                    and kb[: len(ka)] == ka
+                    and not ixs[bname].get("partialFilterExpression")
+                ):
                     prefix.append(f"{c}.{a} ⊂ {bname}")
                     break
     return {"per_collection": per, "unused_since_restart": unused, "prefix_duplicates": prefix}
@@ -695,7 +949,13 @@ def growth(db, inv) -> list:
         days = None
         if first and last:
             try:
-                days = max((datetime.fromisoformat(last["created_at"][:19]) - datetime.fromisoformat(first["created_at"][:19])).days, 1)
+                days = max(
+                    (
+                        datetime.fromisoformat(last["created_at"][:19])
+                        - datetime.fromisoformat(first["created_at"][:19])
+                    ).days,
+                    1,
+                )
             except ValueError:
                 days = None
         per_b = n / nb
@@ -707,9 +967,18 @@ def growth(db, inv) -> list:
             per_day_per_booking = n / days / nb
             f1500 = per_day_per_booking * 1500 * 1825
             f10k = per_day_per_booking * 10000 * 1825
-        out.append({"collection": c, "rows": n, "rows_per_booking": round(per_b, 2), "span_days": days,
-                    "avg_doc_bytes": int(avg), "rows_5y_1500": int(f1500), "rows_5y_10000": int(f10k),
-                    "mb_5y_10000": round(f10k * avg / 1e6, 1)})
+        out.append(
+            {
+                "collection": c,
+                "rows": n,
+                "rows_per_booking": round(per_b, 2),
+                "span_days": days,
+                "avg_doc_bytes": int(avg),
+                "rows_5y_1500": int(f1500),
+                "rows_5y_10000": int(f10k),
+                "mb_5y_10000": round(f10k * avg / 1e6, 1),
+            }
+        )
     return sorted(out, key=lambda r: -r["rows_5y_10000"])
 
 
@@ -736,11 +1005,25 @@ def run(db_name: str, out_dir: str, url: str) -> dict:
     gr = growth(db, inv)
     for e in ex:
         if e["collscan"] and inv.get(e["collection"], {}).get("count", 0) > 1000:
-            finding(f"IDX-COLLSCAN-{e['collection']}-{e['query'][:20]}", "Medium", f"COLLSCAN: {e['query']} ({e['docs_examined']} docs examined)",
-                    e, "Grows linearly with history kept forever", "Add index", "listed for Phase 3I")
+            finding(
+                f"IDX-COLLSCAN-{e['collection']}-{e['query'][:20]}",
+                "Medium",
+                f"COLLSCAN: {e['query']} ({e['docs_examined']} docs examined)",
+                e,
+                "Grows linearly with history kept forever",
+                "Add index",
+                "listed for Phase 3I",
+            )
         elif e["ratio"] > 10 and e["docs_examined"] > 1000:
-            finding(f"IDX-RATIO-{e['collection']}-{e['query'][:20]}", "Medium", f"examined/returned {e['ratio']}: {e['query']}", e,
-                    "Index does not cover the filter", "Better compound index", "listed for Phase 3I")
+            finding(
+                f"IDX-RATIO-{e['collection']}-{e['query'][:20]}",
+                "Medium",
+                f"examined/returned {e['ratio']}: {e['query']}",
+                e,
+                "Index does not cover the filter",
+                "Better compound index",
+                "listed for Phase 3I",
+            )
     after = fingerprint(db)
     changed = [c for c in set(before) | set(after) if before.get(c) != after.get(c)]
     writes = {k: v for k, v in SENT.items() if k not in READ_CMDS}

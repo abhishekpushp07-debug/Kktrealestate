@@ -53,7 +53,7 @@ async def load_shared(older_than_s: float = 0) -> bool:
             dirty["all"] = True
             continue
         kind = next(k for k, p in _PFX.items() if m["_id"].startswith(p))
-        dirty[kind].add(m["_id"][len(_PFX[kind]):])
+        dirty[kind].add(m["_id"][len(_PFX[kind]) :])
     return found
 
 
@@ -66,7 +66,7 @@ async def shared_pending(scope_id: str | None = None) -> bool:
 
 async def marked(kind: str) -> list[str]:
     p = _PFX[kind]
-    return [m["_id"][len(p):] async for m in db.read_model_marks.find({"_id": {"$regex": f"^{p}"}}, {"_id": 1})]
+    return [m["_id"][len(p) :] async for m in db.read_model_marks.find({"_id": {"$regex": f"^{p}"}}, {"_id": 1})]
 
 
 async def version() -> int:

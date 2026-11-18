@@ -2033,18 +2033,6 @@
    ]
   ]
  },
- "ledger_entries.booking_seq": {
-  "key": [
-   [
-    "booking_id",
-    1
-   ],
-   [
-    "seq",
-    1
-   ]
-  ]
- },
  "ledger_entries.id_1": {
   "key": [
    [

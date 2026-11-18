@@ -21,20 +21,49 @@ log = logging.getLogger("invariants")
 # 3G (REQ-290/307): money business keys the database itself must refuse to repeat. A rule that meets existing
 # duplicates (e.g. on an old production copy) is skipped and shown on System Health; the app keeps starting.
 BUSINESS_KEYS = [
-    ("waiver number", "waivers", [("waiver_number", ASCENDING)], "uniq_waiver_number", {"waiver_number": {"$type": "string"}}),
+    (
+        "waiver number",
+        "waivers",
+        [("waiver_number", ASCENDING)],
+        "uniq_waiver_number",
+        {"waiver_number": {"$type": "string"}},
+    ),
     ("credit-note number", "waivers", [("cn_number", ASCENDING)], "uniq_cn_number", {"cn_number": {"$type": "string"}}),
     # a Mixed payout keeps one number across its per-bucket rows (parent = Cash, children = Account / Other)
-    ("refund number", "refunds", [("refund_number", ASCENDING), ("bucket", ASCENDING)], "uniq_refund_number_bucket", None),
-    ("ledger line (booking + sequence)", "ledger_entries", [("booking_id", ASCENDING), ("seq", ASCENDING)], "uniq_ledger_seq", None),
+    (
+        "refund number",
+        "refunds",
+        [("refund_number", ASCENDING), ("bucket", ASCENDING)],
+        "uniq_refund_number_bucket",
+        None,
+    ),
+    (
+        "ledger line (booking + sequence)",
+        "ledger_entries",
+        [("booking_id", ASCENDING), ("seq", ASCENDING)],
+        "uniq_ledger_seq",
+        None,
+    ),
     # Phase K's index covers Active only; a Completed (sold) booking keeps its flat too
-    ("one live booking per flat", "bookings", [("flat_id", ASCENDING)], "uniq_live_booking_per_flat", {"status": {"$in": ["Active", "Completed"]}}),
+    (
+        "one live booking per flat",
+        "bookings",
+        [("flat_id", ASCENDING)],
+        "uniq_live_booking_per_flat",
+        {"status": {"$in": ["Active", "Completed"]}},
+    ),
 ]
 NOT_APPLIED = "Uniqueness rule not applied — duplicates found"
 
 
 async def _duplicates(coll: str, keys: list, pfe: dict | None) -> list:
     group = {k.replace(".", "_"): f"${k}" for k, _ in keys}
-    pipe = [{"$match": pfe or {}}, {"$group": {"_id": group, "n": {"$sum": 1}}}, {"$match": {"n": {"$gt": 1}}}, {"$limit": 5}]
+    pipe = [
+        {"$match": pfe or {}},
+        {"$group": {"_id": group, "n": {"$sum": 1}}},
+        {"$match": {"n": {"$gt": 1}}},
+        {"$limit": 5},
+    ]
     return [r["_id"] async for r in db[coll].aggregate(pipe, allowDiskUse=True)]
 
 

@@ -44,14 +44,23 @@ def main():
     rows = []
     try:
         c = httpx.Client(base_url=f"http://127.0.0.1:{PORT}", timeout=120, headers={"X-Rate-Limit-Bypass": BYPASS})
-        tok = c.post("/api/auth/login", json={"email": "admin@kkt.in", "password": DEMO_PASSWORD}).json()["access_token"]
+        tok = c.post("/api/auth/login", json={"email": "admin@kkt.in", "password": DEMO_PASSWORD}).json()[
+            "access_token"
+        ]
         c.headers["Authorization"] = f"Bearer {tok}"
         keys = [k for k in REGISTRY if not a.only or k in a.only.split(",")]
         for key in keys:
             p = params(key, c) | {"page_size": 50}
             first = []
             for _ in range(a.cold):
-                scratch.audit_logs.insert_one({"id": str(uuid.uuid4()), "action": "perf.bump", "entity_type": "perf", "created_at": time.strftime("%Y-%m-%dT%H:%M:%S+00:00", time.gmtime())})
+                scratch.audit_logs.insert_one(
+                    {
+                        "id": str(uuid.uuid4()),
+                        "action": "perf.bump",
+                        "entity_type": "perf",
+                        "created_at": time.strftime("%Y-%m-%dT%H:%M:%S+00:00", time.gmtime()),
+                    }
+                )
                 r = c.get(f"/api/reports/v3/{key}", params=p)
                 assert r.status_code == 200, (key, r.status_code, r.text[:200])
                 first.append(server_ms(r))
@@ -73,8 +82,14 @@ def main():
     ]
     for key, seg, n, f, w in rows:
         ok = pct(f, 95) <= FIRST and pct(w, 95) <= CACHED
-        lines.append(f"| {seg} | {key} | {n:,} | {pct(f, 50):.0f} | {pct(f, 95):.0f} | {pct(w, 50):.0f} | {pct(w, 95):.0f} | {'yes' if ok else 'NO'} |")
-    lines += ["", f"**{len(rows) - len(bad)}/{len(rows)} within budget**" + (f" — over: {', '.join(bad)}" if bad else ""), ""]
+        lines.append(
+            f"| {seg} | {key} | {n:,} | {pct(f, 50):.0f} | {pct(f, 95):.0f} | {pct(w, 50):.0f} | {pct(w, 95):.0f} | {'yes' if ok else 'NO'} |"
+        )
+    lines += [
+        "",
+        f"**{len(rows) - len(bad)}/{len(rows)} within budget**" + (f" — over: {', '.join(bad)}" if bad else ""),
+        "",
+    ]
     open(a.out, "w").write("\n".join(lines))
     print(f"{len(rows) - len(bad)}/{len(rows)} within budget", bad)
     sys.exit(1 if bad else 0)

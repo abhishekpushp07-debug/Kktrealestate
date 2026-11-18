@@ -283,7 +283,12 @@ async def pay_refund(rf: dict, body: dict, actor: dict) -> dict:
     }
     mixed = bucket == "Mixed"
     if mixed:  # 3G: the parent's split lands in the same atomic write as "Paid"; children are idempotent upserts
-        upd |= {"bucket": "Cash", "amount_paise": rf["split"]["Cash"], "amount_total_paise": rf["amount_paise"], "children_pending": True}
+        upd |= {
+            "bucket": "Cash",
+            "amount_paise": rf["split"]["Cash"],
+            "amount_total_paise": rf["amount_paise"],
+            "children_pending": True,
+        }
     res = await db.refunds.update_one(
         {"id": rf["id"], "status": "Pending", "version": rf["version"]}, {"$set": upd, "$inc": {"version": 1}}
     )

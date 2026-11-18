@@ -6,7 +6,12 @@ import asyncio
 from services import ttlcache
 
 
-def test_invalidate_during_compute_is_not_cached():
+def test_invalidate_during_compute_is_not_cached(monkeypatch):
+    async def stamp():
+        return "s"
+
+    monkeypatch.setattr(ttlcache, "data_stamp", stamp)  # 3G: cached() keys carry the shared data stamp; fixed here
+
     async def go():
         key = "home:test-race"
         ttlcache.invalidate("home:test-race")
@@ -29,7 +34,7 @@ def test_invalidate_during_compute_is_not_cached():
         release.set()
         assert await first == "stale"  # its own caller still gets an answer
         assert second == "fresh"
-        assert ttlcache.get(key) == "fresh"  # and the stale value never overwrote the cache
+        assert ttlcache.get(f"{key}|s") == "fresh"  # and the stale value never overwrote the cache
 
     asyncio.run(go())
 

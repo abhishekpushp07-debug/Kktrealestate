@@ -214,7 +214,8 @@ async def _indexes_list_sorts():
             [("company_id", ASCENDING), ("voided", ASCENDING), ("status", ASCENDING), ("due_date", ASCENDING)],
             "overdue",
         ),
-        ("audit_logs",
+        (
+            "audit_logs",
             [("entity_type", ASCENDING), ("entity_id", ASCENDING), ("created_at", DESCENDING)],
             "entity_time",
         ),

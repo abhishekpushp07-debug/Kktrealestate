@@ -34,7 +34,11 @@ async def cheques(user, rows, ctx):
         if r.get("status") == "Pending":
             r["status"] = "In hand"
         pending = r.get("status") == "In hand"
-        r["days_in_hand"] = (today - __import__("datetime").date.fromisoformat(p["payment_date"])).days if pending and p.get("payment_date") else 0
+        r["days_in_hand"] = (
+            (today - __import__("datetime").date.fromisoformat(p["payment_date"])).days
+            if pending and p.get("payment_date")
+            else 0
+        )
     return rows
 
 
@@ -51,13 +55,29 @@ async def outstanding(user, rows, ctx):
 
 async def day_book(user, rows, ctx):
     for r in rows:
-        r["books"] = [b for b, on in (("cash", r.get("cash_in_paise") or r.get("deposit_paise") or r.get("withdrawal_paise") or r.get("cash_refund_paise")), ("bank", r.get("bank_in_paise") or r.get("deposit_paise"))) if on]
+        r["books"] = [
+            b
+            for b, on in (
+                (
+                    "cash",
+                    r.get("cash_in_paise")
+                    or r.get("deposit_paise")
+                    or r.get("withdrawal_paise")
+                    or r.get("cash_refund_paise"),
+                ),
+                ("bank", r.get("bank_in_paise") or r.get("deposit_paise")),
+            )
+            if on
+        ]
     return rows
 
 
 async def other_charges(user, rows, ctx):
     q = {"company_id": user["company_id"], "id": {"$in": [r.get("booking_id") for r in rows]}}
-    heads = {b["id"]: sorted({l.get("name") for l in b.get("other_charges") or [] if l.get("name")}) async for b in db.bookings.find(q, {"_id": 0, "id": 1, "other_charges.name": 1})}
+    heads = {
+        b["id"]: sorted({l.get("name") for l in b.get("other_charges") or [] if l.get("name")})
+        async for b in db.bookings.find(q, {"_id": 0, "id": 1, "other_charges.name": 1})
+    }
     for r in rows:
         r["heads"] = heads.get(r.get("booking_id"), [])
     return rows
@@ -71,7 +91,12 @@ async def outstanding_asof(user, ctx):
     rows = [r for r in await customer_status(user, ctx) if r["live"]]
     q = {"booking_id": {"$in": [r["booking_id"] for r in rows]}, "date": {"$lte": ctx["as_of"].isoformat()}}
     wv = {"$in": ["$type", ["WAIVER", "WAIVER_REVERSAL"]]}
-    grp = {"_id": "$booking_id", "u": {"$sum": "$udhar_paise"}, "j": {"$sum": "$jama_paise"}, "w": {"$sum": {"$cond": [wv, "$jama_paise", 0]}}}
+    grp = {
+        "_id": "$booking_id",
+        "u": {"$sum": "$udhar_paise"},
+        "j": {"$sum": "$jama_paise"},
+        "w": {"$sum": {"$cond": [wv, "$jama_paise", 0]}},
+    }
     led = {d["_id"]: d async for d in db.ledger_entries.aggregate([{"$match": q}, {"$group": grp}])}
     out = []
     for r in rows:

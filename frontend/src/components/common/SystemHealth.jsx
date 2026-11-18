@@ -135,7 +135,10 @@ function UniquenessRules({ rules }) {
   const off = (rules || []).filter((r) => r.status === "not_applied");
   if (!off.length) return null;
   return (
-    <div className="mt-4 rounded-[10px] border border-brick/30 bg-brick/5 p-3" data-testid="ops-uniqueness-warning">
+    <div
+      className="mt-4 rounded-[10px] border border-brick/30 bg-brick/5 p-3"
+      data-testid="ops-uniqueness-warning"
+    >
       {off.map((r) => (
         <p key={r.index} className="text-sm text-brick" data-testid={`ops-uniqueness-${r.index}`}>
           {r.message} · {r.key}

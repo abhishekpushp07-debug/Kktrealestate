@@ -92,7 +92,9 @@ def _load():
         def draw_page_number(self, total):
             self.setFont("Helvetica", 7.5)
             self.setFillColor(colors.HexColor("#64748B"))
-            self.drawRightString(self._pagesize[0] - 14 * units.mm, 5.5 * units.mm, f"Page {self._pageNumber} of {total}")
+            self.drawRightString(
+                self._pagesize[0] - 14 * units.mm, 5.5 * units.mm, f"Page {self._pageNumber} of {total}"
+            )
 
     g = globals()
     g.update(

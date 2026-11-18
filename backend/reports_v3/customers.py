@@ -92,10 +92,15 @@ async def _lookups(user: dict, as_of: date):
         return dem
 
     async def floors():
-        return {f["id"]: f.get("floor") async for f in db.flats.find({"company_id": cid}, {"_id": 0, "id": 1, "floor": 1})}
+        return {
+            f["id"]: f.get("floor") async for f in db.flats.find({"company_id": cid}, {"_id": 0, "id": 1, "floor": 1})
+        }
 
     async def users():
-        return {u["id"]: u.get("name") or u.get("email") async for u in db.users.find({}, {"_id": 0, "id": 1, "name": 1, "email": 1})}
+        return {
+            u["id"]: u.get("name") or u.get("email")
+            async for u in db.users.find({}, {"_id": 0, "id": 1, "name": 1, "email": 1})
+        }
 
     async def stages():
         blocks = await db.blocks.distinct("id", {"company_id": cid})
@@ -138,7 +143,13 @@ def dims(b: dict, floors: dict, users: dict) -> dict:
     }
 
 
-BAND_KEYS = {"Not due": "band_not_due", "0-30": "band_0_30", "31-60": "band_31_60", "61-90": "band_61_90", "90+": "band_90p"}
+BAND_KEYS = {
+    "Not due": "band_not_due",
+    "0-30": "band_0_30",
+    "31-60": "band_31_60",
+    "61-90": "band_61_90",
+    "90+": "band_90p",
+}
 STATUS_GROUP = {
     "overdue": "Overdue",
     "due": "Due, not late",
@@ -215,7 +226,11 @@ async def _booking_rows(user: dict, as_of: date) -> list[dict]:
                 "status_kind": fs["kind"],
                 "status_group": STATUS_GROUP[fs["kind"]],
                 "final_status": status_label(fs)
-                + (" · other charges" if fs["kind"] in ("overdue", "due") and max(acc_due, 0) + max(cash_due, 0) == 0 else ""),
+                + (
+                    " · other charges"
+                    if fs["kind"] in ("overdue", "due") and max(acc_due, 0) + max(cash_due, 0) == 0
+                    else ""
+                ),
                 "live": live,
             }
         )

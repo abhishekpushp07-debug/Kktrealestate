@@ -142,7 +142,7 @@ API_B = f"{_B}/api"
 def test_stages_forward_only_and_undo_roundtrip(admin_headers):
     h = admin_headers
     blk = next(
-        b for b in requests.get(f"{API_B}/blocks?page_size=20", headers=h).json()["items"] if b["code"] == "C"
+        b for b in requests.get(f"{API_B}/blocks?page_size=200", headers=h).json()["items"] if b["code"] == "C"
     )  # Tower C: mid-construction in the story
     ms = requests.get(f"{API_B}/blocks/{blk['id']}/milestones", headers=h).json()
     nxt = ms["next_seq"]

@@ -1,7 +1,7 @@
 """REQ-259…273: generic filter → sort → group → page, filter sentence, exports. Never computes money itself."""
 
-import re
 import io
+import re
 from datetime import date
 
 from services import clock
@@ -42,11 +42,11 @@ def options(spec: dict, rows: list[dict]) -> dict:
         seen = {}
         for r in rows:
             for v in r.get(f["field"]) if isinstance(r.get(f["field"]), list) else [r.get(f["field"])]:
-              if v is not None and v not in seen:
-                lab = r.get(f.get("label_field", f["field"]))
-                seen[v] = {"value": v, "label": str(v if isinstance(lab, list) else lab or "—")}
-                if pf:
-                    seen[v]["parent"] = r.get(pf["field"])
+                if v is not None and v not in seen:
+                    lab = r.get(f.get("label_field", f["field"]))
+                    seen[v] = {"value": v, "label": str(v if isinstance(lab, list) else lab or "—")}
+                    if pf:
+                        seen[v]["parent"] = r.get(pf["field"])
         out[f["key"]] = sorted(seen.values(), key=lambda o: _natural(o["label"]))
     return out
 
@@ -90,7 +90,11 @@ def apply_filters(spec: dict, rows: list[dict], p: dict) -> list[dict]:
             out = [
                 r
                 for r in out
-                if (want & {str(x) for x in r.get(field)} if isinstance(r.get(field), list) else str(r.get(field)) in want)
+                if (
+                    want & {str(x) for x in r.get(field)}
+                    if isinstance(r.get(field), list)
+                    else str(r.get(field)) in want
+                )
             ]
         elif f["kind"] == "date_range":
             lo, hi = p.get(f"{k}_from"), p.get(f"{k}_to")
@@ -163,7 +167,9 @@ def sentence(spec: dict, p: dict, opts: dict, n: int, as_of: date | None) -> str
             names = [lab.get(v, v) for v in p[k]]
             bits.append(", ".join(names[:3]) + (f" +{len(names) - 3}" if len(names) > 3 else ""))
         elif f["kind"] == "date_range" and (p.get(f"{k}_from") or p.get(f"{k}_to")):
-            bits.append(f"{f['label'].lower()} {fmt_date(p.get(f'{k}_from')) or '…'} – {fmt_date(p.get(f'{k}_to')) or '…'}")
+            bits.append(
+                f"{f['label'].lower()} {fmt_date(p.get(f'{k}_from')) or '…'} – {fmt_date(p.get(f'{k}_to')) or '…'}"
+            )
         elif f["kind"] == "range" and (p.get(f"{k}_min") or p.get(f"{k}_max")):
             lo, hi = p.get(f"{k}_min"), p.get(f"{k}_max")
             fm = (lambda v: inr(_num(v))) if f.get("type") == "money" else str
@@ -266,7 +272,10 @@ async def to_pdf(spec: dict, cols: list[dict], lines: list, tot: dict, head: lis
     for kind, x in lines:
         if kind == "group":
             lab = "  " * x["depth"] + f"<b>{x['label']} ({x['count']})</b>"
-            rows.append([lab] + [f"<b>{_cell(c, x['totals'][c['key']])}</b>" if c["key"] in x["totals"] else "" for c in cols[1:]])
+            rows.append(
+                [lab]
+                + [f"<b>{_cell(c, x['totals'][c['key']])}</b>" if c["key"] in x["totals"] else "" for c in cols[1:]]
+            )
         else:
             rows.append([_cell(c, x.get(c["key"])) for c in cols])
     import re

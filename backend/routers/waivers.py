@@ -86,7 +86,11 @@ async def _approve(w: dict, b: dict, user: dict, request: Request, self_approved
     )
     if not res.modified_count:  # 3G: decided by someone else meanwhile — nothing else is written
         cur = await db.waivers.find_one({"id": w["id"]}, {"_id": 0, "status": 1})
-        raise ApiError(409, "Already approved" if (cur or {}).get("status") == "Approved" else f"Waiver is {(cur or {}).get('status')}", "WAIVER_STATE")
+        raise ApiError(
+            409,
+            "Already approved" if (cur or {}).get("status") == "Approved" else f"Waiver is {(cur or {}).get('status')}",
+            "WAIVER_STATE",
+        )
     await rebuild(b["id"])
     settles = await W.settled_bills(b["id"], before) if target["kind"] == "share" else []
     w = {**w, **upd, "settles": settles}

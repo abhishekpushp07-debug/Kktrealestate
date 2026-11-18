@@ -10,6 +10,7 @@ ERRORS: dict[str, tuple[int, ...]] = {
     "BAD_PARAM": (400,),
     "BAD_PHOTO": (422,),
     "BELOW_PAID": (409,),
+    "BOOKING_BUSY": (409,),
     "BOOKING_NOT_ACTIVE": (409, 422),
     "BUCKET_EXCEEDS_AGREED": (409,),
     "CANNOT_REOPEN": (409,),

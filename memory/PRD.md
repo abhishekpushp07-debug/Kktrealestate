@@ -835,3 +835,8 @@ See `/app/memory/prd_phase11c.md`. Tested: `/app/test_reports/iteration_13.json`
 - Part 5 Waiver: WV/CN numbers, share-level oldest-first settle, GST credit (excess → Other advance), owner approval / self-approved audit, reject w/ reason, owner-only cancel = exact reversing rows, Section 34 flag, credit-note PDF, Waiver Register, Home "Waivers to approve"; waivers never counted as received.
 - Part 6 proof: tools/demo_3e.py (real API, in nightly story), matrix/click-through/tieout extended; all gates green except 10 parallel-only test failures (pass serially). Report: memory/qa/phase3e/gates.md.
 - Next: owner review of Phase 3E; Waiver Register hero eyebrow label still "MONEY" (cosmetic).
+
+## Phase 3G — Database integrity audit + architecture & scale review (2026-11-18)
+- `tools/db_audit.py` (read-only, fingerprint-verified) on preview / kkt_medium / kkt_volume; race + 2-process stale drills `tools/db_audit_drills.py`, crash drills `tools/db_audit_crash.py` (throw-away `kkt_audit_scratch` only, dropped after).
+- 12 High fixed (G-01..G-12): DB-unique money keys (waiver / CN / refund no., ledger seq, one live booking per flat Active+Completed) with skip + System Health on duplicates; per-booking Mongo lease (`services/booking_lock.py`) on receipt / cancel / waiver / ledger rebuild, tower lease on stage complete; guarded split-receipt cap; crash-safe retry for receipt, cancel, mixed refund; shared read-model marks; data-stamped caches → replica B stale 0 s (with and without Redis).
+- Medium read-model repair (23 customer summaries, money-neutral). Tests: `tests/test_phase3g_integrity.py`. Report: memory/qa/db_audit/report.md; Medium/Low items assigned to 3I (pool sizing, transactions on replica set).

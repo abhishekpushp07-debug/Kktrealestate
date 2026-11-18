@@ -37,7 +37,9 @@ def _py(script: str):
 
 
 def _call(h, method, path, body=None, ok=(200, 201)):
-    r = requests.request(method, f"{API}{path}", headers={**h, "Idempotency-Key": uuid.uuid4().hex}, json=body, timeout=120)
+    r = requests.request(
+        method, f"{API}{path}", headers={**h, "Idempotency-Key": uuid.uuid4().hex}, json=body, timeout=120
+    )
     assert r.status_code in ok, (method, path, r.status_code, r.text[:300])
     return r.json()
 
@@ -57,7 +59,12 @@ def _both(fa, fb):
 
 def _own_booking(h, cash_share: bool):
     f = own_flats(API, h, 1)[0]
-    cust = _call(h, "POST", "/customers", {"full_name": "T3G Buyer", "phone": f"+9190{uuid.uuid4().int % 10**8:08d}", "source": "Walk-in"})
+    cust = _call(
+        h,
+        "POST",
+        "/customers",
+        {"full_name": "T3G Buyer", "phone": f"+9190{uuid.uuid4().int % 10**8:08d}", "source": "Walk-in"},
+    )
     price = f["price"]
     plans = _call(h, "GET", f"/projects/{f['project_id']}/blocks/{f['block_id']}/payment-plans")["items"]
     return _call(h, "POST", "/bookings", {"flat_id": f["id"], "customer_id": cust["id"], "booking_date": date.today().isoformat(),
@@ -127,21 +134,27 @@ def test_waiver_double_approve_and_approve_vs_reject(admin_headers):
         w = _call(acc, "POST", "/waivers",
                   {"booking_id": bid, "target": {"kind": "share", "share": share}, "amount": 1, "reason": "t3g double approve"})  # fmt: skip
         url = f"{API}/waivers/{w['id']}/approve"
-        ra, rb = _both(lambda: requests.post(url, headers=admin_headers, timeout=60),
-                       lambda: requests.post(url, headers=admin_headers, timeout=60))  # fmt: skip
+        ra, rb = _both(lambda url=url: requests.post(url, headers=admin_headers, timeout=60),
+                       lambda url=url: requests.post(url, headers=admin_headers, timeout=60))  # fmt: skip
         codes = sorted([ra.status_code, rb.status_code])
-        audits = db.audit_logs.count_documents({"action": {"$in": ["waiver.approve", "waiver.self_approve"]}, "after.waiver_number": w["waiver_number"]})
+        audits = db.audit_logs.count_documents(
+            {"action": {"$in": ["waiver.approve", "waiver.self_approve"]}, "after.waiver_number": w["waiver_number"]}
+        )
         assert codes == [200, 409] and audits == 1, (codes, audits, i, ra.text[:160], rb.text[:160])
         loser = ra if ra.status_code == 409 else rb
         assert "Already approved" in loser.text
         _call(admin_headers, "POST", f"/waivers/{w['id']}/cancel", {"reason": "t3g cleanup"})
         z = _call(acc, "POST", "/waivers",
                   {"booking_id": bid, "target": {"kind": "share", "share": share}, "amount": 1, "reason": "t3g approve vs reject"})  # fmt: skip
-        ra, rb = _both(lambda: requests.post(f"{API}/waivers/{z['id']}/approve", headers=admin_headers, timeout=60),
-                       lambda: requests.post(f"{API}/waivers/{z['id']}/reject", headers=admin_headers, json={"reason": "t3g"}, timeout=60))  # fmt: skip
+        ra, rb = _both(lambda z=z: requests.post(f"{API}/waivers/{z['id']}/approve", headers=admin_headers, timeout=60),
+                       lambda z=z: requests.post(f"{API}/waivers/{z['id']}/reject", headers=admin_headers, json={"reason": "t3g"}, timeout=60))  # fmt: skip
         final = db.waivers.find_one({"id": z["id"]})
         won = "Approved" if ra.status_code == 200 else "Rejected"
-        assert sorted([ra.status_code, rb.status_code]) == [200, 409] and final["status"] == won, (ra.status_code, rb.status_code, final["status"])
+        assert sorted([ra.status_code, rb.status_code]) == [200, 409] and final["status"] == won, (
+            ra.status_code,
+            rb.status_code,
+            final["status"],
+        )
         if final["status"] == "Approved":
             _call(admin_headers, "POST", f"/waivers/{z['id']}/cancel", {"reason": "t3g cleanup"})
 
@@ -192,7 +205,9 @@ def test_interrupted_mixed_refund_payout_is_completed_once():
 # ---- G-07 read-model marks survive a crash and are visible to every process (REQ-314, crash drill)
 def test_read_model_marks_are_shared_and_survive_a_crash():
     cid = f"t3g-{uuid.uuid4().hex}"
-    _py(f"from services import read_model_state as S\nasyncio.run(S.persist(customer_id='{cid}'))")  # process 1 marks, then dies
+    _py(
+        f"from services import read_model_state as S\nasyncio.run(S.persist(customer_id='{cid}'))"
+    )  # process 1 marks, then dies
     out = _py(f"""
 from datetime import UTC, datetime
 from services import read_model_state as S
@@ -242,7 +257,9 @@ print(json.dumps(asyncio.run(go())))
         if os.path.exists(marker):
             break
         time.sleep(0.1)
-    r = requests.post(f"{API}/payments", json=body, headers={**admin_headers, "Idempotency-Key": uuid.uuid4().hex}, timeout=60)
+    r = requests.post(
+        f"{API}/payments", json=body, headers={**admin_headers, "Idempotency-Key": uuid.uuid4().hex}, timeout=60
+    )
     assert r.status_code == 201
     open(marker + ".done", "w").close()
     out = json.loads(proc.communicate(timeout=120)[0].strip().splitlines()[-1])
@@ -254,7 +271,12 @@ print(json.dumps(asyncio.run(go())))
 def test_interrupted_cancel_is_completed_by_retry(admin_headers):
     db = _db()
     f = own_flats(API, admin_headers, 1)[0]
-    cust = _call(admin_headers, "POST", "/customers", {"full_name": "T3G Cancel Buyer", "phone": f"+9190{uuid.uuid4().int % 10**8:08d}", "source": "Walk-in"})
+    cust = _call(
+        admin_headers,
+        "POST",
+        "/customers",
+        {"full_name": "T3G Cancel Buyer", "phone": f"+9190{uuid.uuid4().int % 10**8:08d}", "source": "Walk-in"},
+    )
     price = f["price"]
     plans = _call(admin_headers, "GET", f"/projects/{f['project_id']}/blocks/{f['block_id']}/payment-plans")["items"]
     bk = _call(admin_headers, "POST", "/bookings", {"flat_id": f["id"], "customer_id": cust["id"], "booking_date": date.today().isoformat(),
@@ -268,10 +290,16 @@ def test_interrupted_cancel_is_completed_by_retry(admin_headers):
     deduction = received // 10
     canc = {"at": b["updated_at"], "by": "t3g", "by_name": "T3G", "reason": "t3g crash", "received_paise": received, "deduction_paise": deduction,
             "charges_due_paise": 0, "refund_paise": received - deduction, "forfeiture_paise": deduction, "lines": []}  # fmt: skip
-    db.bookings.update_one({"id": bk["id"]}, {"$set": {"status": "Cancelled", "cancellation": canc}, "$inc": {"version": 1}})  # crash here
+    db.bookings.update_one(
+        {"id": bk["id"]}, {"$set": {"status": "Cancelled", "cancellation": canc}, "$inc": {"version": 1}}
+    )  # crash here
     out = _call(admin_headers, "POST", f"/bookings/{bk['id']}/cancel", {"reason": "t3g retry"})
     assert out["status"] == "Cancelled" and out["refund"], out
     assert db.refunds.count_documents({"booking_id": bk["id"], "parent_refund_id": {"$exists": False}}) == 1
+    flat = db.flats.find_one({"id": f["id"]})
+    assert flat["status"] == "Available" and flat.get("booking_id") is None, flat.get(
+        "status"
+    )  # the flat is free again
     _call(admin_headers, "POST", f"/bookings/{bk['id']}/cancel", {"reason": "t3g retry again"}, ok=(409,))
 
 
@@ -289,7 +317,7 @@ import asyncio, sys
 sys.path.insert(0, '.')
 from services.booking_lock import booking_lock
 async def go():
-    async with booking_lock("{work_booking['id']}"):
+    async with booking_lock("{work_booking["id"]}"):
         print("held", flush=True)
         await asyncio.sleep(3)
 asyncio.run(go())
@@ -298,7 +326,9 @@ asyncio.run(go())
                               stdout=subprocess.PIPE, text=True, env={**os.environ})  # fmt: skip
     assert holder.stdout.readline().strip() == "held"  # "process 2" is cancelling / posting on this booking
     t0 = time.monotonic()
-    r = requests.post(f"{API}/payments", json=body, headers={**admin_headers, "Idempotency-Key": uuid.uuid4().hex}, timeout=60)
+    r = requests.post(
+        f"{API}/payments", json=body, headers={**admin_headers, "Idempotency-Key": uuid.uuid4().hex}, timeout=60
+    )
     waited = time.monotonic() - t0
     holder.wait(30)
     assert r.status_code == 201

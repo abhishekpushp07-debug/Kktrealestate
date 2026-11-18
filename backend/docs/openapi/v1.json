@@ -9600,9 +9600,19 @@
       "title": "Name",
       "type": "string"
      },
+     "pinned": {
+      "default": false,
+      "title": "Pinned",
+      "type": "boolean"
+     },
      "report_key": {
       "title": "Report Key",
       "type": "string"
+     },
+     "shared": {
+      "default": false,
+      "title": "Shared",
+      "type": "boolean"
      }
     },
     "required": [
@@ -9617,13 +9627,39 @@
     "additionalProperties": false,
     "properties": {
      "name": {
-      "title": "Name",
-      "type": "string"
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Name"
+     },
+     "pinned": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Pinned"
+     },
+     "shared": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Shared"
      }
     },
-    "required": [
-     "name"
-    ],
     "title": "PresetPatchIn",
     "type": "object"
    },
@@ -50049,6 +50085,166 @@
     "summary": "Upcoming Dues",
     "tags": [
      "construction"
+    ]
+   }
+  },
+  "/api/reports/v3": {
+   "get": {
+    "description": "REQ-274: 5 segments \u00d7 10 tiles in order, live headline for engine reports, plus the control-room row.",
+    "operationId": "hub_api_reports_v3_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Hub",
+    "tags": [
+     "reports-v3"
+    ]
+   }
+  },
+  "/api/reports/v3/{key}": {
+   "get": {
+    "operationId": "report_api_reports_v3__key__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "key",
+      "required": true,
+      "schema": {
+       "title": "Key",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Report",
+    "tags": [
+     "reports-v3"
+    ]
+   }
+  },
+  "/api/reports/v3/{key}/export.pdf": {
+   "get": {
+    "operationId": "export_pdf_api_reports_v3__key__export_pdf_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "key",
+      "required": true,
+      "schema": {
+       "title": "Key",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Export Pdf",
+    "tags": [
+     "reports-v3"
+    ]
+   }
+  },
+  "/api/reports/v3/{key}/export.xlsx": {
+   "get": {
+    "operationId": "export_xlsx_api_reports_v3__key__export_xlsx_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "key",
+      "required": true,
+      "schema": {
+       "title": "Key",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Export Xlsx",
+    "tags": [
+     "reports-v3"
     ]
    }
   },

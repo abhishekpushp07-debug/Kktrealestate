@@ -178,8 +178,16 @@ async def _reserve_split(booking: dict, p: dict) -> dict:
             "id": booking["id"],
             "status": "Active",
             # 3G: the cap is enforced by the write itself (a concurrent receipt can never push a bucket over agreed)
-            **({"summary.cash_paid_paise": {"$not": {"$gt": booking["cash_agreed_paise"] - parts["Cash"]}}} if parts["Cash"] else {}),
-            **({"summary.account_paid_paise": {"$not": {"$gt": booking["account_agreed_paise"] - parts["Account"]}}} if parts["Account"] else {}),
+            **(
+                {"summary.cash_paid_paise": {"$not": {"$gt": booking["cash_agreed_paise"] - parts["Cash"]}}}
+                if parts["Cash"]
+                else {}
+            ),
+            **(
+                {"summary.account_paid_paise": {"$not": {"$gt": booking["account_agreed_paise"] - parts["Account"]}}}
+                if parts["Account"]
+                else {}
+            ),
         },
         {"$inc": inc},
     )
@@ -421,7 +429,18 @@ async def _post_payment(body: PaymentIn, request: Request, user: dict):
         # the retry with the same key finishes it and answers with the original receipt, never a second one
         await rebuild(booking["id"])
         if not await db.audit_logs.find_one({"action": "payment.post", "entity_id": prior["id"]}, {"_id": 1}):
-            await write_audit(user, "payment.post", "payment", prior["id"], after={"receipt_number": prior["receipt_number"], "amount_paise": prior["amount_paise"], "recovered": True}, ip=client_ip(request))  # fmt: skip
+            await write_audit(
+                user,
+                "payment.post",
+                "payment",
+                prior["id"],
+                after={
+                    "receipt_number": prior["receipt_number"],
+                    "amount_paise": prior["amount_paise"],
+                    "recovered": True,
+                },
+                ip=client_ip(request),
+            )
         out = present_money(await db.payments.find_one({"id": prior["id"]}, {"_id": 0}))
         out["warnings"] = []
         return out

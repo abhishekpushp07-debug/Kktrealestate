@@ -3,8 +3,8 @@ timings in-process, plus a cProfile of the cold run. GET requests only — no wr
 Run: python tools/profile_reports.py collections [kkt_volume]"""
 
 import asyncio
-import logging
 import cProfile
+import logging
 import os
 import pstats
 import sys
@@ -41,7 +41,9 @@ async def main():
         cold = 1000 * (time.perf_counter() - a)
         a = time.perf_counter()
         await c.get(path, headers=h)
-        print(f"{KEY}: status {r.status_code} rows {r.json().get('count')} cold {cold:.0f} ms warm {1000 * (time.perf_counter() - a):.0f} ms")
+        print(
+            f"{KEY}: status {r.status_code} rows {r.json().get('count')} cold {cold:.0f} ms warm {1000 * (time.perf_counter() - a):.0f} ms"
+        )
     pstats.Stats(pr).sort_stats("cumulative").print_stats(r"(routers|services|reports_v3|motor)", 30)
 
 

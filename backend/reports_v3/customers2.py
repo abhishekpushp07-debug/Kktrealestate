@@ -54,11 +54,18 @@ def ageing_illus(rows, t):
 
 # ---------- Advance holders ----------
 async def advance_holders(user, ctx):
-    return [r | {"received_total": r["account_received"] + r["cash_received"]} for r in await customer_status(user, ctx) if r["live"] and r["advance_total"] > 0]
+    return [
+        r | {"received_total": r["account_received"] + r["cash_received"]}
+        for r in await customer_status(user, ctx)
+        if r["live"] and r["advance_total"] > 0
+    ]
 
 
 def advance_formula(t):
-    return f"Received {inr(t.get('received_total', 0))} beyond bills raised → advance held {inr(t.get('advance_total', 0))}; it settles the next bills oldest-first"
+    return (
+        f"Received {inr(t.get('received_total', 0))} beyond bills raised → advance held {inr(t.get('advance_total', 0))}; "
+        "it settles the next bills oldest-first"
+    )
 
 
 def advance_illus(rows, t):
@@ -77,8 +84,15 @@ async def call_list(user, ctx):
     rows = [r for r in await customer_status(user, ctx) if r["live"] and r["total_due"] > 0]
     # same follow-up source as the customer card's "follow-up today" pill: the customer's converted lead
     leads: dict = {}
-    q = {"$or": [{"converted_customer_id": {"$in": list({r["customer_id"] for r in rows})}}, {"id": {"$in": [r["lead_id"] for r in rows if r.get("lead_id")]}}]}
-    async for l in db.leads.find(q, {"_id": 0, "id": 1, "converted_customer_id": 1, "next_follow_up_at": 1, "follow_ups": {"$slice": -1}}):
+    q = {
+        "$or": [
+            {"converted_customer_id": {"$in": list({r["customer_id"] for r in rows})}},
+            {"id": {"$in": [r["lead_id"] for r in rows if r.get("lead_id")]}},
+        ]
+    }
+    async for l in db.leads.find(
+        q, {"_id": 0, "id": 1, "converted_customer_id": 1, "next_follow_up_at": 1, "follow_ups": {"$slice": -1}}
+    ):
         leads[l["id"]] = l
         if l.get("converted_customer_id"):
             leads[l["converted_customer_id"]] = l
@@ -99,7 +113,9 @@ async def call_list(user, ctx):
 
 
 def call_formula(t):
-    return f"Dues {inr(t.get('total_due', 0))} of which overdue {inr(t.get('overdue_amount', 0))}; call the oldest first"
+    return (
+        f"Dues {inr(t.get('total_due', 0))} of which overdue {inr(t.get('overdue_amount', 0))}; call the oldest first"
+    )
 
 
 def call_illus(rows, t):
@@ -123,7 +139,8 @@ async def paper_pending(user, ctx):
         )
     }
     types = await db.document_types.find(
-        {"applies_to": {"$in": ["customer", "booking"]}, "is_active": {"$ne": False}}, {"_id": 0, "id": 1, "name": 1, "applies_to": 1}
+        {"applies_to": {"$in": ["customer", "booking"]}, "is_active": {"$ne": False}},
+        {"_id": 0, "id": 1, "name": 1, "applies_to": 1},
     ).to_list(100)
     have: dict = {}
     async for d in db.documents.find(
@@ -139,12 +156,16 @@ async def paper_pending(user, ctx):
             if t["id"] not in have.get(r["customer_id"] if t["applies_to"] == "customer" else r["booking_id"], set())
         ]
         signed = r.get("plan_accepted_on")
-        pend = [x for x, on in (("kyc", kyc != "Verified"), ("agreement", not signed), ("documents", bool(missing))) if on]
+        pend = [
+            x for x, on in (("kyc", kyc != "Verified"), ("agreement", not signed), ("documents", bool(missing))) if on
+        ]
         out.append(
             r
             | {
                 "kyc_status": kyc,
-                "agreement": f"Signed {fmt_date(signed)}" if signed else f"Pending · {_days(r['booking_date'], ctx['as_of'])} days",
+                "agreement": f"Signed {fmt_date(signed)}"
+                if signed
+                else f"Pending · {_days(r['booking_date'], ctx['as_of'])} days",
                 "days_since_booking": _days(r["booking_date"], ctx["as_of"]),
                 "docs_missing": ", ".join(missing) or "—",
                 "docs_missing_n": len(missing),
@@ -157,7 +178,9 @@ async def paper_pending(user, ctx):
 
 
 def paper_formula(t):
-    return f"{t.get('pending_n', 0)} things pending across these bookings · {t.get('docs_missing_n', 0)} documents missing"
+    return (
+        f"{t.get('pending_n', 0)} things pending across these bookings · {t.get('docs_missing_n', 0)} documents missing"
+    )
 
 
 def paper_illus(rows, t):
@@ -180,7 +203,10 @@ async def behaviour(user, ctx):
     bounced = {
         x["_id"]: x["n"]
         async for x in db.payments.aggregate(
-            [{"$match": q | {"status": "Bounced", "bounced_at": {"$lte": as_of.isoformat() + "T23:59:59"}}}, {"$group": {"_id": "$booking_id", "n": {"$sum": 1}}}]
+            [
+                {"$match": q | {"status": "Bounced", "bounced_at": {"$lte": clock.day_end_utc(as_of)}}},
+                {"$group": {"_id": "$booking_id", "n": {"$sum": 1}}},
+            ]
         )
     }
     waived = {
@@ -193,8 +219,29 @@ async def behaviour(user, ctx):
     for r in rows:
         c = per.setdefault(
             r["customer_id"],
-            {k: r[k] for k in ("customer_id", "customer_name", "customer_label", "phone", "sales_person", "sales_id", "project", "project_id")}
-            | {"flats": [], "bills_due": 0, "on_time": 0, "late_days": 0, "late_n": 0, "bounces": 0, "waivers": 0, "received": 0},
+            {
+                k: r[k]
+                for k in (
+                    "customer_id",
+                    "customer_name",
+                    "customer_label",
+                    "phone",
+                    "sales_person",
+                    "sales_id",
+                    "project",
+                    "project_id",
+                )
+            }
+            | {
+                "flats": [],
+                "bills_due": 0,
+                "on_time": 0,
+                "late_days": 0,
+                "late_n": 0,
+                "bounces": 0,
+                "waivers": 0,
+                "received": 0,
+            },
         )
         c["flats"].append(r["flat"])
         for late in settle.get(r["booking_id"], []):
@@ -216,7 +263,13 @@ async def behaviour(user, ctx):
                 "flats": ", ".join(c["flats"]),
                 "on_time_pct": pct,
                 "avg_days_late": round(c["late_days"] / c["late_n"]) if c["late_n"] else 0,
-                "behaviour": "Nothing due yet" if pct is None else "Prompt" if pct >= 90 else "Mostly on time" if pct >= 60 else "Often late",
+                "behaviour": "Nothing due yet"
+                if pct is None
+                else "Prompt"
+                if pct >= 90
+                else "Mostly on time"
+                if pct >= 60
+                else "Often late",
             }
         )
     return out
@@ -235,7 +288,10 @@ def statement_derived(t, rows=None):
 
 def behaviour_formula(t):
     pct = round(100 * t.get("on_time", 0) / t["bills_due"]) if t.get("bills_due") else 0
-    return f"{t.get('on_time', 0)} of {t.get('bills_due', 0)} bills settled by their due date = {pct}% on time · {t.get('bounces', 0)} bounced cheques · {t.get('waivers', 0)} waivers"
+    return (
+        f"{t.get('on_time', 0)} of {t.get('bills_due', 0)} bills settled by their due date = {pct}% on time · {t.get('bounces', 0)} "
+        f"bounced cheques · {t.get('waivers', 0)} waivers"
+    )
 
 
 def behaviour_illus(rows, t):
@@ -254,7 +310,16 @@ async def directory(user, ctx):
     q = {"company_id": user["company_id"], "deleted_at": None, "id": {"$in": list(by)}}
     if not report_scope_filter(user):
         q.pop("id")
-    proj = {"_id": 0, "id": 1, "full_name": 1, "customer_code": 1, "phone": 1, "email": 1, "co_applicants": 1, "address_current": 1}
+    proj = {
+        "_id": 0,
+        "id": 1,
+        "full_name": 1,
+        "customer_code": 1,
+        "phone": 1,
+        "email": 1,
+        "co_applicants": 1,
+        "address_current": 1,
+    }
     proj |= {"source": 1, "assigned_sales_user_id": 1, "kyc_status": 1, "lifecycle_stage": 1, "is_active": 1}
     users = {u["id"]: u.get("name") async for u in db.users.find({}, {"_id": 0, "id": 1, "name": 1})}
     out = []
@@ -294,7 +359,11 @@ def directory_illus(rows, t):
     c = {}
     for r in rows:
         c[r["source"]] = c.get(r["source"], 0) + 1
-    return {"type": "counts", "title": "Where these customers came from", "counts": dict(sorted(c.items(), key=lambda x: -x[1])[:8])}
+    return {
+        "type": "counts",
+        "title": "Where these customers came from",
+        "counts": dict(sorted(c.items(), key=lambda x: -x[1])[:8]),
+    }
 
 
 # ---------- Customer statement ----------
@@ -302,7 +371,10 @@ async def statement_options(user):
     q = {"company_id": user["company_id"], **report_scope_filter(user)}
     seen = {}
     async for b in db.bookings.find(q, {"_id": 0, "customer_id": 1, "customer_name": 1, "customer_code": 1}):
-        seen[b["customer_id"]] = {"value": b["customer_id"], "label": f"{b.get('customer_name')} · {b.get('customer_code')}"}
+        seen[b["customer_id"]] = {
+            "value": b["customer_id"],
+            "label": f"{b.get('customer_name')} · {b.get('customer_code')}",
+        }
     return {"customer": sorted(seen.values(), key=lambda o: o["label"])}
 
 
@@ -313,11 +385,38 @@ async def statement(user, ctx):
     if not ids:
         return []
     q = {"company_id": user["company_id"], "customer_id": {"$in": ids}, **report_scope_filter(user)}
-    bks = {b["id"]: b async for b in db.bookings.find(q, {"_id": 0, "id": 1, "customer_id": 1, "customer_name": 1, "project_code": 1, "block_name": 1, "flat_snapshot.flat_number": 1, "booking_number": 1})}
+    bks = {
+        b["id"]: b
+        async for b in db.bookings.find(
+            q,
+            {
+                "_id": 0,
+                "id": 1,
+                "customer_id": 1,
+                "customer_name": 1,
+                "project_code": 1,
+                "block_name": 1,
+                "flat_snapshot.flat_number": 1,
+                "booking_number": 1,
+            },
+        )
+    }
     out = []
     cur = db.ledger_entries.find(
         {"booking_id": {"$in": list(bks)}, "date": {"$lte": ctx["as_of"].isoformat()}},
-        {"_id": 0, "booking_id": 1, "date": 1, "seq": 1, "type": 1, "ref": 1, "note": 1, "udhar_paise": 1, "jama_paise": 1, "balance_paise": 1, "mode": 1},
+        {
+            "_id": 0,
+            "booking_id": 1,
+            "date": 1,
+            "seq": 1,
+            "type": 1,
+            "ref": 1,
+            "note": 1,
+            "udhar_paise": 1,
+            "jama_paise": 1,
+            "balance_paise": 1,
+            "mode": 1,
+        },
     ).sort([("booking_id", 1), ("seq", 1)])
     async for e in cur:
         b = bks[e["booking_id"]]
@@ -345,7 +444,10 @@ async def statement(user, ctx):
 
 
 def statement_formula(t):
-    return f"Bills {inr(t.get('bill', 0))} − received {inr(t.get('received', 0))} − waived {inr(t.get('waived', 0))} = balance {sinr(t.get('bill', 0) - t.get('received', 0) - t.get('waived', 0))}"
+    return (
+        f"Bills {inr(t.get('bill', 0))} − received {inr(t.get('received', 0))} − waived {inr(t.get('waived', 0))} "
+        f"= balance {sinr(t.get('bill', 0) - t.get('received', 0) - t.get('waived', 0))}"
+    )
 
 
 def statement_illus(rows, t):
@@ -355,7 +457,11 @@ def statement_illus(rows, t):
         "parts": [
             {"label": "Received", "value": t.get("received", 0), "tone": "sapphire"},
             {"label": "Waived", "value": t.get("waived", 0), "tone": "muted"},
-            {"label": "Balance", "value": max(t.get("bill", 0) - t.get("received", 0) - t.get("waived", 0), 0), "tone": "coral"},
+            {
+                "label": "Balance",
+                "value": max(t.get("bill", 0) - t.get("received", 0) - t.get("waived", 0), 0),
+                "tone": "coral",
+            },
         ],
     }
 
@@ -364,15 +470,47 @@ def statement_illus(rows, t):
 async def cancelled(user, ctx):
     as_of = ctx["as_of"].isoformat()
     q = {"company_id": user["company_id"], **report_scope_filter(user)}
-    proj = {"_id": 0, "id": 1, "customer_id": 1, "customer_name": 1, "customer_phone": 1, "booking_number": 1, "booking_date": 1, "status": 1}
-    proj |= {"project_id": 1, "project_code": 1, "block_id": 1, "block_name": 1, "flat_id": 1, "flat_snapshot.flat_number": 1}
-    proj |= {"sales_user_id": 1, "payment_plan_snapshot.id": 1, "payment_plan_snapshot.name": 1, "cancellation": 1, "transfers": 1}
-    bks = await db.bookings.find(q | {"$or": [{"status": "Cancelled"}, {"transfers.0": {"$exists": True}}]}, proj).to_list(None)
+    proj = {
+        "_id": 0,
+        "id": 1,
+        "customer_id": 1,
+        "customer_name": 1,
+        "customer_phone": 1,
+        "booking_number": 1,
+        "booking_date": 1,
+        "status": 1,
+    }
+    proj |= {
+        "project_id": 1,
+        "project_code": 1,
+        "block_id": 1,
+        "block_name": 1,
+        "flat_id": 1,
+        "flat_snapshot.flat_number": 1,
+    }
+    proj |= {
+        "sales_user_id": 1,
+        "payment_plan_snapshot.id": 1,
+        "payment_plan_snapshot.name": 1,
+        "cancellation": 1,
+        "transfers": 1,
+    }
+    bks = await db.bookings.find(
+        q | {"$or": [{"status": "Cancelled"}, {"transfers.0": {"$exists": True}}]}, proj
+    ).to_list(None)
     paid: dict = {}
-    async for r in db.refunds.find({"booking_id": {"$in": [b["id"] for b in bks]}, "status": "Paid", "paid_date": {"$lte": as_of}}, {"_id": 0, "booking_id": 1, "amount_total_paise": 1, "amount_paise": 1}):
+    async for r in db.refunds.find(
+        {"booking_id": {"$in": [b["id"] for b in bks]}, "status": "Paid", "paid_date": {"$lte": as_of}},
+        {"_id": 0, "booking_id": 1, "amount_total_paise": 1, "amount_paise": 1},
+    ):
         paid[r["booking_id"]] = paid.get(r["booking_id"], 0) + (r.get("amount_paise") or 0)
     users = {u["id"]: u.get("name") async for u in db.users.find({}, {"_id": 0, "id": 1, "name": 1})}
-    flats = {f["id"]: f for f in await db.flats.find({"company_id": user["company_id"]}, {"_id": 0, "id": 1, "floor": 1, "flat_number": 1}).to_list(None)}
+    flats = {
+        f["id"]: f
+        for f in await db.flats.find(
+            {"company_id": user["company_id"]}, {"_id": 0, "id": 1, "floor": 1, "flat_number": 1}
+        ).to_list(None)
+    }
     floors = {k: v.get("floor") for k, v in flats.items()}
     out = []
     for b in bks:
@@ -403,7 +541,13 @@ async def cancelled(user, ctx):
             to = (flats.get(t.get("to_flat_id")) or {}).get("flat_number") or t.get("to_flat") or "—"
             out.append(
                 base
-                | {"kind": "Transferred", "event_date": tday, "reason": t.get("reason") or "—", "received": 0, "forfeit": 0}
+                | {
+                    "kind": "Transferred",
+                    "event_date": tday,
+                    "reason": t.get("reason") or "—",
+                    "received": 0,
+                    "forfeit": 0,
+                }
                 | {"refund_payable": 0, "refund_paid": 0, "refund_pending": 0, "new_flat": f"{frm} → {to}"}
             )
     return out

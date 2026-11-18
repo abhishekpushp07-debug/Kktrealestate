@@ -70,9 +70,9 @@ def test_weekly_series_ties_out_and_cancel_removes_from_week():
         "flat_id": flat["id"],
         "customer_id": cid,
         "booking_date": date.today().isoformat(),
-        "agreement_value": 2500000,
+        "agreement_value": max(int(flat.get("price") or 0), 2500000),  # agreed = list: no discount reason needed
         "cash_agreed": 500000,
-        "account_agreed": 2000000,
+        "account_agreed": max(int(flat.get("price") or 0), 2500000) - 500000,
         "payment_plan_id": plans[0]["id"] if plans else None,
     }
     r = requests.post(

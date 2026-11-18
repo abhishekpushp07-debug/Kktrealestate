@@ -23,6 +23,7 @@ SCRATCH_DB = "kkt_perf_scratch"
 PORT = 8031
 BYPASS = os.environ.get("LOGIN_RATE_LIMIT_BYPASS_TOKEN", "kkt-test-bypass-local")
 BUDGET = {"hot": 200, "write": 600, "report": 800, "report_cached": 100}
+CFG = {"workers": 1, "cpus": None, "v3": False}  # 3G Elite baseline: --workers 2 --cpus 0,1 --reports-v3
 
 
 def server_ms(r):
@@ -61,6 +62,7 @@ def start_backend():
     with open("/tmp/kkt_perf_backend.log", "w") as log:
         proc = subprocess.Popen(
             [
+                *(["taskset", "-c", CFG["cpus"]] if CFG["cpus"] else []),
                 sys.executable,
                 "-m",
                 "uvicorn",
@@ -69,6 +71,8 @@ def start_backend():
                 "127.0.0.1",
                 "--port",
                 str(PORT),
+                "--workers",
+                str(CFG["workers"]),
                 "--log-level",
                 "warning",
             ],
@@ -135,6 +139,10 @@ def reads(c, runs):
         ("report", "FY collections", f"/api/reports/collections-v2?from_date={fy0}&to_date={t.isoformat()}"),
         ("report", "Outstanding & ageing", "/api/reports/outstanding-v2"),
     ]
+    if CFG["v3"]:  # every engine report of the Reports hub (first call + cached repeats)
+        hub = c.get("/api/reports/v3").json()
+        tiles = [t for s in hub.get("segments", []) for t in s.get("tiles", []) if t.get("live")]
+        rows += [("report", f"v3 {t['title']}", f"/api/reports/v3/{t['key']}") for t in tiles]
     out = []
     for kind, name, path in rows:
         first = server_ms(c.get(path))
@@ -268,8 +276,8 @@ def report(rows, runs, js):
         f"# Perf budget — {time.strftime('%Y-%m-%d %H:%M UTC', time.gmtime())}",
         "",
         (
-            f"Scratch copy of the preview DB, private backend (1 worker, no reload), {runs} warm requests per path after 2 warm-ups; server time = "
-            f"`Server-Timing: total`."
+            f"Scratch copy of the preview DB, private backend ({CFG['workers']} worker(s){', CPUs ' + CFG['cpus'] if CFG['cpus'] else ''}, no reload), "
+            f"{runs} warm requests per path after 2 warm-ups; server time = `Server-Timing: total`."
         ),
         "",
         "| Kind | Path | Endpoint | p50 ms | p95 ms | first ms | Budget p95 | Within |",
@@ -279,10 +287,8 @@ def report(rows, runs, js):
         p50, p95 = pct(xs, 50), pct(xs, 95)
         budget = BUDGET["report_cached"] if kind == "report" else BUDGET[kind]
         lines.append(
-            (
-                f"| {kind} | {name} | `{path}` | {p50:.1f} | {p95:.1f} | {'' if first is None else f'{first:.1f}'} | ≤ {budget} | "
-                f"{'yes' if p95 <= budget else 'NO'} |"
-            )
+            f"| {kind} | {name} | `{path}` | {p50:.1f} | {p95:.1f} | {'' if first is None else f'{first:.1f}'} | ≤ {budget} | "
+            f"{'yes' if p95 <= budget else 'NO'} |"
         )
     lines += [
         "",
@@ -302,7 +308,11 @@ def main():
         "--only", choices=["create-booking"], help="measure one write path and print its Server-Timing spans"
     )
     ap.add_argument("--source", default=os.environ["DB_NAME"], help="DB to copy into the scratch DB (e.g. kkt_volume)")
+    ap.add_argument("--workers", type=int, default=1)
+    ap.add_argument("--cpus", help="pin the backend to these CPUs, e.g. 0,1 (Elite = 2 cores)")
+    ap.add_argument("--reports-v3", action="store_true", help="also measure every Reports-hub engine report")
     a = ap.parse_args()
+    CFG.update(workers=a.workers, cpus=a.cpus, v3=a.reports_v3)
     js = js_gzip()
     snapshot(a.source)
     proc = start_backend()

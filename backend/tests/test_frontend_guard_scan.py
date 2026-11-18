@@ -11,6 +11,7 @@ PATTERN = re.compile(
 # Files whose ROUTE is guarded by the write permission (ErpApp.jsx R table) — every button inside is implicitly guarded.
 ROUTE_GUARDED = {
     "pages/Exports.jsx": "reports.*",
+    "components/reports3/ReportSheet.jsx": "rendered only by pages/ReportV3.jsx, route reports/v3/:key = reports.*|masters.flat.view",
     "components/common/FileGallery.jsx": "canEdit prop (construction.photo.upload / service.ticket.assign at the call sites)",
     "pages/BookingWizard.jsx": "booking.create",
     "pages/v2/CustomerForm.jsx": "customer.write",

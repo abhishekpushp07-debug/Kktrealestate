@@ -89,9 +89,9 @@ def test_wizard_co_applicants_linked_on_letter_and_idempotent():
         "flat_id": flat["id"],
         "customer_id": cid,
         "booking_date": "2026-10-28",
-        "agreement_value": 2500000,
+        "agreement_value": max(int(flat.get("price") or 0), 2500000),  # agreed = list: no discount reason needed
         "cash_agreed": 500000,
-        "account_agreed": 2000000,
+        "account_agreed": max(int(flat.get("price") or 0), 2500000) - 500000,
         "payment_plan_id": plans[0]["id"] if plans else None,
         "co_applicants": [
             {"name": f"Co One {tag}", "relation": "Spouse", "phone": "9876500001"},

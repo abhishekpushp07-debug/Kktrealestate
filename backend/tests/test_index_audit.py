@@ -11,6 +11,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
 from db import db  # noqa: E402
 
+_LOOP = asyncio.new_event_loop()  # own loop: an earlier asyncio.run() leaves none set in the main thread
 TODAY = "2026-10-24"
 QUERIES = [
     ("customers list", db.customers, {"company_id": "c", "is_active": True}, [("created_at", -1), ("id", 1)]),
@@ -128,7 +129,7 @@ async def _explain(coll, q, sort):
 
 @pytest.mark.parametrize("name,coll,q,sort", QUERIES, ids=[q[0] for q in QUERIES])
 def test_query_uses_index(name, coll, q, sort):
-    plan = asyncio.get_event_loop().run_until_complete(_explain(coll, q, sort))["queryPlanner"]["winningPlan"]
+    plan = _LOOP.run_until_complete(_explain(coll, q, sort))["queryPlanner"]["winningPlan"]
     stages = _stages(plan)
     assert "COLLSCAN" not in stages, f"{name}: COLLSCAN — {stages}"
     assert "IXSCAN" in stages or "EOF" in stages, f"{name}: {stages}"

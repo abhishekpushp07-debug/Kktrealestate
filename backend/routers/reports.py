@@ -1636,7 +1636,10 @@ class PresetIn(StrictModel):
 
 
 @router.get("/presets")
-async def list_presets(report_key: str | None = None, user: dict = Depends(require_any("reports.collections.view", "reports.outstanding.view"))):
+async def list_presets(
+    report_key: str | None = None,
+    user: dict = Depends(require_any("reports.collections.view", "reports.outstanding.view")),
+):
     q = {"$or": [{"user_id": user["id"]}, {"shared": True, "company_id": user["company_id"]}]}
     if report_key:
         q["report_key"] = report_key
@@ -1644,18 +1647,31 @@ async def list_presets(report_key: str | None = None, user: dict = Depends(requi
 
 
 async def _pin_room(user: dict, pinned: bool, except_id: str | None = None):
-    if pinned and await db.report_presets.count_documents({"user_id": user["id"], "pinned": True, "id": {"$ne": except_id}}) >= 6:
+    if (
+        pinned
+        and await db.report_presets.count_documents({"user_id": user["id"], "pinned": True, "id": {"$ne": except_id}})
+        >= 6
+    ):
         raise ApiError(409, "Home holds up to 6 pinned views — unpin one first", "PIN_LIMIT")
 
 
 @router.post("/presets", status_code=201)
-async def create_preset(body: PresetIn, request: Request, user: dict = Depends(require_any("reports.collections.view", "reports.outstanding.view"))):
+async def create_preset(
+    body: PresetIn,
+    request: Request,
+    user: dict = Depends(require_any("reports.collections.view", "reports.outstanding.view")),
+):
     from reports_v3.registry import REGISTRY
 
     if body.report_key not in {r["key"] for r in REPORTS} | set(REGISTRY):
         raise ApiError(422, "Unknown report", "VALIDATION_ERROR")
     await _pin_room(user, body.pinned)
-    doc = {**base_doc(user, user["company_id"]), "user_id": user["id"], "created_by_name": user.get("name"), **body.model_dump()}
+    doc = {
+        **base_doc(user, user["company_id"]),
+        "user_id": user["id"],
+        "created_by_name": user.get("name"),
+        **body.model_dump(),
+    }
     await db.report_presets.insert_one(doc)
     doc.pop("_id", None)
     await write_audit(
@@ -1665,7 +1681,9 @@ async def create_preset(body: PresetIn, request: Request, user: dict = Depends(r
 
 
 @router.delete("/presets/{preset_id}")
-async def delete_preset(preset_id: str, user: dict = Depends(require_any("reports.collections.view", "reports.outstanding.view"))):
+async def delete_preset(
+    preset_id: str, user: dict = Depends(require_any("reports.collections.view", "reports.outstanding.view"))
+):
     r = await db.report_presets.delete_one({"id": preset_id, "user_id": user["id"]})
     if not r.deleted_count:
         raise ApiError(404, "Preset not found", "NOT_FOUND")
@@ -1679,7 +1697,11 @@ class PresetPatchIn(StrictModel):
 
 
 @router.patch("/presets/{preset_id}")
-async def rename_preset(preset_id: str, body: PresetPatchIn, user: dict = Depends(require_any("reports.collections.view", "reports.outstanding.view"))):
+async def rename_preset(
+    preset_id: str,
+    body: PresetPatchIn,
+    user: dict = Depends(require_any("reports.collections.view", "reports.outstanding.view")),
+):
     upd = {k: v for k, v in body.model_dump().items() if v is not None}
     if "name" in upd:
         upd["name"] = upd["name"].strip()

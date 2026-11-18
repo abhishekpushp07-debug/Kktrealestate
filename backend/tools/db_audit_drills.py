@@ -1,3 +1,5 @@
+# ruff: noqa: B023 — every drill lambda is called by both() inside its own loop iteration
+
 """Phase 3G race / stale-window / startup drills (REQ-296, 313, 314, JRN-124…130, 137, 138). THROW-AWAY copy only.
 
     python -m tools.db_audit_drills setup              # kkt_volume → kkt_audit_scratch
@@ -41,7 +43,9 @@ def mdb():
 
 def setup():
     MongoClient(URL).drop_database(SCRATCH)
-    dump = subprocess.Popen(["mongodump", f"--uri={URL}", f"--db={SRC}", "--archive", "--quiet"], stdout=subprocess.PIPE)
+    dump = subprocess.Popen(
+        ["mongodump", f"--uri={URL}", f"--db={SRC}", "--archive", "--quiet"], stdout=subprocess.PIPE
+    )
     subprocess.run(["mongorestore", f"--uri={URL}", "--archive", f"--nsFrom={SRC}.*", f"--nsTo={SCRATCH}.*", "--quiet"],
                    stdin=dump.stdout, check=True)  # fmt: skip
     dump.wait()
@@ -52,7 +56,18 @@ def start(port, extra=None, cpus=None):
     env = {**os.environ, "DB_NAME": SCRATCH, "LOGIN_RATE_LIMIT_BYPASS_TOKEN": BYPASS, "KKT_ROLE": "test",
            "BACKUP_ENABLED": "0", "DEMO_AUTO_REFRESH": "false", "ACCESS_TOKEN_MINUTES": "120", **(extra or {})}  # fmt: skip
     env.pop("REDIS_URL", None) if not (extra or {}).get("REDIS_URL") else None
-    cmd = [sys.executable, "-m", "uvicorn", "server:app", "--host", "127.0.0.1", "--port", str(port), "--log-level", "warning"]
+    cmd = [
+        sys.executable,
+        "-m",
+        "uvicorn",
+        "server:app",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        str(port),
+        "--log-level",
+        "warning",
+    ]
     if cpus:
         cmd = ["taskset", "-c", cpus] + cmd
     log = open(f"/tmp/kkt_drill_{port}.log", "w")
@@ -115,7 +130,14 @@ def modes(c):
 
 
 def pay_body(bid, md, amount=1000, mode="CASH"):
-    b = {"booking_id": bid, "amount": amount, "payment_date": TODAY, "payment_mode_id": md[mode], "allocation": "auto", "remarks": "drill"}
+    b = {
+        "booking_id": bid,
+        "amount": amount,
+        "payment_date": TODAY,
+        "payment_mode_id": md[mode],
+        "allocation": "auto",
+        "remarks": "drill",
+    }
     if mode != "CASH":
         b["bank_account_id"] = mdb().bank_accounts.find_one({"is_active": True})["id"]
         b["instrument"] = {"number": uuid.uuid4().hex[:6], "date": TODAY, "bank_name": "SBI"}
@@ -136,19 +158,36 @@ def booking_checks(bid) -> list[str]:
     if len(seqs) != len(set(seqs)) or (seqs and seqs != list(range(seqs[0], seqs[0] + len(seqs)))):
         bad.append(f"ledger seqs {len(seqs)} rows / {len(set(seqs))} distinct")
     per = Counter()
-    for p in db.payments.find({"booking_id": bid, "status": "Cleared", "allocations.demand_id": {"$exists": True}}, {"allocations": 1}):
+    for p in db.payments.find(
+        {"booking_id": bid, "status": "Cleared", "allocations.demand_id": {"$exists": True}}, {"allocations": 1}
+    ):
         for a in p["allocations"]:
             if a.get("demand_id"):
                 per[a["demand_id"]] += a["amount_paise"]
     for d in db.demands.find({"id": {"$in": list(per)}}, {"id": 1, "total_demand_paise": 1, "demand_number": 1}):
         if per[d["id"]] > d["total_demand_paise"]:
             bad.append(f"bill {d['demand_number']} allocated {per[d['id']]} > {d['total_demand_paise']}")
-    b = db.bookings.find_one({"id": bid}, {"summary": 1, "cash_agreed_paise": 1, "account_agreed_paise": 1, "status": 1})
+    b = db.bookings.find_one(
+        {"id": bid}, {"summary": 1, "cash_agreed_paise": 1, "account_agreed_paise": 1, "status": 1}
+    )
     s = b.get("summary") or {}
-    if s.get("cash_paid_paise", 0) > b["cash_agreed_paise"] or s.get("account_paid_paise", 0) > b["account_agreed_paise"]:
+    if (
+        s.get("cash_paid_paise", 0) > b["cash_agreed_paise"]
+        or s.get("account_paid_paise", 0) > b["account_agreed_paise"]
+    ):
         bad.append("bucket paid above agreed")
-    cleared = sum(p["amount_paise"] for p in db.payments.find({"booking_id": bid, "status": "Cleared", "against": "FLAT_VALUE"}, {"amount_paise": 1}))
-    if b["status"] == "Active" and s.get("paid_paise") is not None and abs(s["paid_paise"] - cleared) > 0 and not db.payments.find_one({"booking_id": bid, "allocations.kind": "OTHER_CHARGE"}):
+    cleared = sum(
+        p["amount_paise"]
+        for p in db.payments.find(
+            {"booking_id": bid, "status": "Cleared", "against": "FLAT_VALUE"}, {"amount_paise": 1}
+        )
+    )
+    if (
+        b["status"] == "Active"
+        and s.get("paid_paise") is not None
+        and abs(s["paid_paise"] - cleared) > 0
+        and not db.payments.find_one({"booking_id": bid, "allocations.kind": "OTHER_CHARGE"})
+    ):
         bad.append(f"summary paid {s['paid_paise']} != Σ cleared {cleared}")
     return bad
 
@@ -169,7 +208,12 @@ def races(label, reps):
         ra, rb = both(lambda: A.post("/api/payments", json=pay_body(bid, md), headers=h),
                       lambda: B.post("/api/payments", json=pay_body(bid, md), headers=h))  # fmt: skip
         n = db.payments.count_documents({"idempotency_key": key})
-        same = isinstance(ra, httpx.Response) and isinstance(rb, httpx.Response) and ra.status_code == rb.status_code == 201 and ra.json().get("receipt_number") == rb.json().get("receipt_number")
+        same = (
+            isinstance(ra, httpx.Response)
+            and isinstance(rb, httpx.Response)
+            and ra.status_code == rb.status_code == 201
+            and ra.json().get("receipt_number") == rb.json().get("receipt_number")
+        )
         out[f"receipts={n} codes={code(ra)}/{code(rb)} same_receipt={same}"] += 1
         out["integrity_bad"] += bool(booking_checks(bid))
     res["R1 same receipt + same key at once"] = dict(out)
@@ -198,8 +242,14 @@ def races(label, reps):
                       lambda: B.post(f"/api/bookings/{bid}/cancel", json={"reason": "drill cancel", "version": v}))  # fmt: skip
         b = db.bookings.find_one({"id": bid}, {"status": 1, "cancellation": 1})
         received_rec = (b.get("cancellation") or {}).get("received_paise")
-        cleared = sum(p["amount_paise"] for p in db.payments.find({"booking_id": bid, "status": "Cleared"}, {"amount_paise": 1}))
-        ok = b["status"] != "Cancelled" or received_rec == cleared or db.payments.count_documents({"booking_id": bid, "remarks": "drill", "status": "Cleared"}) == 0
+        cleared = sum(
+            p["amount_paise"] for p in db.payments.find({"booking_id": bid, "status": "Cleared"}, {"amount_paise": 1})
+        )
+        ok = (
+            b["status"] != "Cancelled"
+            or received_rec == cleared
+            or db.payments.count_documents({"booking_id": bid, "remarks": "drill", "status": "Cleared"}) == 0
+        )
         out[f"codes pay/cancel={code(ra)}/{code(rb)} accounted={ok}"] += 1
         if not ok and len(ex) < 3:
             ex.append({"booking": bid, "cancellation_received": received_rec, "cleared_now": cleared})
@@ -210,7 +260,9 @@ def races(label, reps):
     ex = []
     for i in range(reps):
         bid = bks[3 * reps + i] if 3 * reps + i < len(bks) else bks[i]
-        chq = A.post("/api/payments", json=pay_body(bid, md, 1000, "CHEQUE"), headers={"Idempotency-Key": uuid.uuid4().hex})
+        chq = A.post(
+            "/api/payments", json=pay_body(bid, md, 1000, "CHEQUE"), headers={"Idempotency-Key": uuid.uuid4().hex}
+        )
         if chq.status_code != 201:
             out[f"cheque post {chq.status_code}"] += 1
             continue
@@ -226,18 +278,35 @@ def races(label, reps):
 
     # R3 two bookings on one flat at once
     out = Counter()
-    flats = [f for f in db.flats.find({"status": "Available", "is_active": {"$ne": False}, "price_paise": {"$gt": 0}}, {"_id": 0, "id": 1, "project_id": 1, "block_id": 1, "price_paise": 1}).limit(reps * 3)]
-    cust = A.post("/api/customers", json={"full_name": "Drill Buyer", "phone": "+919000000777", "source": "Walk-in"}, headers={"Idempotency-Key": uuid.uuid4().hex}).json()
+    flats = [
+        f
+        for f in db.flats.find(
+            {"status": "Available", "is_active": {"$ne": False}, "price_paise": {"$gt": 0}},
+            {"_id": 0, "id": 1, "project_id": 1, "block_id": 1, "price_paise": 1},
+        ).limit(reps * 3)
+    ]
+    cust = A.post(
+        "/api/customers",
+        json={"full_name": "Drill Buyer", "phone": "+919000000777", "source": "Walk-in"},
+        headers={"Idempotency-Key": uuid.uuid4().hex},
+    ).json()
     done = 0
     for f in flats:
         if done >= reps:
             break
         plans = A.get(f"/api/projects/{f['project_id']}/blocks/{f['block_id']}/payment-plans").json().get("items") or []
         price = f["price_paise"] / 100
-        pre = A.post("/api/bookings/breakdown-preview", json={"flat_id": f["id"], "agreement_value": price, "has_plan": bool(plans)})
+        pre = A.post(
+            "/api/bookings/breakdown-preview",
+            json={"flat_id": f["id"], "agreement_value": price, "has_plan": bool(plans)},
+        )
         if pre.status_code != 200 or not plans:
             continue
-        oc = [{k: x.get(k) for k in ("charge_type_id", "name", "source", "amount", "gst_percent", "demand_at")} for x in pre.json()["charges"] if x.get("code") != "AGR_GST"]
+        oc = [
+            {k: x.get(k) for k in ("charge_type_id", "name", "source", "amount", "gst_percent", "demand_at")}
+            for x in pre.json()["charges"]
+            if x.get("code") != "AGR_GST"
+        ]
         body = {"flat_id": f["id"], "customer_id": cust["id"], "booking_date": TODAY, "agreement_value": price, "cash_agreed": 0,
                 "account_agreed": price, "payment_plan_id": plans[0]["id"], "other_charges": oc, "agreement_gst_percent": 5, "remarks": "drill"}  # fmt: skip
         before_d = db.demands.count_documents({"flat_id": f["id"]})
@@ -256,23 +325,44 @@ def races(label, reps):
     # R4 same waiver approved twice at once; R5 two waivers approved at once
     out4, out5 = Counter(), Counter()
     sales = client(PORTS[0], "accounts@kkt.in")
-    wb = [b["id"] for b in db.bookings.find({"status": "Active", "summary.account_due_paise": {"$gt": 100000}}, {"id": 1}).limit(reps * 3)]
+    wb = [
+        b["id"]
+        for b in db.bookings.find({"status": "Active", "summary.account_due_paise": {"$gt": 100000}}, {"id": 1}).limit(
+            reps * 3
+        )
+    ]
     for i in range(reps):
         bid = wb[i % len(wb)]
-        mk = lambda: sales.post("/api/waivers", json={"booking_id": bid, "target": {"kind": "share", "share": "Account"}, "amount": 10, "reason": "drill waiver"})
+        mk = lambda: sales.post(
+            "/api/waivers",
+            json={
+                "booking_id": bid,
+                "target": {"kind": "share", "share": "Account"},
+                "amount": 10,
+                "reason": "drill waiver",
+            },
+        )
         w1 = mk()
         if w1.status_code != 201:
             out4[f"request {w1.status_code} {str(msg(w1))[:60]}"] += 1
             continue
         wid = w1.json()["id"]
         ra, rb = both(lambda: A.post(f"/api/waivers/{wid}/approve"), lambda: B.post(f"/api/waivers/{wid}/approve"))
-        audits = db.audit_logs.count_documents({"action": {"$in": ["waiver.approve", "waiver.self_approve"]}, "after.waiver_number": w1.json()["waiver_number"]})
+        audits = db.audit_logs.count_documents(
+            {
+                "action": {"$in": ["waiver.approve", "waiver.self_approve"]},
+                "after.waiver_number": w1.json()["waiver_number"],
+            }
+        )
         loser = rb if code(ra) == 200 else ra
         out4[f"codes={code(ra)}/{code(rb)} approval_audits={audits}"] += 1
         out4[f"loser says: {str(msg(loser))[:60]}"] += 1
         x, y = mk(), mk()
         if x.status_code == 201 and y.status_code == 201:
-            ra, rb = both(lambda: A.post(f"/api/waivers/{x.json()['id']}/approve"), lambda: B.post(f"/api/waivers/{y.json()['id']}/approve"))
+            ra, rb = both(
+                lambda: A.post(f"/api/waivers/{x.json()['id']}/approve"),
+                lambda: B.post(f"/api/waivers/{y.json()['id']}/approve"),
+            )
             cns = [db.waivers.find_one({"id": w.json()["id"]}).get("cn_number") for w in (x, y)]
             out5[f"codes={code(ra)}/{code(rb)} distinct_cn={len(set(cns)) == 2 and None not in cns}"] += 1
         # approve vs reject at once
@@ -284,7 +374,15 @@ def races(label, reps):
             out4[f"approve/reject codes={code(ra)}/{code(rb)} final={st['status']} cn={bool(st.get('cn_number'))}"] += 1
     res["R4 same waiver approved twice at once (+ approve vs reject)"] = dict(out4)
     res["R5 two waivers approved at once"] = dict(out5)
-    cn_dups = list(db.waivers.aggregate([{"$match": {"cn_number": {"$type": "string"}}}, {"$group": {"_id": "$cn_number", "n": {"$sum": 1}}}, {"$match": {"n": {"$gt": 1}}}]))
+    cn_dups = list(
+        db.waivers.aggregate(
+            [
+                {"$match": {"cn_number": {"$type": "string"}}},
+                {"$group": {"_id": "$cn_number", "n": {"$sum": 1}}},
+                {"$match": {"n": {"$gt": 1}}},
+            ]
+        )
+    )
     res["R5 duplicate credit-note numbers"] = len(cn_dups)
 
     # R6 stage completed twice at once
@@ -304,9 +402,27 @@ def races(label, reps):
         ra, rb = both(lambda: A.post(f"/api/blocks/{blk['id']}/construction/stage", json=body),
                       lambda: B.post(f"/api/blocks/{blk['id']}/construction/stage", json=body))  # fmt: skip
         raised = db.demands.count_documents({"block_id": blk["id"], "voided": False}) - before
-        dup = list(db.demands.aggregate([{"$match": {"block_id": blk["id"], "voided": False}}, {"$group": {"_id": {"b": "$booking_id", "s": "$installment_seq"}, "n": {"$sum": 1}}}, {"$match": {"n": {"$gt": 1}}}]))
-        gst_parts = list(db.bookings.aggregate([{"$match": {"block_id": blk["id"], "status": "Active"}}, {"$unwind": "$other_charges"}, {"$unwind": "$other_charges.demand_history"},
-                                                {"$match": {"other_charges.demand_history.stage_id": sid}}, {"$group": {"_id": {"b": "$id", "l": "$other_charges.line_id"}, "n": {"$sum": 1}}}, {"$match": {"n": {"$gt": 1}}}]))  # fmt: skip
+        dup = list(
+            db.demands.aggregate(
+                [
+                    {"$match": {"block_id": blk["id"], "voided": False}},
+                    {"$group": {"_id": {"b": "$booking_id", "s": "$installment_seq"}, "n": {"$sum": 1}}},
+                    {"$match": {"n": {"$gt": 1}}},
+                ]
+            )
+        )
+        gst_parts = list(
+            db.bookings.aggregate(
+                [
+                    {"$match": {"block_id": blk["id"], "status": "Active"}},
+                    {"$unwind": "$other_charges"},
+                    {"$unwind": "$other_charges.demand_history"},
+                    {"$match": {"other_charges.demand_history.stage_id": sid}},
+                    {"$group": {"_id": {"b": "$id", "l": "$other_charges.line_id"}, "n": {"$sum": 1}}},
+                    {"$match": {"n": {"$gt": 1}}},
+                ]
+            )
+        )
         out[f"codes={code(ra)}/{code(rb)} dup_bills={len(dup)} dup_gst_parts={len(gst_parts)}"] += 1
         out["bills_raised_total"] += raised
         out["bookings_in_towers"] += nb
@@ -333,8 +449,20 @@ def races(label, reps):
 
 
 # ---------------------------------------------------------------- stale window (2 processes)
-VOLATILE = ("computed_at", "generated_at", "data_age", "took_ms", "ms", "server_time", "etag", "cached", "age_s", "stamp", "greeting_date",
-            "recent_audit")  # activity feed: background jobs add rows on their own
+VOLATILE = (
+    "computed_at",
+    "generated_at",
+    "data_age",
+    "took_ms",
+    "ms",
+    "server_time",
+    "etag",
+    "cached",
+    "age_s",
+    "stamp",
+    "greeting_date",
+    "recent_audit",
+)  # activity feed: background jobs add rows on their own
 
 
 def _clean(x):
@@ -356,10 +484,18 @@ SURFACES = [
     ("Customer 360", "/api/customers/{cid}", lambda j, ctx: fpj(j)),
     ("Bills raised", "/api/demands/register?booking_id={bid}&page_size=50", lambda j, ctx: fpj(j)),
     ("Outstanding", "/api/reports/outstanding-v2", lambda j, ctx: fpj(j.get("totals", j))),
-    ("Collections", "/api/reports/collections-v2?from_date={fy0}&to_date={today}", lambda j, ctx: fpj(j.get("totals", j))),
+    (
+        "Collections",
+        "/api/reports/collections-v2?from_date={fy0}&to_date={today}",
+        lambda j, ctx: fpj(j.get("totals", j)),
+    ),
     ("Customer status", "/api/reports/v3/customer-status", lambda j, ctx: fpj(j.get("totals", j))),
     ("Bills vs Collection", "/api/reports/v3/bills-vs-collection", lambda j, ctx: fpj(j.get("totals", j))),
-    ("Payments list", "/api/payments?booking_id={bid}&page_size=50", lambda j, ctx: fpj([x.get("receipt_number") for x in j.get("items", [])])),
+    (
+        "Payments list",
+        "/api/payments?booking_id={bid}&page_size=50",
+        lambda j, ctx: fpj([x.get("receipt_number") for x in j.get("items", [])]),
+    ),
     ("Dashboard", "/api/dashboard", lambda j, ctx: fpj(j)),
 ]
 
@@ -389,7 +525,11 @@ def stale(label, reps, redis_url=None):
             kind = ("receipt", "waiver approve", "stage complete")[i % 3]
             bid = bks[i // 3]
             if kind == "waiver approve":
-                bid = db.bookings.find({"status": "Active", "summary.account_due_paise": {"$gt": 100000}}, {"id": 1}).skip(i).limit(1)[0]["id"]
+                bid = (
+                    db.bookings.find({"status": "Active", "summary.account_due_paise": {"$gt": 100000}}, {"id": 1})
+                    .skip(i)
+                    .limit(1)[0]["id"]
+                )
             if kind == "stage complete":
                 blk = None
                 for b in db.blocks.find({}, {"_id": 0, "id": 1}):
@@ -406,13 +546,26 @@ def stale(label, reps, redis_url=None):
             _read_all(B, ctx)  # warm B's caches with the old figures
             _read_all(B, ctx)
             if kind == "receipt":
-                r = A.post("/api/payments", json=pay_body(bid, md, 1000 + i), headers={"Idempotency-Key": uuid.uuid4().hex})
+                r = A.post(
+                    "/api/payments", json=pay_body(bid, md, 1000 + i), headers={"Idempotency-Key": uuid.uuid4().hex}
+                )
             elif kind == "waiver approve":
-                w = acc.post("/api/waivers", json={"booking_id": bid, "target": {"kind": "share", "share": "Account"}, "amount": 10 + i, "reason": "drill stale"})
+                w = acc.post(
+                    "/api/waivers",
+                    json={
+                        "booking_id": bid,
+                        "target": {"kind": "share", "share": "Account"},
+                        "amount": 10 + i,
+                        "reason": "drill stale",
+                    },
+                )
                 _read_all(B, ctx)
                 r = A.post(f"/api/waivers/{w.json()['id']}/approve") if w.status_code == 201 else w
             else:
-                r = A.post(f"/api/blocks/{blk}/construction/stage", json={"stage_id": sid, "completed_on": TODAY, "notes": "drill stale"})
+                r = A.post(
+                    f"/api/blocks/{blk}/construction/stage",
+                    json={"stage_id": sid, "completed_on": TODAY, "notes": "drill stale"},
+                )
             assert r.status_code in (200, 201), r.text[:200]
             truth = _read_all(A, ctx)  # what A shows right after its own write
             t0 = time.monotonic()
@@ -432,7 +585,10 @@ def stale(label, reps, redis_url=None):
                                           json.loads(truth[k]) if truth[k].startswith(("{", "[")) else truth[k])  # fmt: skip
             rows.append({"action": kind, **secs})
         summary = {k: sorted({str(r[k]) for r in rows if k in r}) for k in SURFACES_NAMES()}
-        save(f"stale_{label}{'_redis' if redis_url else ''}", {"reps": reps, "redis": bool(redis_url), "per_surface_seconds": summary, "rows": rows})
+        save(
+            f"stale_{label}{'_redis' if redis_url else ''}",
+            {"reps": reps, "redis": bool(redis_url), "per_surface_seconds": summary, "rows": rows},
+        )
     finally:
         [p.kill() for p in procs]
 

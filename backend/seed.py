@@ -568,8 +568,14 @@ async def seed():
                         "updated_at": now_iso(),
                         # 3G: the demo seed obeys the owner rule too — a Hold always carries an explicit expiry
                         **(
-                            {"hold": {"note": reason, "expires_at": (datetime.now(UTC) + timedelta(days=15)).isoformat(),
-                                      "created_at": now_iso(), "created_by": None}}  # fmt: skip
+                            {
+                                "hold": {
+                                    "note": reason,
+                                    "expires_at": (datetime.now(UTC) + timedelta(days=15)).isoformat(),
+                                    "created_at": now_iso(),
+                                    "created_by": None,
+                                }
+                            }  # fmt: skip
                             if status == "Hold"
                             else {}
                         ),

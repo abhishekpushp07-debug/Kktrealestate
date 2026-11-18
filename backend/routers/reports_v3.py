@@ -29,7 +29,9 @@ def _spec(key: str, user: dict) -> dict:
     if not spec:
         raise ApiError(404, "Unknown report", "NOT_FOUND")
     if not can_open(spec, user["permissions"]):
-        raise ApiError(403, f"Missing permission: {spec['permission']}", "PERMISSION_DENIED", {"missing": spec["permission"]})
+        raise ApiError(
+            403, f"Missing permission: {spec['permission']}", "PERMISSION_DENIED", {"missing": spec["permission"]}
+        )
     return {**spec, "key": REDIRECTS.get(key, key)}
 
 
@@ -91,7 +93,9 @@ def _params(spec: dict, request: Request) -> dict:
 
 
 # writes that never change report data (reminder runs, generated PDFs, messages, sign-ins) don't bust the cache
-_NOISE = re.compile(r"^(reminder\.|document\.generated|message\.|notification\.|auth\.|login|report\.|export\.|session\.)")
+_NOISE = re.compile(
+    r"^(reminder\.|document\.generated|message\.|notification\.|auth\.|login|report\.|export\.|session\.)"
+)
 
 
 async def _data_stamp() -> str:
@@ -105,7 +109,11 @@ async def _rows(spec: dict, user: dict, as_of: date, p: dict | None = None) -> l
     """Provider rows cached per scope + as-of + pushed-down filters + data stamp (any write anywhere → recompute)."""
     stamp = await _data_stamp()
     push = {k: (p or {}).get(k) for k in spec.get("pushdown", [])}
-    push |= {f["key"]: (p or {}).get(f["key"]) for f in spec["filters"] if f.get("pushdown") and f["kind"] in ("choice", "multi")}
+    push |= {
+        f["key"]: (p or {}).get(f["key"])
+        for f in spec["filters"]
+        if f.get("pushdown") and f["kind"] in ("choice", "multi")
+    }
     from services.inventory import can_see_real
 
     # real vs display inventory layer is part of the key: a Sales viewer never reads a privileged viewer's rows
@@ -119,7 +127,8 @@ async def _run(spec: dict, user: dict, p: dict) -> dict:
     """The filtered / sorted / totalled result is cached per viewer + params + data stamp, so a repeat (or the next page)
     only slices; any write anywhere changes the stamp and recomputes."""
     stamp = await _data_stamp()
-    key = f"rpt3res:{spec['key']}:{user['id']}:{stamp}:{clock.today()}:{json.dumps({k: v for k, v in p.items() if k not in ('page', 'page_size')}, default=str, sort_keys=True)}"
+    filt = json.dumps({k: v for k, v in p.items() if k not in ("page", "page_size")}, default=str, sort_keys=True)
+    key = f"rpt3res:{spec['key']}:{user['id']}:{stamp}:{clock.today()}:{filt}"
     return await ttlcache.cached(key, 600, lambda: _compute(spec, user, p), stamped=True)
 
 
@@ -152,12 +161,13 @@ async def _compute(spec: dict, user: dict, p: dict) -> dict:
         "options": opts,
         "sentence": E.sentence(spec, p, opts, len(got), p["as_of"] if spec.get("date_mode") == "as_of" else None),
         "formula": spec["formula"](tot) if money or spec.get("public_money") else None,
-        "illustration": spec["illustration"](got, tot) if money or spec.get("public_money") or spec.get("illus_always") else None,
+        "illustration": spec["illustration"](got, tot)
+        if money or spec.get("public_money") or spec.get("illus_always")
+        else None,
     }
 
 
 def _meta(spec: dict, user: dict) -> dict:
-    money = E.MONEY_PERM in user["permissions"]
     return {
         "key": spec["key"],
         "segment": spec["segment"],
@@ -171,7 +181,8 @@ def _meta(spec: dict, user: dict) -> dict:
         "columns": E.allowed_columns(spec, user),
         "filters": [{k: v for k, v in f.items() if k not in ("field", "label_field")} for f in spec["filters"]],
         "groups": [{"key": g["key"], "label": g["label"]} for g in spec["groups"]],
-        "can_export": spec["export_permission"] in user["permissions"] or any(p in user["permissions"] for p in spec.get("export_any", ())),
+        "can_export": spec["export_permission"] in user["permissions"]
+        or any(p in user["permissions"] for p in spec.get("export_any", ())),
     }
 
 
@@ -184,7 +195,11 @@ def _strip_tree(tree: list[dict], cols) -> list[dict]:
     out = []
     for g in tree:
         n = {k: v for k, v in g.items() if k not in ("children", "rows")}
-        n |= {"children": _strip_tree(g["children"], cols)} if "children" in g else {"rows": [_strip(r, cols) for r in g["rows"]]}
+        n |= (
+            {"children": _strip_tree(g["children"], cols)}
+            if "children" in g
+            else {"rows": [_strip(r, cols) for r in g["rows"]]}
+        )
         out.append(n)
     return out
 
@@ -206,7 +221,11 @@ async def hub(user: dict = Depends(get_current_user)):
         elif key == "customer-status" and E.MONEY_PERM in perms:
             rows = [r for r in await _rows({**spec, "key": key}, user, today) if r.get("live")]
             due = sum(r["account_dues"] + r["cash_dues"] for r in rows)
-            out |= {"headline": inr(due), "headline_paise": due, "caption": f"instalment dues · {len(rows):,} live bookings · today"}
+            out |= {
+                "headline": inr(due),
+                "headline_paise": due,
+                "caption": f"instalment dues · {len(rows):,} live bookings · today",
+            }
         elif spec:
             sp = {**spec, "key": key}
             dp = {}
@@ -221,10 +240,23 @@ async def hub(user: dict = Depends(get_current_user)):
                 v = E.totals(sp, rows).get(key_)
                 if col["type"] == "money":
                     out["headline_paise"] = v or 0
-                fig = inr(v or 0) if col["type"] == "money" else f"{v}%" if col["type"] == "pct" and v is not None else f"{v or 0:,}"
-                out |= {"headline": fig, "caption": f"{cap or col['label'].lower()} · {len(rows):,} {spec['unit'][1]}" + (" · this FY" if dp else "")}
+                fig = (
+                    inr(v or 0)
+                    if col["type"] == "money"
+                    else f"{v}%"
+                    if col["type"] == "pct" and v is not None
+                    else f"{v or 0:,}"
+                )
+                out |= {
+                    "headline": fig,
+                    "caption": f"{cap or col['label'].lower()} · {len(rows):,} {spec['unit'][1]}"
+                    + (" · this FY" if dp else ""),
+                }
             else:
-                out |= {"headline": f"{len(rows):,}", "caption": f"{spec['unit'][1]} · " + ("this FY" if dp else "today")}
+                out |= {
+                    "headline": f"{len(rows):,}",
+                    "caption": f"{spec['unit'][1]} · " + ("this FY" if dp else "today"),
+                }
         return out
 
     segs = []
@@ -232,13 +264,35 @@ async def hub(user: dict = Depends(get_current_user)):
         tiles = [x for x in [await tile(t) for t in CATALOGUE[s]] if x]
         if tiles:
             fig = next((t for t in tiles if t.get("headline_paise") is not None), None)
-            segs.append({"segment": s, "tiles": tiles, "summary": f"{len(tiles)} reports" + (f" · {fig['caption'].split(' · ')[0]} {fig['headline']}" if fig else ""), "figure": fig and {"label": fig["caption"].split(" · ")[0], "paise": fig["headline_paise"]}})
+            segs.append(
+                {
+                    "segment": s,
+                    "tiles": tiles,
+                    "summary": f"{len(tiles)} reports"
+                    + (f" · {fig['caption'].split(' · ')[0]} {fig['headline']}" if fig else ""),
+                    "figure": fig and {"label": fig["caption"].split(" · ")[0], "amount_paise": fig["headline_paise"]},
+                }
+            )
     ctrl = [x for x in [await tile(t) for t in CONTROL_ROOM] if x]
-    views = await db.report_presets.find(
-        {"$or": [{"user_id": user["id"]}, {"shared": True, "company_id": user["company_id"]}], "report_key": {"$in": list(REGISTRY)}},
-        {"_id": 0},
-    ).sort("name", 1).to_list(200)
-    return {"segments": segs, "control_room": ctrl, "views": views, "as_of": today.isoformat(), "count": sum(len(s["tiles"]) for s in segs), "one_click": "customer-status" if "customer-status" in {t["key"] for s in segs for t in s["tiles"]} else None}
+    views = (
+        await db.report_presets.find(
+            {
+                "$or": [{"user_id": user["id"]}, {"shared": True, "company_id": user["company_id"]}],
+                "report_key": {"$in": list(REGISTRY)},
+            },
+            {"_id": 0},
+        )
+        .sort("name", 1)
+        .to_list(200)
+    )
+    return {
+        "segments": segs,
+        "control_room": ctrl,
+        "views": views,
+        "as_of": today.isoformat(),
+        "count": sum(len(s["tiles"]) for s in segs),
+        "one_click": "customer-status" if "customer-status" in {t["key"] for s in segs for t in s["tiles"]} else None,
+    }
 
 
 @router.get("/{key}")
@@ -251,7 +305,9 @@ async def report(key: str, request: Request, user: dict = Depends(get_current_us
     body = {
         "meta": _meta(spec, user),
         "as_of": p["as_of"].isoformat(),
-        "defaults": {k: p[k] for k in ("period_from", "period_to", "_default_period") if p.get("_default_period") and k in p},
+        "defaults": {
+            k: p[k] for k in ("period_from", "period_to", "_default_period") if p.get("_default_period") and k in p
+        },
         "count": len(rows),
         "page": page,
         "page_size": size,
@@ -261,13 +317,22 @@ async def report(key: str, request: Request, user: dict = Depends(get_current_us
         body["groups"] = _strip_tree(E.group_tree(spec, rows, p["group"]), cols)
     else:
         body["rows"] = [_strip(r, cols) for r in rows[(page - 1) * size : page * size]]
-    return Response(json.dumps(body, default=str), media_type="application/json", headers={"Cache-Control": "private, no-cache"})
+    return Response(
+        json.dumps(body, default=str), media_type="application/json", headers={"Cache-Control": "private, no-cache"}
+    )
 
 
 async def _export(key: str, request: Request, user: dict, fmt: str) -> Response:
     spec = _spec(key, user)
-    if spec["export_permission"] not in user["permissions"] and not any(p in user["permissions"] for p in spec.get("export_any", ())):
-        raise ApiError(403, f"Missing permission: {spec['export_permission']}", "PERMISSION_DENIED", {"missing": spec["export_permission"]})
+    if spec["export_permission"] not in user["permissions"] and not any(
+        p in user["permissions"] for p in spec.get("export_any", ())
+    ):
+        raise ApiError(
+            403,
+            f"Missing permission: {spec['export_permission']}",
+            "PERMISSION_DENIED",
+            {"missing": spec["export_permission"]},
+        )
     p = _params(spec, request)
     out = dict(await _run(spec, user, p))  # the cached result is shared; never mutate it
     rows, cols = out["rows_all"], out["cols"]

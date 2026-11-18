@@ -417,7 +417,9 @@ def overdue_days(
     """REQ-209: days past due of the oldest unpaid overdue line (instalment share or other-charge part) — the one
     'overdue N days' figure for card, customer page, booking page, Call today and reminders.
     REQ-278: for a past date pass the share state of that date as `summary` and billed_by=as_of."""
-    late = [_oldest_late(lines, unpaid, as_of) for lines, unpaid in _share_lines(summary, demands, other_charges, billed_by)]
+    late = [
+        _oldest_late(lines, unpaid, as_of) for lines, unpaid in _share_lines(summary, demands, other_charges, billed_by)
+    ]
     return max(((as_of - date.fromisoformat(x[:10])).days for x in late if x), default=0)
 
 
@@ -448,7 +450,13 @@ def final_status(
     if due > 0:
         days = overdue_days(summary, demands, other_charges, as_of, billed_by)
         nxt = min((x for x in (_oldest_late(l, u, as_of, False) for l, u in lines) if x), default=None)
-        return {"kind": "overdue" if days else "due", "days": days, "due_on": nxt, "advance_paise": adv, "due_paise": due}
+        return {
+            "kind": "overdue" if days else "due",
+            "days": days,
+            "due_on": nxt,
+            "advance_paise": adv,
+            "due_paise": due,
+        }
     return {"kind": "advance" if adv > 0 else "clear", "days": 0, "due_on": None, "advance_paise": adv, "due_paise": 0}
 
 
@@ -666,14 +674,18 @@ async def bill_settle_days(booking_ids: list[str], as_of: date) -> dict:
     cut = as_of.isoformat()
     bills: dict = {}
     q = {"booking_id": {"$in": booking_ids}, "voided": {"$ne": True}, "status": {"$ne": "Cancelled"}}
-    async for d in db.demands.find(q, {"_id": 0, "booking_id": 1, "due_date": 1, "demand_date": 1, "total_demand_paise": 1}):
+    async for d in db.demands.find(
+        q, {"_id": 0, "booking_id": 1, "due_date": 1, "demand_date": 1, "total_demand_paise": 1}
+    ):
         if (d.get("demand_date") or "") <= cut and d.get("due_date"):
             bills.setdefault(d["booking_id"], []).append((d["due_date"][:10], d.get("total_demand_paise") or 0))
     paid: dict = {}
     proj = {"_id": 0, "booking_id": 1, "date": 1, "cash_paid_cum_paise": 1, "account_paid_cum_paise": 1}
     cur = db.ledger_entries.find({"booking_id": {"$in": list(bills)}, "date": {"$lte": cut}}, proj)
     async for e in cur.sort([("booking_id", 1), ("seq", 1)]).batch_size(5000):
-        paid.setdefault(e["booking_id"], []).append((e["date"], (e.get("cash_paid_cum_paise") or 0) + (e.get("account_paid_cum_paise") or 0)))
+        paid.setdefault(e["booking_id"], []).append(
+            (e["date"], (e.get("cash_paid_cum_paise") or 0) + (e.get("account_paid_cum_paise") or 0))
+        )
     out = {}
     for bid, bl in bills.items():
         rows, cum, i, late = paid.get(bid, []), 0, 0, []

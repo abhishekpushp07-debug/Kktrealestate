@@ -1021,10 +1021,45 @@ async def _finish_interrupted_cancel(b: dict, user: dict, request: Request):
     from services.money_ops import create_refund
 
     canc = b["cancellation"]
+    ts = canc.get("at") or b.get("updated_at")
+    flat = await db.flats.find_one_and_update(
+        {"id": b["flat_id"], "booking_id": b["id"]},
+        {"$set": {"status": "Available", "booking_id": None, "status_changed_at": ts, "status_changed_by": user["id"]},
+         "$inc": {"version": 1}},
+        projection={"_id": 0},
+    )  # fmt: skip
+    if flat:
+        await apply_status_delta(b["block_id"], b["project_id"], flat["status"], "Available", None)
+        await write_audit(user, "flat.status", "flat", b["flat_id"], before={"status": flat["status"], "flat_number": b.get("flat_number")},
+                          after={"status": "Available", "reason": "Booking cancelled", "flat_number": b.get("flat_number")}, ip=client_ip(request))  # fmt: skip
+    await db.parking_slots.update_many(
+        {"booking_id": b["id"]},
+        [{"$set": {"status": {"$cond": [{"$eq": ["$flat_id", b["flat_id"]]}, "Attached", "Available"]}, "booking_id": None, "customer_id": None}}],
+    )  # fmt: skip
+    await db.demands.update_many(
+        {"booking_id": b["id"], "status": {"$nin": ["Paid", "Cancelled"]}}, {"$set": {"status": "Cancelled", "cancelled_at": ts}}
+    )  # fmt: skip
+    await db.generated_documents.update_many(
+        {"booking_id": b["id"], "voided": {"$ne": True}},
+        {"$set": {"voided": True, "voided_at": ts, "voided_by": user["id"], "voided_by_name": user["name"],
+                  "void_reason": f"Booking cancelled — {canc.get('reason', '')}"}},
+    )  # fmt: skip
+    if b.get("lead_id"):
+        await db.leads.update_one({"id": b["lead_id"]}, {"$set": {"status": "Lost", "lost_reason": "Booking cancelled", "updated_at": ts}})  # fmt: skip
+    if await db.refunds.find_one({"booking_id": b["id"]}, {"_id": 1}) or not canc.get("received_paise"):
+        from services import ttlcache
+
+        await rebuild(b["id"])
+        ttlcache.invalidate("dreg")
+        out = _present(await db.bookings.find_one({"id": b["id"]}, {"_id": 0}))
+        out["refund"] = None
+        return out
     policy = canc.get("policy") or await _policy(user["company_id"], b.get("project_id"))
     await rebuild(b["id"])
     fresh = await db.bookings.find_one({"id": b["id"]}, {"_id": 0})
-    rf = await create_refund(fresh, canc["deduction_paise"], user, policy, preview=canc, pre_summary=fresh.get("summary"))
+    rf = await create_refund(
+        fresh, canc["deduction_paise"], user, policy, preview=canc, pre_summary=fresh.get("summary")
+    )
     await auto_register(b["id"], ["cancellation"], user)
     await write_audit(user, "booking.cancel", "booking", b["id"], before={"status": "Active", "booking_number": b["booking_number"]},
                       after={"status": "Cancelled", "recovered": True, "booking_number": b["booking_number"]}, ip=client_ip(request))  # fmt: skip
@@ -1039,8 +1074,14 @@ async def _cancel_booking(booking_id: str, body: CancelIn, request: Request, use
     b = await _load(booking_id, user)
     if (
         b["status"] == "Cancelled"
-        and (b.get("cancellation") or {}).get("received_paise")
-        and not await db.refunds.find_one({"booking_id": booking_id}, {"_id": 1})
+        and b.get("cancellation")
+        and (
+            await db.flats.find_one({"id": b["flat_id"], "booking_id": booking_id}, {"_id": 1})
+            or (
+                b["cancellation"].get("received_paise")
+                and not await db.refunds.find_one({"booking_id": booking_id}, {"_id": 1})
+            )
+        )
     ):
         return await _finish_interrupted_cancel(b, user, request)
     if b["status"] != "Active":

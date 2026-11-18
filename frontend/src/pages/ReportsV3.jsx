@@ -40,14 +40,14 @@ function Tile({ t, head, nav }) {
 export default function ReportsHubV3() {
   const nav = useNavigate();
   const { data, loading } = useFetch("/reports/v3");
-  const legacy = useMemo(() => {
+  const legacyKeys = useMemo(() => {
     const keys = new Set();
     for (const s of data?.segments || [])
       for (const t of s.tiles) if (!t.live && t.legacy) keys.add(t.legacy);
     for (const t of data?.control_room || []) if (t.legacy) keys.add(t.legacy);
     return [...keys].map((key) => ({ key }));
   }, [data]);
-  const heads = useHeadlines(legacy);
+  const heads = useHeadlines(legacyKeys);
   if (loading || !data) return <Skeleton className="h-96 w-full" />;
   const one = data.segments.flatMap((s) => s.tiles).find((t) => t.key === data.one_click);
   return (
@@ -109,7 +109,7 @@ export default function ReportsHubV3() {
               data-testid={`hub-summary-${s.segment.toLowerCase().replace(/[^a-z]+/g, "-")}`}
             >
               {s.tiles.length} reports
-              {s.figure ? ` · ${s.figure.label} ${inrShort(s.figure.paise / 100)}` : ""}
+              {s.figure ? ` · ${s.figure.label} ${inrShort(s.figure.amount_paise / 100)}` : ""}
             </small>
           </p>
           <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">

@@ -27,7 +27,10 @@ async def _booking_dims(user: dict) -> tuple[dict, dict]:
     proj |= {"block_name": 1, "flat_id": 1, "flat_snapshot.flat_number": 1, "sales_user_id": 1, "customer_name": 1}
     bks = await db.bookings.find(q, proj).to_list(None)
     users = {u["id"]: u.get("name") async for u in db.users.find({}, {"_id": 0, "id": 1, "name": 1})}
-    floors = {f["id"]: f.get("floor") async for f in db.flats.find({"company_id": user["company_id"]}, {"_id": 0, "id": 1, "floor": 1})}
+    floors = {
+        f["id"]: f.get("floor")
+        async for f in db.flats.find({"company_id": user["company_id"]}, {"_id": 0, "id": 1, "floor": 1})
+    }
     by_no, by_id = {}, {}
     for b in bks:
         flat = (b.get("flat_snapshot") or {}).get("flat_number") or ""
@@ -86,6 +89,12 @@ def provider(path: str, fixed: dict | None = None, period: bool = False, push: t
 def columns(cols: list[tuple], hide: tuple = ()) -> list[dict]:
     """(key, label, legacy type[, width]) → engine columns; keys stay the existing report's keys."""
     return [
-        {"key": c[0], "label": c[1], "type": _TYPE.get(c[2], c[2]), "default": c[0] not in hide, "width": c[3] if len(c) > 3 else 12}
+        {
+            "key": c[0],
+            "label": c[1],
+            "type": _TYPE.get(c[2], c[2]),
+            "default": c[0] not in hide,
+            "width": c[3] if len(c) > 3 else 12,
+        }
         for c in cols
     ]

@@ -623,7 +623,9 @@ def main(base):
     _bookings_f4(g, tie, db, cid)
 
     def g_as(email):
-        t = requests.post(f"{A}/auth/login", json={"email": email, "password": DEMO_PASSWORD}, headers=BYPASS, timeout=20).json()["access_token"]
+        t = requests.post(
+            f"{A}/auth/login", json={"email": email, "password": DEMO_PASSWORD}, headers=BYPASS, timeout=20
+        ).json()["access_token"]
         return lambda p, **k: HTTP.get(A + p, headers={"Authorization": f"Bearer {t}"}, params=k, timeout=90).json()
 
     _inventory_f5(g, g_as("accounts@kkt.in"), tie, db, cid, g_as("sales@kkt.in"))
@@ -662,7 +664,8 @@ def _customer_status(g, tie, db, cid, live):
     """Phase 3F pilot (REQ-276…278): Customer status vs definitions, the customer card and the ledger."""
     import asyncio
 
-    from services import cards, definitions as D
+    from services import cards
+    from services import definitions as D
 
     loop = asyncio.new_event_loop()
     run = loop.run_until_complete
@@ -671,10 +674,20 @@ def _customer_status(g, tie, db, cid, live):
     d, rows = _v3_rows(g, R, cols=cols)
     t = d["totals"]
     raw = [D.outstanding(b.get("summary") or {}) for b in live]
-    tie(R, "Σ Account dues + Σ Cash dues == instalment outstanding", t["account_dues"] + t["cash_dues"], sum(o["cash_paise"] + o["account_paise"] for o in raw))
+    tie(
+        R,
+        "Σ Account dues + Σ Cash dues == instalment outstanding",
+        t["account_dues"] + t["cash_dues"],
+        sum(o["cash_paise"] + o["account_paise"] for o in raw),
+    )
     tie(R, "rows == live bookings", d["count"], len(live))
     ss = [b.get("summary") or {} for b in live]
-    tie(R, "Σ bills raised == Σ Cash + Account order raised", t["bills_raised"], sum(s.get("cash_order_raised_paise", 0) + s.get("account_order_raised_paise", 0) for s in ss))
+    tie(
+        R,
+        "Σ bills raised == Σ Cash + Account order raised",
+        t["bills_raised"],
+        sum(s.get("cash_order_raised_paise", 0) + s.get("account_order_raised_paise", 0) for s in ss),
+    )
     f = t["bills_raised"] - t["account_received"] - t["cash_received"] - t["waived"] + t["instalment_advance"]
     tie(R, "formula: raised − received − waived + advance == dues", f, t["account_dues"] + t["cash_dues"])
     full = {b["id"]: b for b in db.bookings.find({"id": {"$in": [b["id"] for b in live]}}, {"_id": 0})}
@@ -684,14 +697,37 @@ def _customer_status(g, tie, db, cid, live):
         bal = c["balance"]
         kind[bid] = ("overdue" if bal["overdue_days"] else "due") if bal["state"] == "due" else bal["state"]
     got = {r["booking_id"]: r for r in rows}
-    tie(R, "final status kind == customer card, every booking", sum(1 for b, k in kind.items() if got.get(b, {}).get("status_kind") != k), 0)
+    tie(
+        R,
+        "final status kind == customer card, every booking",
+        sum(1 for b, k in kind.items() if got.get(b, {}).get("status_kind") != k),
+        0,
+    )
     od = {b: c["balance"]["overdue_days"] for b, c in card.items()}
-    lab = sum(1 for b, n in od.items() if n and not (got.get(b, {}).get("final_status") or "").startswith(f"Overdue {n} day{'s' if n != 1 else ''}"))
+    lab = sum(
+        1
+        for b, n in od.items()
+        if n and not (got.get(b, {}).get("final_status") or "").startswith(f"Overdue {n} day{'s' if n != 1 else ''}")
+    )
     tie(R, "overdue days == customer card, every booking", lab, 0)
     today = clock.today()
     snap = run(D.shares_as_of(list(full), today))
-    keys = ("cash_due_paise", "account_due_paise", "other_charges_due_paise", "outstanding_paise", "advance_paise", "cash_paid_paise", "account_paid_paise", "cash_waived_paise", "account_waived_paise")
-    bad = sum(1 for b in full.values() if any((snap.get(b["id"]) or {}).get(k, 0) != (b.get("summary") or {}).get(k, 0) for k in keys))
+    keys = (
+        "cash_due_paise",
+        "account_due_paise",
+        "other_charges_due_paise",
+        "outstanding_paise",
+        "advance_paise",
+        "cash_paid_paise",
+        "account_paid_paise",
+        "cash_waived_paise",
+        "account_waived_paise",
+    )
+    bad = sum(
+        1
+        for b in full.values()
+        if any((snap.get(b["id"]) or {}).get(k, 0) != (b.get("summary") or {}).get(k, 0) for k in keys)
+    )
     tie(R, "ledger share state today == booking summary (as-of path)", bad, 0)
     fy = today.year if today.month >= 4 else today.year - 1
     eom = f"{fy}-03-31"
@@ -707,12 +743,31 @@ def _customer_status(g, tie, db, cid, live):
     for b in ids31:
         e = db.ledger_entries.find_one({"booking_id": b, "date": {"$lte": eom}}, sort=[("seq", -1)])
         # other-charge net billed − received on that day = running balance − instalment shares (row's other due counts unbilled)
-        oc31 += (e or {}).get("balance_paise", 0) - (e or {}).get("cash_due_paise", 0) - (e or {}).get("account_due_paise", 0)
+        oc31 += (
+            (e or {}).get("balance_paise", 0)
+            - (e or {}).get("cash_due_paise", 0)
+            - (e or {}).get("account_due_paise", 0)
+        )
     car = run(D.carried(ids31, f"{fy}-04-01", today.isoformat()))
-    tie(R, f"as of {eom} instalment net + other-charge net == carried from before at {fy}-04-01", net31 + oc31, car["opening_paise"])
+    tie(
+        R,
+        f"as of {eom} instalment net + other-charge net == carried from before at {fy}-04-01",
+        net31 + oc31,
+        car["opening_paise"],
+    )
     grp = g(f"/reports/v3/{R}", group="project,tower")
-    tie(R, "Σ project subtotals == total dues", sum(x["totals"]["account_dues"] + x["totals"]["cash_dues"] for x in grp["groups"]), t["account_dues"] + t["cash_dues"])
-    tie(R, "Σ tower subtotals == project subtotal", sum(sum(c["totals"]["cash_dues"] for c in x["children"]) == x["totals"]["cash_dues"] for x in grp["groups"]), len(grp["groups"]))
+    tie(
+        R,
+        "Σ project subtotals == total dues",
+        sum(x["totals"]["account_dues"] + x["totals"]["cash_dues"] for x in grp["groups"]),
+        t["account_dues"] + t["cash_dues"],
+    )
+    tie(
+        R,
+        "Σ tower subtotals == project subtotal",
+        sum(sum(c["totals"]["cash_dues"] for c in x["children"]) == x["totals"]["cash_dues"] for x in grp["groups"]),
+        len(grp["groups"]),
+    )
 
 
 def _customers_f2(g, tie, db, cid, live):
@@ -733,25 +788,55 @@ def _customers_f2(g, tie, db, cid, live):
     cs = g("/reports/v3/customer-status", page_size=10)["totals"]
     tie("customer-status", "formula bridge: total due == Overdue & ageing total due", cs["total_due"], t["total_due"])
     a = g("/reports/v3/advance-holders", page_size=500)
-    tie("advance-holders", "Σ advance == Σ booking advance (definitions)", a["totals"]["advance_total"], sum(D.advance(b.get("summary") or {}) for b in live))
+    tie(
+        "advance-holders",
+        "Σ advance == Σ booking advance (definitions)",
+        a["totals"]["advance_total"],
+        sum(D.advance(b.get("summary") or {}) for b in live),
+    )
     c = g("/reports/v3/call-list", page_size=500)
     tie("call-list", "Σ due == ageing Σ total due", c["totals"]["total_due"], t["total_due"])
     tie("call-list", "Σ overdue == ageing Σ overdue", c["totals"]["overdue_amount"], t["overdue_amount"])
     days = [r["days_overdue"] for r in c["rows"]]
     tie("call-list", "sorted oldest first", days == sorted(days, reverse=True), True)
     k = g("/reports/v3/kyc-pending", page_size=500, pending="agreement", show_complete=1)
-    raw = db.bookings.count_documents({"company_id": cid, "status": LIVE, "plan_acceptance.accepted_on": {"$in": [None, ""]}})
+    raw = db.bookings.count_documents(
+        {"company_id": cid, "status": LIVE, "plan_acceptance.accepted_on": {"$in": [None, ""]}}
+    )
     tie("kyc-pending", "agreement pending == live bookings without signed agreement", k["count"], raw)
     pb = g("/reports/v3/payment-behaviour", page_size=500)
     rows_pb = pb["rows"]
-    tie("payment-behaviour", "customers == customers with live bookings", pb["count"], len({b.get("customer_id") for b in db.bookings.find({"company_id": cid, "status": LIVE}, {"customer_id": 1})}))
-    tie("payment-behaviour", "on time ≤ bills due on every row", all(r["on_time"] <= r["bills_due"] for r in rows_pb), True)
+    tie(
+        "payment-behaviour",
+        "customers == customers with live bookings",
+        pb["count"],
+        len({b.get("customer_id") for b in db.bookings.find({"company_id": cid, "status": LIVE}, {"customer_id": 1})}),
+    )
+    tie(
+        "payment-behaviour",
+        "on time ≤ bills due on every row",
+        all(r["on_time"] <= r["bills_due"] for r in rows_pb),
+        True,
+    )
     dr = g("/reports/v3/customer-directory", page_size=10)
-    tie("customer-directory", "rows == customers (not deleted)", dr["count"], db.customers.count_documents({"company_id": cid, "deleted_at": None}))
+    tie(
+        "customer-directory",
+        "rows == customers (not deleted)",
+        dr["count"],
+        db.customers.count_documents({"company_id": cid, "deleted_at": None}),
+    )
     cc = g("/reports/v3/cancelled-customers", page_size=500)
     canc = list(db.bookings.find({"company_id": cid, "status": "Cancelled"}, {"id": 1, "cancellation": 1}))
-    tie("cancelled-customers", "Σ refund payable == Σ cancellation refund", cc["totals"]["refund_payable"], sum((b.get("cancellation") or {}).get("refund_paise") or 0 for b in canc))
-    rp = sum((r.get("amount_paise") or 0) for r in db.refunds.find({"booking_id": {"$in": [b["id"] for b in canc]}, "status": "Paid"}))
+    tie(
+        "cancelled-customers",
+        "Σ refund payable == Σ cancellation refund",
+        cc["totals"]["refund_payable"],
+        sum((b.get("cancellation") or {}).get("refund_paise") or 0 for b in canc),
+    )
+    rp = sum(
+        (r.get("amount_paise") or 0)
+        for r in db.refunds.find({"booking_id": {"$in": [b["id"] for b in canc]}, "status": "Paid"})
+    )
     tie("cancelled-customers", "Σ refund paid == Σ refunds paid on cancelled bookings", cc["totals"]["refund_paid"], rp)
     b0 = max(live, key=lambda b: (b.get("summary") or {}).get("waived_paise", 0))
     cust = db.bookings.find_one({"id": b0["id"]})["customer_id"]
@@ -792,7 +877,12 @@ def _finance_f3(g, tie):
             q = dict(x.split("=") for x in gp.split("&") if x) | period
             before = g(f"/reports/{old}", **q).get("totals") or {}
             same = [k for k in money if k in before]
-            tie(key, f"new sheet == {old}{' (' + gp + ')' if gp else ''}: {len(same)} money totals", {k: round(new[k]) for k in same}, {k: round(before[k]) for k in same})
+            tie(
+                key,
+                f"new sheet == {old}{' (' + gp + ')' if gp else ''}: {len(same)} money totals",
+                {k: round(new[k]) for k in same},
+                {k: round(before[k]) for k in same},
+            )
     pid = g("/reports/v3/outstanding")["options"]["project"][0]["value"]
     a = g("/reports/v3/outstanding", project=pid)["totals"]["outstanding_paise"]
     b = (g("/reports/outstanding-v2", project_id=pid).get("totals") or {}).get("outstanding_paise")
@@ -807,34 +897,97 @@ def _bookings_f4(g, tie, db, cid):
     """Phase 3F F4: Bookings reports tie to the bookings collection, Customer status and the existing reports."""
     wide = {"period_from": "2000-01-01", "period_to": "2099-12-31"}
     reg = g("/reports/v3/booking-register", booking_status="Active,Completed", page_size=1)["totals"]
-    raw = sum(b.get("agreement_value_paise") or 0 for b in db.bookings.find({"company_id": cid, "status": {"$in": ["Active", "Completed"]}}, {"agreement_value_paise": 1}))
-    tie("booking-register", "Σ agreement value (Active + Completed) == bookings collection", reg["agreement_value"], raw)
+    raw = sum(
+        b.get("agreement_value_paise") or 0
+        for b in db.bookings.find(
+            {"company_id": cid, "status": {"$in": ["Active", "Completed"]}}, {"agreement_value_paise": 1}
+        )
+    )
+    tie(
+        "booking-register", "Σ agreement value (Active + Completed) == bookings collection", reg["agreement_value"], raw
+    )
     d = g("/reports/v3/sales-summary", page_size=1)
     fy = d["defaults"]
-    r = g("/reports/v3/booking-register", booking_status="Active,Completed", period_from=fy["period_from"], period_to=fy["period_to"], page_size=1)
-    tie("sales-summary", "Σ bookings this FY == booking register (not cancelled) this FY", d["totals"]["bookings"], r["count"])
-    tie("sales-summary", "Σ agreement value this FY == booking register this FY", d["totals"]["agreement_value"], r["totals"]["agreement_value"])
+    r = g(
+        "/reports/v3/booking-register",
+        booking_status="Active,Completed",
+        period_from=fy["period_from"],
+        period_to=fy["period_to"],
+        page_size=1,
+    )
+    tie(
+        "sales-summary",
+        "Σ bookings this FY == booking register (not cancelled) this FY",
+        d["totals"]["bookings"],
+        r["count"],
+    )
+    tie(
+        "sales-summary",
+        "Σ agreement value this FY == booking register this FY",
+        d["totals"]["agreement_value"],
+        r["totals"]["agreement_value"],
+    )
     new = g("/reports/v3/discount-register", **wide)["totals"]
     old = g("/reports/discount-register", from_date="2000-01-01", to_date="2099-12-31")["totals"]
-    tie("discount-register", "Σ discount (all dates) == existing Discount register", new["discount_paise"], old["discount_paise"])
-    tie("discount-register", "Σ discount (all dates) == booking register discount (Active + Completed)", new["discount_paise"], reg["discount"])
+    tie(
+        "discount-register",
+        "Σ discount (all dates) == existing Discount register",
+        new["discount_paise"],
+        old["discount_paise"],
+    )
+    tie(
+        "discount-register",
+        "Σ discount (all dates) == booking register discount (Active + Completed)",
+        new["discount_paise"],
+        reg["discount"],
+    )
     cs = g("/reports/v3/customer-status", page_size=1)["totals"]
     pp = g("/reports/v3/plan-position", page_size=1)["totals"]
     tie("plan-position", "Σ bills raised == Customer status", pp["bills_raised"], cs["bills_raised"])
-    tie("plan-position", "Σ received == Customer status Account + Cash received", pp["received"], cs["account_received"] + cs["cash_received"])
+    tie(
+        "plan-position",
+        "Σ received == Customer status Account + Cash received",
+        pp["received"],
+        cs["account_received"] + cs["cash_received"],
+    )
     ag = g("/reports/v3/agreements", page_size=1)
-    signed = db.bookings.count_documents({"company_id": cid, "status": {"$in": ["Active", "Completed"]}, "plan_acceptance.accepted_on": {"$nin": [None, ""]}})
-    tie("agreements", "signed + pending == live bookings", ag["totals"]["signed"] + ag["totals"]["pending"], pp and g("/reports/v3/plan-position", page_size=1)["count"])
+    signed = db.bookings.count_documents(
+        {
+            "company_id": cid,
+            "status": {"$in": ["Active", "Completed"]},
+            "plan_acceptance.accepted_on": {"$nin": [None, ""]},
+        }
+    )
+    tie(
+        "agreements",
+        "signed + pending == live bookings",
+        ag["totals"]["signed"] + ag["totals"]["pending"],
+        pp and g("/reports/v3/plan-position", page_size=1)["count"],
+    )
     tie("agreements", "signed == live bookings with an accepted plan", ag["totals"]["signed"], signed)
     new = g("/reports/v3/cancellations", **wide)["totals"]
     old = g("/reports/cancellations", from_date="2000-01-01", to_date="2099-12-31")["totals"]
     tie("cancellations", "Σ refund payable == existing Cancellations report", new["refund_paise"], old["refund_paise"])
-    tie("cancellations", "Σ refund paid == existing Cancellations report", new["refund_paid_paise"], old["refund_paid_paise"])
+    tie(
+        "cancellations",
+        "Σ refund paid == existing Cancellations report",
+        new["refund_paid_paise"],
+        old["refund_paid_paise"],
+    )
     tr = g("/reports/v3/transfers", **wide)
-    n = sum(len(b.get(k) or []) for b in db.bookings.find({"company_id": cid}, {"transfers": 1, "agreement_revisions": 1, "discount_events": 1}) for k in ("transfers", "agreement_revisions", "discount_events"))
+    n = sum(
+        len(b.get(k) or [])
+        for b in db.bookings.find({"company_id": cid}, {"transfers": 1, "agreement_revisions": 1, "discount_events": 1})
+        for k in ("transfers", "agreement_revisions", "discount_events")
+    )
     ids = db.bookings.distinct("id", {"company_id": cid})
     n += db.audit_logs.count_documents({"company_id": cid, "action": "booking.plan_change", "entity_id": {"$in": ids}})
-    tie("transfers", "changes == transfers + revisions + price events on bookings + plan changes in audit log (bookings that exist)", tr["totals"]["changes"], n)
+    tie(
+        "transfers",
+        "changes == transfers + revisions + price events on bookings + plan changes in audit log (bookings that exist)",
+        tr["totals"]["changes"],
+        n,
+    )
     new = g("/reports/v3/sales-team", **wide)["totals"]
     old = g("/reports/sales-team", from_date="2000-01-01", to_date="2099-12-31")["totals"]
     tie("sales-team", "Σ sold (all dates) == existing Sales team report", new["sold_paise"], old["sold_paise"])
@@ -843,9 +996,19 @@ def _bookings_f4(g, tie, db, cid):
     tie("realised-rate", "Σ agreement value == Plan & stage position", rr["agreement_value"], pp["agreement_value"])
     tie("realised-rate", "Σ list − Σ agreement == Σ discount", rr["list_value"] - rr["agreement_value"], rr["discount"])
     bh = g("/reports/v3/booking-health", page_size=1)["totals"]
-    tie("booking-health", "Σ overdue == Customer status overdue", bh["overdue_amount"], cs.get("overdue_amount", g("/reports/v3/customer-ageing", page_size=1)["totals"]["overdue_amount"]))
+    tie(
+        "booking-health",
+        "Σ overdue == Customer status overdue",
+        bh["overdue_amount"],
+        cs.get("overdue_amount", g("/reports/v3/customer-ageing", page_size=1)["totals"]["overdue_amount"]),
+    )
     tie("booking-health", "Σ total due == Customer status total due", bh["total_due"], cs["total_due"])
-    tie("booking-health", "healthy + watch + at risk == live bookings", sum(bh["health_counts"].values()), g("/reports/v3/plan-position", page_size=1)["count"])
+    tie(
+        "booking-health",
+        "healthy + watch + at risk == live bookings",
+        sum(bh["health_counts"].values()),
+        g("/reports/v3/plan-position", page_size=1)["count"],
+    )
 
 
 def _inventory_f5(g, g_acc, tie, db, cid, g_sales=None):
@@ -861,31 +1024,81 @@ def _inventory_f5(g, g_acc, tie, db, cid, g_sales=None):
     inv = g("/reports/v3/inventory-status", page_size=1)["totals"]
     ctl = g("/reports/inventory-control")["totals"]
     for s in ("Available", "Hold", "Blocked", "Booked", "Sold"):
-        tie("inventory-status", f"{s} flats (real layer) == existing Inventory control", inv["by_status"][s], ctl[s.lower()])
+        tie(
+            "inventory-status",
+            f"{s} flats (real layer) == existing Inventory control",
+            inv["by_status"][s],
+            ctl[s.lower()],
+        )
     acc = g_acc("/reports/v3/inventory-status", page_size=1)["totals"]
     for s, k in (("Available", "show_available"), ("Hold", "show_hold"), ("Sold", "show_sold")):
-        tie("inventory-status", f"{s} flats for a display-layer viewer == shown-as {s.lower()} in Inventory control", acc["by_status"].get(s, 0), ctl[k])
-    tie("inventory-status", "display-layer viewer sees no Booked / Blocked", acc["by_status"].get("Booked", 0) + acc["by_status"].get("Blocked", 0), 0)
+        tie(
+            "inventory-status",
+            f"{s} flats for a display-layer viewer == shown-as {s.lower()} in Inventory control",
+            acc["by_status"].get(s, 0),
+            ctl[k],
+        )
+    tie(
+        "inventory-status",
+        "display-layer viewer sees no Booked / Blocked",
+        acc["by_status"].get("Booked", 0) + acc["by_status"].get("Blocked", 0),
+        0,
+    )
     st = g("/reports/v3/stacking-plan", page_size=1)
     cells = sum(len(f["flats"]) for p in st["illustration"]["projects"] for t in p["towers"] for f in t["floors"])
     tie("stacking-plan", "cells == flats in Inventory status", cells, inv["flats"])
     pl = g("/reports/v3/price-list", page_size=1)["totals"]
-    tie("price-list", "Σ list price of available flats == existing Inventory available value", pl["value_by_status"]["Available"], g("/reports/inventory")["totals"]["available_value_paise"])
-    tie("price-list", "unsold == available + hold in Inventory status", pl["flats"], inv["by_status"]["Available"] + inv["by_status"]["Hold"])
+    tie(
+        "price-list",
+        "Σ list price of available flats == existing Inventory available value",
+        pl["value_by_status"]["Available"],
+        g("/reports/inventory")["totals"]["available_value_paise"],
+    )
+    tie(
+        "price-list",
+        "unsold == available + hold in Inventory status",
+        pl["flats"],
+        inv["by_status"]["Available"] + inv["by_status"]["Hold"],
+    )
     hr = g("/reports/v3/hold-register", page_size=1)["totals"]
-    tie("hold-register", "active holds == flats on Hold in the flats master", hr["holds"], db.flats.count_documents({"company_id": cid, "status": "Hold", "deleted_at": None}))
+    tie(
+        "hold-register",
+        "active holds == flats on Hold in the flats master",
+        hr["holds"],
+        db.flats.count_documents({"company_id": cid, "status": "Hold", "deleted_at": None}),
+    )
     leg = g("/reports/hold-register")["totals_extra"]
     tie("hold-register", "holds == existing Hold register active holds", hr["holds"], leg["active"])
     tie("hold-register", "lapsing within 48 h == existing Hold register expiring", hr["expiring"], leg["expiring_48h"])
     sal = g_sales("/reports/v3/inventory-status", page_size=1)["totals"]
     for s_, k in (("Available", "show_available"), ("Hold", "show_hold"), ("Sold", "show_sold")):
-        tie("inventory-status", f"{s_} flats for Sales (display layer) == shown-as {s_.lower()} in Inventory control", sal["by_status"].get(s_, 0), ctl[k])
+        tie(
+            "inventory-status",
+            f"{s_} flats for Sales (display layer) == shown-as {s_.lower()} in Inventory control",
+            sal["by_status"].get(s_, 0),
+            ctl[k],
+        )
     lo = g("/reports/v3/landowner", page_size=1)["totals"]
-    tie("landowner", "landowner units == existing Landowner share", (lo.get("kinds") or {}).get("Landowner", 0), g("/reports/landowner-share")["totals"]["landowner"])
-    tie("landowner", "masked units == existing Masked inventory", (lo.get("kinds") or {}).get("Masked", 0), len([r for r in g("/reports/masked-inventory")["rows"] if not r.get("_subtotal")]))
+    tie(
+        "landowner",
+        "landowner units == existing Landowner share",
+        (lo.get("kinds") or {}).get("Landowner", 0),
+        g("/reports/landowner-share")["totals"]["landowner"],
+    )
+    tie(
+        "landowner",
+        "masked units == existing Masked inventory",
+        (lo.get("kinds") or {}).get("Masked", 0),
+        len([r for r in g("/reports/masked-inventory")["rows"] if not r.get("_subtotal")]),
+    )
     pk = g("/reports/v3/parking", page_size=1)["totals"]
     for s in db.parking_slots.distinct("status", {"company_id": cid}):
-        tie("parking", f"{s} slots == parking slots master", pk["by_status"].get(s, 0), db.parking_slots.count_documents({"company_id": cid, "status": s, "deleted_at": None}))
+        tie(
+            "parking",
+            f"{s} slots == parking slots master",
+            pk["by_status"].get(s, 0),
+            db.parking_slots.count_documents({"company_id": cid, "status": s, "deleted_at": None}),
+        )
     new = g("/reports/v3/construction-vs-plan", page_size=1)["totals"]
     old = g("/reports/construction-vs-plan")["totals"]
     for k in ("demanded_paise", "collected_paise", "balance_paise"):
@@ -893,13 +1106,34 @@ def _inventory_f5(g, g_acc, tie, db, cid, g_sales=None):
     sb = g("/reports/v3/stage-bills", page_size=1)["totals"]
     cs = g("/reports/v3/customer-status", page_size=1)["totals"]
     tie("stage-bills", "Σ bills raised == Customer status", sb["bills_raised"], cs["bills_raised"])
-    tie("stage-bills", "Σ received == Customer status Account + Cash", sb["received"], cs["account_received"] + cs["cash_received"])
-    tie("stage-bills", "Σ instalment dues == Customer status", sb["instalment_dues"], cs["account_dues"] + cs["cash_dues"])
+    tie(
+        "stage-bills",
+        "Σ received == Customer status Account + Cash",
+        sb["received"],
+        cs["account_received"] + cs["cash_received"],
+    )
+    tie(
+        "stage-bills",
+        "Σ instalment dues == Customer status",
+        sb["instalment_dues"],
+        cs["account_dues"] + cs["cash_dues"],
+    )
     sv = g("/reports/v3/sales-velocity", page_size=1)["totals"]
-    tie("sales-velocity", "Σ unsold == Inventory status available + hold", sv["unsold"], inv["by_status"]["Available"] + inv["by_status"]["Hold"])
+    tie(
+        "sales-velocity",
+        "Σ unsold == Inventory status available + hold",
+        sv["unsold"],
+        inv["by_status"]["Available"] + inv["by_status"]["Hold"],
+    )
     today = date.fromisoformat(g("/reports/v3/sales-summary", page_size=1)["defaults"]["period_to"])
     frm = (today - timedelta(days=round(30.44 * 12)) + timedelta(days=1)).isoformat()
-    reg = g("/reports/v3/booking-register", booking_status="Active,Completed", period_from=frm, period_to=today.isoformat(), page_size=1)
+    reg = g(
+        "/reports/v3/booking-register",
+        booking_status="Active,Completed",
+        period_from=frm,
+        period_to=today.isoformat(),
+        page_size=1,
+    )
     tie("sales-velocity", "Σ booked in the last 12 months == booking register same window", sv["m12"], reg["count"])
 
 
@@ -907,12 +1141,27 @@ def _bridges_f7(g, tie):
     """Phase 3F F7: sibling reports that count on a different basis reconcile to the paisa through their bridge."""
     bw = g("/reports/v3/bank-receipts", page_size=1)["totals"]
     co = g("/reports/v3/collections", page_size=1)["totals"]
-    tie("bank-receipts", "Collections == Bank-wise total − pending + cash receipts − reversals (this FY, to the paisa)", co["total_paise"], bw["total_paise"] - bw["pending_paise"] + bw["br_cash"] + bw["br_reversal"])
+    tie(
+        "bank-receipts",
+        "Collections == Bank-wise total − pending + cash receipts − reversals (this FY, to the paisa)",
+        co["total_paise"],
+        bw["total_paise"] - bw["pending_paise"] + bw["br_cash"] + bw["br_reversal"],
+    )
     tie("bank-receipts", "bridge has no unexplained remainder", bw["br_rest"], 0)
     bv = g("/reports/v3/bills-vs-collection", page_size=1)["totals"]
     cs = g("/reports/v3/customer-status", page_size=1)["totals"]
-    tie("bills-vs-collection", "bill raised − on cancelled/transferred ± transfer adjustments == Customer status bills raised", bv["demand_paise"] - bv["br_not_live"] + bv["br_adjust"], cs["bills_raised"])
-    tie("customer-status", "Customer status bridge line == Bills vs Collection bridge", (cs["br_instalment"], cs["br_not_live"], cs["br_adjust"]), (bv["demand_paise"], bv["br_not_live"], bv["br_adjust"]))
+    tie(
+        "bills-vs-collection",
+        "bill raised − on cancelled/transferred ± transfer adjustments == Customer status bills raised",
+        bv["demand_paise"] - bv["br_not_live"] + bv["br_adjust"],
+        cs["bills_raised"],
+    )
+    tie(
+        "customer-status",
+        "Customer status bridge line == Bills vs Collection bridge",
+        (cs["br_instalment"], cs["br_not_live"], cs["br_adjust"]),
+        (bv["demand_paise"], bv["br_not_live"], bv["br_adjust"]),
+    )
 
 
 def _leads_f6(g, tie, db, cid):
@@ -922,39 +1171,99 @@ def _leads_f6(g, tie, db, cid):
     old = g("/reports/sales-leads", from_date=fy["period_from"], to_date=fy["period_to"])
     by = {r["stage"]: r["leads"] for r in fn["rows"]}
     for s in old["funnel"]:
-        tie("lead-funnel", f"{s['stage']} (this FY) == existing Sales & leads funnel", by.get(s["stage"], 0), s["count"])
+        tie(
+            "lead-funnel", f"{s['stage']} (this FY) == existing Sales & leads funnel", by.get(s["stage"], 0), s["count"]
+        )
     tie("lead-funnel", "Σ leads (this FY) == existing Sales & leads", fn["totals"]["leads"], old["totals"]["leads"])
     sp = {r["source"]: r for r in g("/reports/v3/source-performance", page_size=50)["rows"]}
     for r in old["rows"]:
-        tie("source-performance", f"{r['source']} leads / converted == existing Sales & leads", (sp[r["source"]]["leads"], sp[r["source"]]["converted"]), (r["leads"], r["converted"]))
+        tie(
+            "source-performance",
+            f"{r['source']} leads / converted == existing Sales & leads",
+            (sp[r["source"]]["leads"], sp[r["source"]]["converted"]),
+            (r["leads"], r["converted"]),
+        )
     reg = g("/reports/v3/lead-register", page_size=1)
     live = db.leads.count_documents({"company_id": cid, "deleted_at": None})
     tie("lead-register", "leads == leads master (live)", reg["count"], live)
     wide = {"from_date": "2000-01-01", "to_date": "2099-12-31"}
     fu = g("/reports/v3/follow-ups", page_size=1)["totals"]
-    tie("follow-ups", "overdue == existing Sales & leads follow-ups overdue (all dates)", fu["fu"]["Overdue"], g("/reports/sales-leads", **wide)["follow_ups_overdue"])
+    tie(
+        "follow-ups",
+        "overdue == existing Sales & leads follow-ups overdue (all dates)",
+        fu["fu"]["Overdue"],
+        g("/reports/sales-leads", **wide)["follow_ups_overdue"],
+    )
     vr = g("/reports/v3/visit-register", page_size=1)
-    sv = g("/reports/site-visits", from_date=vr["defaults"]["period_from"], to_date=vr["defaults"]["period_to"])["totals"]
+    sv = g("/reports/site-visits", from_date=vr["defaults"]["period_from"], to_date=vr["defaults"]["period_to"])[
+        "totals"
+    ]
     c = vr["totals"]["by_status"]
-    tie("visit-register", "completed / no-show / cancelled (this FY) == existing Site visit conversion", (c.get("Completed", 0), c.get("No-show", 0), c.get("Cancelled", 0)), (sv["completed"], sv["no_show"], sv["cancelled"]))
+    tie(
+        "visit-register",
+        "completed / no-show / cancelled (this FY) == existing Site visit conversion",
+        (c.get("Completed", 0), c.get("No-show", 0), c.get("Cancelled", 0)),
+        (sv["completed"], sv["no_show"], sv["cancelled"]),
+    )
     tie("visit-register", "visits (this FY) == existing scheduled", vr["count"], sv["scheduled"])
-    tie("visit-register", "booked after visit (this FY) == existing converted", vr["totals"]["converted_n"], sv["converted"])
+    tie(
+        "visit-register",
+        "booked after visit (this FY) == existing converted",
+        vr["totals"]["converted_n"],
+        sv["converted"],
+    )
     vc = g("/reports/v3/visit-conversion", page_size=1)["totals"]
-    tie("visit-conversion", "scheduled / completed / booked == existing Site visit conversion", (vc["scheduled"], vc["completed"], vc["converted"]), (sv["scheduled"], sv["completed"], sv["converted"]))
+    tie(
+        "visit-conversion",
+        "scheduled / completed / booked == existing Site visit conversion",
+        (vc["scheduled"], vc["completed"], vc["converted"]),
+        (sv["scheduled"], sv["completed"], sv["converted"]),
+    )
     lo = g("/reports/v3/lost-leads", page_size=1)
-    tie("lost-leads", "lost == leads master status Lost", lo["count"], db.leads.count_documents({"company_id": cid, "deleted_at": None, "status": "Lost"}))
+    tie(
+        "lost-leads",
+        "lost == leads master status Lost",
+        lo["count"],
+        db.leads.count_documents({"company_id": cid, "deleted_at": None, "status": "Lost"}),
+    )
     rt = g("/reports/v3/response-time", page_size=1)
-    tie("response-time", "responded + not yet == leads this FY (Lead funnel)", sum(rt["totals"]["bands"].values()), fn["totals"]["leads"])
+    tie(
+        "response-time",
+        "responded + not yet == leads this FY (Lead funnel)",
+        sum(rt["totals"]["bands"].values()),
+        fn["totals"]["leads"],
+    )
     ag = g("/reports/v3/lead-ageing", page_size=1)
-    tie("lead-ageing", "open leads == leads master open stages", ag["count"], db.leads.count_documents({"company_id": cid, "deleted_at": None, "status": {"$in": ["New", "Contacted", "Site Visit Scheduled", "Site Visit Done", "Negotiation"]}}))
+    tie(
+        "lead-ageing",
+        "open leads == leads master open stages",
+        ag["count"],
+        db.leads.count_documents(
+            {
+                "company_id": cid,
+                "deleted_at": None,
+                "status": {"$in": ["New", "Contacted", "Site Visit Scheduled", "Site Visit Done", "Negotiation"]},
+            }
+        ),
+    )
     tp = g("/reports/v3/team-pipeline", page_size=50)["totals"]
     tie("team-pipeline", "Σ open == Lead ageing open leads", tp["open"], ag["count"])
     tie("team-pipeline", "Σ follow-ups overdue == Follow-ups overdue", tp["fu_overdue"], fu["fu"]["Overdue"])
     rt_t = rt["totals"]
-    tie("response-time", "average first response (this FY) == existing Sales & leads avg_response_hours", rt_t["avg_h"], old["avg_response_hours"])
+    tie(
+        "response-time",
+        "average first response (this FY) == existing Sales & leads avg_response_hours",
+        rt_t["avg_h"],
+        old["avg_response_hours"],
+    )
     sla = g("/reports/v3/service-sla", period_from="2000-01-01", period_to="2099-12-31", page_size=1)["totals"]
     old = g("/reports/service-sla", **wide)["totals"]
-    tie("service-sla", "requests / open / resolved == existing Service requests & SLA", (sla["total"], sla["open"], sla["resolved"]), (old["total"], old["open"], old["resolved"]))
+    tie(
+        "service-sla",
+        "requests / open / resolved == existing Service requests & SLA",
+        (sla["total"], sla["open"], sla["resolved"]),
+        (old["total"], old["open"], old["resolved"]),
+    )
 
 
 if __name__ == "__main__":
