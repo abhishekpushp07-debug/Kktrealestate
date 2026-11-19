@@ -39,16 +39,12 @@ def flush(q: dict | None):
         from services import duty
 
         async with _lock():
-            if len(_TASKS) <= 2:  # 3I: pace only when the queue is short; a backlog catches up at full speed
-                await duty.idle()
-            t0 = duty.start()
-            for fn, items in batch:
+            await duty.idle()  # 3I: in-flight requests on this worker finish first (≤ 0.25 s); no rest between steps —
+            for fn, items in batch:  # letters / notifications are user-facing and must not queue up behind pacing
                 try:
                     await fn(items)
                 except Exception:  # noqa: BLE001 — follow-up work never fails the request that queued it
                     log.exception("after-commit task failed")
-                if len(_TASKS) <= 2:
-                    t0 = await duty.breathe(t0)  # 3I: requests on this worker go first
 
     t = asyncio.create_task(run())
     _TASKS.add(t)
