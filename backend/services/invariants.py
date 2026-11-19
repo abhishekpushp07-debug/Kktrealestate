@@ -52,6 +52,23 @@ BUSINESS_KEYS = [
         "uniq_live_booking_per_flat",
         {"status": {"$in": ["Active", "Completed"]}},
     ),
+    # 3I M-01: the remaining serials (0 duplicates on preview / medium / volume). generated_documents.number is a label
+    # ("Cost sheet") on per-booking sheets, so it is not a serial key and stays unenforced.
+    ("lead number", "leads", [("lead_number", ASCENDING)], "uniq_lead_number", {"lead_number": {"$type": "string"}}),
+    (
+        "site-visit number",
+        "site_visits",
+        [("visit_number", ASCENDING)],
+        "uniq_visit_number",
+        {"visit_number": {"$type": "string"}},
+    ),
+    (
+        "service ticket number",
+        "service_requests",
+        [("ticket_number", ASCENDING)],
+        "uniq_ticket_number",
+        {"ticket_number": {"$type": "string"}},
+    ),
 ]
 NOT_APPLIED = "Uniqueness rule not applied — duplicates found"
 

@@ -313,7 +313,7 @@ async def startup_tasks():
     """Heavy, idempotent work moved out of lifespan: runs once per deploy on the lease holder, never blocks serving."""
     STARTUP["started_at"] = __import__("datetime").datetime.now(__import__("datetime").UTC).isoformat()
     try:
-        leader = await try_acquire("startup")
+        leader, _ = await try_acquire("startup")
     except Exception:
         logging.getLogger(__name__).debug("handled error", exc_info=True)
         leader = False
@@ -446,7 +446,6 @@ async def lifespan(app: FastAPI):
         if os.environ.get("KKT_TRACEMALLOC"):
             _spawn(_tracemalloc_loop())
         _spawn(_memory_loop())
-        _spawn(_hold_expiry_loop())  # Phase N: HOLD_EXPIRY_SWEEP every 15 min
         try:
             await asyncio.wait_for(detect_transaction_support(), timeout=2)
         except Exception:
@@ -465,6 +464,7 @@ async def lifespan(app: FastAPI):
         run_as_leader(
             "scheduler",
             _overdue_loop,
+            _hold_expiry_loop,  # Phase N: HOLD_EXPIRY_SWEEP every 15 min (3I: leader only — not on every server)
             _dues_loop,
             nudge_loop,
             sweep_loop,
@@ -901,7 +901,7 @@ if _cors_list or _cors_regex:
         ],
     )
 app.add_middleware(ETagMiddleware)
-app.add_middleware(GZipMiddleware, minimum_size=1024)
+app.add_middleware(GZipMiddleware, minimum_size=1024, compresslevel=5)  # 3I: level 9 cost 90 ms per 3 MB
 app.add_middleware(IdempotencyMiddleware)
 app.add_middleware(ObservabilityMiddleware)
 app.add_middleware(
@@ -917,37 +917,38 @@ async def _trim_loop():
 
 
 async def _tracemalloc_loop():
-    """Phase J.2 profiling aid (KKT_TRACEMALLOC=1): log top allocation sites + RSS every 20 s."""
-    tracemalloc.start(40)
+    """KKT_TRACEMALLOC=1 profiling aid: after warm-up, log RSS, cache sizes and the top allocation growth every 60 s."""
+    while not STARTUP.get("done"):
+        await asyncio.sleep(5)
+    tracemalloc.start(int(os.environ.get("KKT_TRACEMALLOC_DEPTH", "1")))
+    base = tracemalloc.take_snapshot()
+    from reports_v3 import customers as _cu
+    from services import ttlcache as _tc
+
     while True:
-        await asyncio.sleep(20)
-        unreachable = gc.collect()
+        await asyncio.sleep(60)
+        gc.collect()
         _trim_memory()
-        snap = tracemalloc.take_snapshot().statistics("lineno")
         rss = int(Path("/proc/self/statm").read_text().split()[1]) * 4096 // 1048576
         logger.warning(
-            "[tracemalloc] rss=%sMB traced=%sMB gc_unreachable=%s phase=%s",
+            "[mem] pid=%s rss=%sMB traced=%sMB ttl_entries=%s ttl_mb=%s tags=%s row_memo=%s inflight=%s",
+            os.getpid(),
             rss,
             tracemalloc.get_traced_memory()[0] // 1048576,
-            unreachable,
-            STARTUP.get("phase"),
+            len(_tc._store),
+            round(_tc._BYTES[0] / 1048576),
+            len(_tc._TAG),
+            len(_cu._ROW_MEMO),
+            len(_tc._inflight),
         )
-        for st in snap[:3]:
-            logger.warning("[tracemalloc]   %s", str(st)[:220])
-        top = tracemalloc.take_snapshot().statistics("traceback")[0]
-        for line in top.traceback.format()[-40:]:
-            logger.warning("[tracemalloc] tb %s", line.strip()[:200])
-        big = []
-        for o in gc.get_objects():
-            if isinstance(o, (list, dict)) and len(o) > 2000:
-                big.append(o)
-        big.sort(key=len, reverse=True)
-        for o in big[:6]:
-            refs = [type(r).__name__ for r in gc.get_referrers(o)[:4]]
-            sample = list(o)[:3] if isinstance(o, dict) else [type(x).__name__ for x in o[:2]]
-            logger.warning(
-                "[tracemalloc] big %s len=%s refs=%s sample=%s", type(o).__name__, len(o), refs, str(sample)[:160]
-            )
+        fams: dict = {}
+        for k in list(_tc._store):
+            f = k.split("|")[0][:40]
+            fams[f] = fams.get(f, 0) + 1
+        logger.warning("[mem] families %s", sorted(fams.items(), key=lambda x: -x[1])[:8])
+        top = tracemalloc.take_snapshot().compare_to(base, "lineno")
+        for st in top[:10]:
+            logger.warning("[mem]   %s", str(st)[:220])
 
 
 async def _memory_loop():

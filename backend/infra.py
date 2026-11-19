@@ -269,6 +269,7 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
         )
         request.state.request_id = rid
         REQ_CTX.set({"request_id": rid, "user_agent": (request.headers.get("user-agent") or "")[:200]})
+        __import__("services.ttlcache", fromlist=["REQ_STAMPS"]).REQ_STAMPS.set({} if request.method == "GET" else None)
         early = _reject_early(request, rid)
         if early is not None:
             return early

@@ -67,6 +67,7 @@ def main():
 
     adm.today = _today(adm)
     if any(w["reason"].startswith(TAG) for w in adm.get("/waivers")["items"]):
+        older_booking_waiver(adm, acc)
         print("demo_3e: already seeded")
         return
     sgh = next(p for p in adm.get("/projects")["items"] if p.get("code") == "SGH")
@@ -113,6 +114,31 @@ def main():
     out.append(adm.post(f"/waivers/{w['id']}/cancel", {"reason": "Raised on the wrong charge"}))
     for x in out:
         print(x["waiver_number"], x["status"], x.get("cn_number") or "", x["booking_number"], x["amount_paise"] / 100)
+    older_booking_waiver(adm, acc)
+
+
+def older_booking_waiver(adm, acc):
+    """3H note: a booking made before this month gets a waiver approved today — after the prior month end — so an
+    As-of of that month end must ignore it (the "later waiver" case on a booking that already existed then)."""
+    reason = f"{TAG} older booking, approved after month end"
+    if any(w["reason"] == reason for w in adm.get("/waivers", page_size=200)["items"]):
+        return
+    month_start = adm.today[:8] + "01"
+    old = next(
+        b
+        for b in adm.get("/bookings", status="Active", page_size=200)["items"]
+        if (b.get("booking_date") or "9999") < month_start
+        and (b.get("summary") or {}).get("account_due_paise", 0) >= 2000000
+        and not (b.get("customer_name") or "").startswith("QA ")
+    )
+    w = acc.post(
+        "/waivers",
+        {"booking_id": old["id"], "target": {"kind": "share", "share": "Account"}, "amount": 15000, "reason": reason},
+    )
+    x = adm.post(f"/waivers/{w['id']}/approve")
+    print(
+        x["waiver_number"], x["status"], x["booking_number"], "booked", old.get("booking_date"), x["amount_paise"] / 100
+    )
 
 
 if __name__ == "__main__":

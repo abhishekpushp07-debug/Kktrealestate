@@ -1,6 +1,7 @@
 """Phase 3F F2 — the other Customers reports (REQ-279). Read-only; money figures come from the booking rows
 (services.definitions via customers._booking_rows), the ledger, refunds and waivers — never re-derived here."""
 
+import asyncio
 from datetime import date
 
 from db import db
@@ -196,25 +197,28 @@ async def behaviour(user, ctx):
     """On time = the bill was fully settled (oldest-first, receipts + waivers) on or before its due date
     (definitions.bill_settle_days); days late averages the late bills, open late bills counting to the as-of day."""
     as_of: date = ctx["as_of"]
-    rows = [r for r in await customer_status(user, ctx) if r["live"]]
-    ids = [r["booking_id"] for r in rows]
-    settle = await D.bill_settle_days(ids, as_of)
-    q = {"company_id": user["company_id"], "booking_id": {"$in": ids}}
-    bounced = {
-        x["_id"]: x["n"]
-        async for x in db.payments.aggregate(
-            [
-                {"$match": q | {"status": "Bounced", "bounced_at": {"$lte": clock.day_end_utc(as_of)}}},
-                {"$group": {"_id": "$booking_id", "n": {"$sum": 1}}},
-            ]
+
+    async def agg(coll, match):  # bookings → count
+        return {
+            x["_id"]: x["n"]
+            async for x in coll.aggregate([{"$match": match}, {"$group": {"_id": "$booking_id", "n": {"$sum": 1}}}])
+        }
+
+    async def per_booking():
+        # 3I: read beside customer_status, for every booking booked by the as-of day (a superset of the live rows;
+        # each figure is per booking, so only the live rows' values are ever looked up)
+        ids = await db.bookings.distinct(
+            "id", {"company_id": user["company_id"], "booking_date": {"$lte": as_of.isoformat()}}
         )
-    }
-    waived = {
-        x["_id"]: x["n"]
-        async for x in db.waivers.aggregate(
-            [{"$match": q | {"status": "Approved"}}, {"$group": {"_id": "$booking_id", "n": {"$sum": 1}}}]
+        q = {"company_id": user["company_id"], "booking_id": {"$in": ids}}
+        return await asyncio.gather(
+            D.bill_settle_days(ids, as_of),
+            agg(db.payments, q | {"status": "Bounced", "bounced_at": {"$lte": clock.day_end_utc(as_of)}}),
+            agg(db.waivers, q | {"status": "Approved"}),
         )
-    }
+
+    status_rows, (settle, bounced, waived) = await asyncio.gather(customer_status(user, ctx), per_booking())
+    rows = [r for r in status_rows if r["live"]]
     per: dict = {}
     for r in rows:
         c = per.setdefault(

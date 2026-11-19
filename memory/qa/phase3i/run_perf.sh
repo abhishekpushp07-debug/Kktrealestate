@@ -8,7 +8,7 @@ reap() {  # orphaned uvicorn workers of the scratch server keep writing schedule
   sleep 4
 }
 reap
-: python tools/perf_budget.py --source kkt_volume --runs 30 --workers 2 --cpus 0,1 --out /app/memory/qa/phase3i/perf_elite_budget.md >> $L 2>&1; echo "exit $?" >> $L
+python tools/perf_budget.py --source kkt_volume --runs 30 --workers 2 --cpus 0,1 --out /app/memory/qa/phase3i/perf_elite_budget.md >> $L 2>&1; echo "exit $?" >> $L
 reap
 echo "=== elite reports $(date -u +%T)" >> $L
 python tools/perf_reports_v3.py --source kkt_volume --workers 2 --cpus 0,1 --cold 10 --warm 30 --out /app/memory/qa/phase3i/perf_elite_reports.md >> $L 2>&1; echo "exit $?" >> $L

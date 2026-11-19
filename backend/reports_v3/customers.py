@@ -180,7 +180,9 @@ async def customer_status(user: dict, ctx: dict) -> list[dict]:
     from services import ttlcache
 
     key = f"rpt3:base:{ttlcache.scope_key(user)}:{ctx['as_of']}:{clock.today()}:{ctx.get('stamp')}"
-    return await ttlcache.cached(key, 600, lambda: _booking_rows(user, ctx["as_of"]), stamped=True)
+    return await ttlcache.cached(
+        key, 600, lambda: _booking_rows(user, ctx["as_of"]), stamped=True, stamp=ctx.get("stamp")
+    )
 
 
 _ROW_MEMO: dict = {}  # booking id → (input fingerprint, row); per process, never trusted without the fingerprint

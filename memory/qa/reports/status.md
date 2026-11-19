@@ -1,4 +1,4 @@
-# Phase I reports — tie-out status · DB `kkt_volume` · 2026-11-19T08:53:47+05:30
+# Phase I reports — tie-out status · DB `kkt_volume` · 2026-11-19T16:32:16+05:30
 
 ## collections-v2 — DONE
 - **PASS** net Jama (receipt basis, all time) == Σ cleared receipts · report=`427987735000` raw=`427987735000`
@@ -132,7 +132,7 @@
 - **PASS** requests / open / resolved == existing Service requests & SLA · report=`(200, 198, 2)` raw=`(200, 198, 2)`
 
 ## activity — DONE
-- **PASS** audit actions == audit_logs (live log) · report=`58224` raw=`58224`
+- **PASS** audit actions == audit_logs (live log) · report=`60045` raw=`60045`
 
 ## data-quality — DONE
 - **PASS** open demands on cancelled bookings == 0 (integrity) · report=`0` raw=`0`

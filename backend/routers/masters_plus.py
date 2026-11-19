@@ -527,7 +527,7 @@ async def preview_stage_completion(
 
     possession = (_possession_stage({"construction_stages": stages}) or {}).get("stage_id") in mark_ids
     rows, cash, acct, other = [], 0, 0, 0
-    async for b in db.bookings.find(
+    bks = await db.bookings.find(
         {"block_id": block_id, "status": "Active"},
         {
             "_id": 0,
@@ -540,13 +540,15 @@ async def preview_stage_completion(
             "payment_plan_id": 1,
             "other_charges": 1,
         },
-    ).batch_size(500):
-        raised = {
-            d["installment_seq"]
-            for d in await db.demands.find(
-                {"booking_id": b["id"], "voided": {"$ne": True}}, {"_id": 0, "installment_seq": 1}
-            ).to_list(None)
-        }
+    ).to_list(None)
+    raised_by: dict = {}  # 3I: one read of the tower's bills, not one per booking
+    async for d in db.demands.find(
+        {"booking_id": {"$in": [b["id"] for b in bks]}, "voided": {"$ne": True}},
+        {"_id": 0, "booking_id": 1, "installment_seq": 1},
+    ):
+        raised_by.setdefault(d["booking_id"], set()).add(d.get("installment_seq"))
+    for b in bks:
+        raised = raised_by.get(b["id"], set())
         ins = [
             i
             for i in (b.get("payment_plan_snapshot") or {}).get("installments", [])

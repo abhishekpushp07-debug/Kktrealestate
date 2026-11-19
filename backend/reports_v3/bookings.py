@@ -26,7 +26,9 @@ async def _extras(user: dict, ctx: dict) -> dict:
         q = {"company_id": user["company_id"], **report_scope_filter(user)}
         return {b["id"]: b async for b in db.bookings.find(q, _EXTRA)}
 
-    return await ttlcache.cached(f"rpt3:bkx:{ttlcache.scope_key(user)}:{ctx.get('stamp')}", 600, load, stamped=True)
+    return await ttlcache.cached(
+        f"rpt3:bkx:{ttlcache.scope_key(user)}:{ctx.get('stamp')}", 600, load, stamped=True, stamp=ctx.get("stamp")
+    )
 
 
 def _days(a: str | None, b: date) -> int | None:
@@ -447,6 +449,8 @@ def health_illus(rows, t):
 async def cancellations_enrich(user, rows, ctx):
     for r in rows:
         r["cancelled_on"] = clock.day_of(r.get("cancelled_at")) if r.get("cancelled_at") else None
+        if r.get("flat_code"):
+            r["unit"] = r["flat_code"]  # 3H note: "Project · Tower · Flat", like every other report
     return rows
 
 

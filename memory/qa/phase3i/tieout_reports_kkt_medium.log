@@ -79,7 +79,7 @@ PASS [construction-vs-plan] subtotals == Σ their stage rows (demanded)         
 PASS [construction-vs-plan] no tower name with leading/trailing space                              report=[] raw=[]
 PASS [construction-vs-plan] GET /payments/demands honours block_id                                 report=[] raw=[]
 PASS [service-sla] tickets == service_requests                                            report=14 raw=14
-PASS [activity] audit actions == audit_logs (live log)                                 report=169727 raw=169727
+PASS [activity] audit actions == audit_logs (live log)                                 report=170118 raw=170118
 PASS [data-quality] open demands on cancelled bookings == 0 (integrity)                    report=0 raw=0
 PASS [data-quality] towers without stage plan excludes inactive towers                     report=0 raw=0
 PASS [data-quality] payment plans not summing 100 == 0                                     report=0 raw=0

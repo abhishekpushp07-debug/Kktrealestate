@@ -1,5 +1,6 @@
 """Home v2 payload: snapshot + 12-month collections + due ageing + needs-attention + recent activity in ONE call."""
 
+import asyncio
 from datetime import UTC, date, datetime, timedelta
 
 from fastapi import APIRouter, Depends, Request
@@ -34,10 +35,12 @@ async def home(request: Request, user: dict = Depends(require("masters.project.v
 async def _home(user: dict):
     cid, pf = user["company_id"], report_scope_filter(user)
     today = clock.today().isoformat()
-    snap = await get_dashboard(cid, user.get("project_scope"))
     months = _months()
     from services.definitions import BANDS, SPLIT_KEYS, ageing_for_bookings, receipt_split
 
+    # 3I: every read below is independent — started together, awaited where used
+    t_snap = asyncio.ensure_future(get_dashboard(cid, user.get("project_scope")))
+    t_age = asyncio.ensure_future(ageing_for_bookings({"company_id": cid, **pf}, clock.today()))
     rows = await receipt_split(
         {"company_id": cid, **pf, "status": "Cleared", "payment_date": {"$gte": months[0] + "-01"}},
         {"$substr": ["$payment_date", 0, 7]},
@@ -64,7 +67,7 @@ async def _home(user: dict):
     ).to_list(2000)
     # E1: ONE outstanding number — the same function (bills + demanded other charges) the Outstanding report uses
     keys = dict(zip(BANDS, ("not_due", "d0_30", "d31_60", "d61_90", "d90")))
-    bands, per_bk = await ageing_for_bookings({"company_id": cid, **pf}, clock.today())
+    bands, per_bk = await t_age
     ageing = {keys[b]: v for b, v in bands.items()}
     ageing_counts = {keys[b]: sum(1 for p in per_bk.values() if p[b] > 0) for b in BANDS}  # bookings per band
     overdue = []
@@ -168,6 +171,7 @@ async def _home(user: dict):
         {"company_id": cid, **pf, "posted_at": {"$gte": clock.day_start_utc(today)}}
     )
     spark = {"collections": [by[m]["Cash"] + by[m]["Account"] + by[m]["Other"] for m in months[-8:]]}
+    snap = await t_snap
     out = {
         "computed_at": snap["computed_at"],
         **snap["payload"],

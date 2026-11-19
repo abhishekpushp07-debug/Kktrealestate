@@ -56,6 +56,9 @@ def main():
             p = params(key, c) | {"page_size": 50}
             first = []
             for _ in range(a.cold):
+                scratch.cache_stamps.update_many(  # 3I: a save moves the domain stamps; worst case = every domain
+                    {}, {"$inc": dict.fromkeys(("money", "bookings", "leads", "inventory", "service", "other"), 1)}
+                )
                 scratch.audit_logs.insert_one(
                     {
                         "id": str(uuid.uuid4()),

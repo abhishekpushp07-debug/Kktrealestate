@@ -693,29 +693,49 @@ async def attention(user, base, pid):
     from routers.flats import list_flats
 
     perms = set(user["permissions"])
-    holds = await _count(
-        list_flats,
-        user,
-        project_id=pid,
-        block_id=None,
-        floor=None,
-        status=None,
-        flat_type_id=None,
-        bookable_for=None,
-        category=None,
-        display=None,
-        hold_expiring=True,
-    )
+
+    async def holds():
+        return await _count(
+            list_flats,
+            user,
+            project_id=pid,
+            block_id=None,
+            floor=None,
+            status=None,
+            flat_type_id=None,
+            bookable_for=None,
+            category=None,
+            display=None,
+            hold_expiring=True,
+        )
+
+    async def bounced():
+        return await _pay_totals(user, pid, "Bounced", unreplaced=True) if "finance.payment.view" in perms else None
+
+    async def waivers():
+        if "finance.waiver.approve" not in perms:  # REQ-254: Needs attention · waivers to approve
+            return None
+        q = {"company_id": user["company_id"], "status": "Pending"} | ({"project_id": pid} if pid else {})
+        return await db.waivers.aggregate(
+            [{"$match": q}, {"$group": {"_id": None, "n": {"$sum": 1}, "s": {"$sum": "$amount_paise"}}}]
+        ).to_list(1)
+
+    async def stale():
+        if "demands.register.view" not in perms:
+            return None
+        return await register_totals(user, stale_days=STALE_DAYS, project_id=pid)
+
+    nh, bo, wv, st = await asyncio.gather(holds(), bounced(), waivers(), stale())  # 3I: in parallel
     out = {
         "holds_expiring": {
-            "count": holds,
+            "count": nh,
             "drill": _drill(
                 f"/flats?hold_expiring=1{_q(pid)}", "/flats", {"hold_expiring": True, "project_id": pid}, "total"
             ),
         }
     }
-    if "finance.payment.view" in perms:
-        n, amt = await _pay_totals(user, pid, "Bounced", unreplaced=True)
+    if bo is not None:
+        n, amt = bo
         out["bounced"] = {
             "count": n,
             "amount_paise": amt,
@@ -726,20 +746,15 @@ async def attention(user, base, pid):
                 "Bounced.count",
             ),
         }
-    if "finance.waiver.approve" in perms:  # REQ-254: Needs attention · waivers to approve
-        q = {"company_id": user["company_id"], "status": "Pending"} | ({"project_id": pid} if pid else {})
-        r = await db.waivers.aggregate(
-            [{"$match": q}, {"$group": {"_id": None, "n": {"$sum": 1}, "s": {"$sum": "$amount_paise"}}}]
-        ).to_list(1)
+    if wv is not None:
         out["waivers_to_approve"] = {
-            "count": r[0]["n"] if r else 0,
-            "amount_paise": r[0]["s"] if r else 0,
+            "count": wv[0]["n"] if wv else 0,
+            "amount_paise": wv[0]["s"] if wv else 0,
             "drill": _drill(f"/reports/waiver-register?status=Pending{_q(pid)}"),
         }
-    if "demands.register.view" in perms:
-        t = await register_totals(user, stale_days=STALE_DAYS, project_id=pid)
+    if st is not None:
         out["stale_part_paid"] = {
-            "count": t["count"],
+            "count": st["count"],
             "drill": _drill(
                 f"/demands?stale_days={STALE_DAYS}{_q(pid)}",
                 "/demands/register",

@@ -71,9 +71,31 @@ async def dump(dbname: str, path: str):
     print(len(res), "requests dumped")
 
 
+def _opts_unordered(d):
+    """3I: options with the same label are now ordered by value (stable across paths) — compare them as sets."""
+    for _, v in d.items():
+        if isinstance(v, list) and len(v) > 1 and isinstance(v[1], dict) and isinstance(v[1].get("options"), dict):
+            v[1]["options"] = {
+                f: sorted(o, key=lambda x: json.dumps(x, sort_keys=True)) if isinstance(o, list) else o
+                for f, o in v[1]["options"].items()
+            }
+    return d
+
+
 def diff(a: str, b: str):
-    A, B = clean(json.load(open(a))), clean(json.load(open(b)))
+    A, B = _opts_unordered(clean(json.load(open(a)))), _opts_unordered(clean(json.load(open(b))))
     bad = [k for k in sorted(set(A) | set(B)) if A.get(k) != B.get(k)]
+    fields: dict = {}
+    for k in bad:
+        x, y = A.get(k), B.get(k)
+        for f in (
+            [f for f in set(x[1]) | set(y[1]) if x[1].get(f) != y[1].get(f)]
+            if x and y and isinstance(x[1], dict)
+            else ["?"]
+        ):
+            fields.setdefault(f, []).append(k.split("?")[0])
+    for f, ks in fields.items():
+        print("FIELD", f, len(ks), sorted(set(ks))[:8])
     for k in bad[:20]:
         x, y = A.get(k), B.get(k)
         if x and y and isinstance(x[1], dict):

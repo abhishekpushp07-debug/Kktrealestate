@@ -1,58 +1,50 @@
-# Phase 3I — Speed everywhere (F-59) · status report
+# Phase 3I — Speed everywhere (F-59) · final report (2026-11-20)
 
-Elite shape throughout: `kkt_volume` scratch copy (1,500 bookings, 18k receipts) · 2 processes · `taskset` cores 0,1.
-After-table: `memory/qa/perf/after_3i_elite.md` (next to `baseline_3g_elite.md`).
+Elite shape for every number: scratch copy of `kkt_volume` (1,500 bookings, 19.5k receipts) · 2 worker processes · `taskset` cores 0,1 · nothing else running on the box.
+"First" = first open right after a save (every cache stale); "cached" = repeat opens.
 
-## 1 · What changed (one rule each)
-| Change | Where | Effect |
-|---|---|---|
-| GC: startup objects `gc.freeze()`d, thresholds 20000/20/20, periodic collect every 120 s (was a gen-2 pass every 20 s) | `server.py` | the 20 s full pass stalled the loop → first-open p95 was ≈ 2× p50 |
-| Every process opens each report once at startup (per company, as its Super Admin) | `server._warm_reports` | no cold code paths / empty row memo on the first real open |
-| Report provider calls hand the result object over in-process (no JSON encode + hash + parse, no money twins) | `routers/reports.handoff`, `reports_v3/legacy.call` | −100…300 ms on big legacy-backed reports |
-| Per-booking report rows recomputed only when that booking's own inputs changed (fingerprint of exactly what the row reads; read fresh every time, so correct on every server) | `reports_v3/customers._booking_rows` | booking-grain reports |
-| Receivables forecast: one query for every booking's raised instalments (was one per booking) | `routers/reports_i.receivables_forecast` | 1,785 → 260 ms |
-| Collections / Cheques: receipt mode / bank carried on the row (no second read of 10k receipts) | `reports_i`, `reports.cheques`, `reports_v3/finance` | |
-| Received = cleared queries: two index-led pipelines (receipt day / clearing time) + indexes `received_mode_day`, `received_instrument` (the planner chose a full scan for the combined `$or`) | `services/definitions.receipt_split`, `services/trends`, `db.py` | Home "received today" 485 → 3 ms |
-| Bounced-not-replaced: one read of the candidate replacements (was one query per bounced receipt) | `services/home_filters` | |
-| Read-model marks + version bump in one `bulk_write` (was 4 round trips per change); trend months in one `bulk_write` (was 24); trend refresh only for companies that own the touched scope (was every company) | `read_model_state`, `trends`, `read_models` | write path 73 → 49 Mongo commands |
-| Process cache: entries keyed by an older data stamp are freed the moment the stamp moves | `services/ttlcache` | |
-| Redis = shared layer: process memory first, one GET on a miss, one SET per compute, no deletes (keys carry the stamp), 50 ms bound, outage → 30 s park + Mongo/memory, logged once a minute, command counter (today / month vs 500,000) on System Health | `services/cache`, `ttlcache`, `routers/ops`, `SystemHealth.jsx` (`ops-fast-cache`) | |
-| M-04: indexes `job_runs(job, started_at)`, `doc_verifications(code)`, `generated_documents(booking_id, type)` · M-10: pool 40 / 2 · M-05: list only (`index_usage_preview.md`, 12 prefix duplicates, nothing dropped) | `db.py`, `tools/index_usage.py` | |
-
-## 2 · Q-49 … Q-58 measured (Elite, no Redis unless stated)
-| Q | Must / Plan | Measured | Met? |
+## 1 · Result against the brief
+| Q | Must | Final measured | Met? |
 |---|---|---|---|
-| Q-49 reports first open ≤ 300 ms p95 | 50/50 | **45/50** (3G 17/50). Over: Collections 945, Outstanding 308, Customer status 314, Payment behaviour ≈ 320, Sales summary 312 (p50 168) | **No** |
-| Q-50 repeat opens | ≤ 100 | every report ≤ 30 ms p95 | Yes |
-| Q-51 hot reads incl. first-after-save ≤ 200 | ≤ 200 | warm ≤ 16 ms; first after save: Home month 452, FY ≈ 600, Bills raised 488 (before the received-index fix; Home in-process 771 → 380 after it) | **No** |
-| Q-52 writes vs 3G (111 / 259 / 526) | no slower | Post payment 167, Create booking 460, Stage complete 600 | **No** (better than 3H 224 / 555 / 654) |
-| Q-53 both modes | report both | Load test both modes (§4); Redis-mode report table not re-run | partly |
-| Q-54 50-user load, 0 user errors | 0 | **0 user-visible errors** in both 20-min runs (no Redis; Redis incl. the 60 s stop) and in the 9-min command run | Yes |
-| Q-55 memory flat, ≤ 4 GB with 2 workers | flat | **not flat**: biggest worker 284 → 1,758 → 2,487 MB (no Redis) / 299 → 1,850 → 2,668 MB (Redis); total ≤ 3.5 GB. Same 6 min load on the 3H code: 3.35 GB total vs 1.63 GB on 3I. GC settings A/B (old vs new): same total → GC change is not the cause. Python-traced memory ≈ 100 MB → allocator fragmentation; arena cap and `PYTHONMALLOC=malloc` tried, no gain | **No** (half of 3H's growth, still rising) |
-| Q-56 Redis commands / month (15 staff × 10 h × 26 d) | ≤ 500,000 | ≈ 295,000 at 1 request / staff / minute (1.26 commands / request measured) | Yes at that rate (§4) |
-| Q-57 Redis outage | 0 user-visible errors | 0 during the 60 s stop; requests carried on from Mongo / memory | Yes |
-| Q-58 route change ≤ 300 ms warm, initial JS ≤ 250 KB | | initial JS **112.7 KB** gzip; lazy app shell; route-change timing **not measured** | partly |
+| Q-49 · 50 reports first open ≤ 300 ms p95 | 50/50, both modes | **3 consecutive runs, all 50/50**: no Redis 224 / 223 ms max, Redis 229 ms max (payment-behaviour). Every report ≤ 240 ms (headroom target) | **Yes** |
+| Q-50 · repeat opens | ≤ 100 | every report ≤ 30 ms p95; Outstanding-v2 legacy 18.7 ms (was 230 — un-cached path, fixed) | Yes |
+| Q-51 · hot reads first-after-save ≤ 200 | | Home FY 181 · Home today/project 112 · legacy Home 154 · booking detail 6 · Customer 360 9 · **Home month 221 · Bills raised 248** | **2 left** (see §6) |
+| Q-52 · writes no slower than 3G (111 / 259 / 526) | | payment 70 · booking 203 · stage complete 469 (p50; p95 109 / 239 / 536) | Yes |
+| Q-54 · 50 users, 0 user-visible errors | 0 | 0 — no Redis 20 min (10,7xx req) · Redis 20 min incl. 60 s Redis stop · 60-min soak (32,075 req) | Yes |
+| Q-55 · memory ≤ 1.2 GB / worker, flat 10 → 20 min, 60-min soak | | no Redis 274 → 294 MB (10 → 20) · Redis ≈ 325 / 295 MB flat · soak 60 min ≈ 295 / 270 MB, flat from minute 10 | Yes |
+| Q-56 · Redis ≤ 500,000 commands / month at 2 req / staff / min | | 0.67 commands / request → **≈ 315,000 / month** (15 staff × 600 min × 2 × 26 days = 468k requests). Hard cap 19,000 / day (≤ 494k / 26-day month): at the cap Redis is skipped for the rest of the day, figures come from Mongo, System Health shows "daily budget reached" | Yes |
+| Q-57 · Redis outage | 0 errors | 0 during a 60 s stop mid-load; silent Mongo fallback | Yes |
+| Q-58 · route change ≤ 300 ms, JS ≤ 250 KB gzip | | 10 routes median 15–67 ms · 115.6 KB | Yes |
+| Equivalence (preview, medium, volume, past As-of) | 0 unexplained | 411 × 3 DBs: one **declared, intended** difference — Cancellations flat label `Project · Tower · Flat` (3H note); checker: label cells only (`unit`), **money / count columns and totals identical** | Yes |
+| Full pytest, ONE sequential run | 0 failed | **961 passed, 5 skipped, 0 failed** (23 min 49 s, final code) | Yes |
+| Gates (tie-out, report tie-outs, As-of replay, exports; medium + volume) | | all exit 0 · tie-outs 219/219 + 217/217 PASS · As-of replay 0 problems | Yes |
 
-## 3 · Same figures
-`tools/equiv_3i.py`: 50 reports × filter matrix (defaults, As of 3 past dates on every As-of report, 2 periods, Include cancelled, 2 projects, up to 5 group levels) = 411 requests per DB, old code (git worktree at the 3H commit) vs new:
-**0 differences on kkt_medium, kkt_volume and preview** (`equiv_*.log`). Rows that tie on the sort key are compared as a set; `hours_left` (moves with the clock) is ignored.
+Redis hit rate under the 50-user mix: **12 %** (was 0.1–0.3 %). Home p95 under load: 642 → 329 ms (Redis), 618 → 420 ms (no Redis).
 
-## 4 · Load test (`tools/loadtest_3i.py`, `load_noredis.md`, `load_redis.md`)
-50 users × 20 min, think 3–8 s, mix: Home 20 %, report 25 %, bookings list 15 %, booking 15 %, ledger 10 %, search 10 %, payment post 5 %.
-| | no Redis p50 / p95 | Redis p50 / p95 | 3H code (6 min) p95 |
-|---|---|---|---|
-| Home | 14 / 519 | 15 / 578 | 1,444 |
-| Report | 67 / 329 | 87 / 398 | 741 |
-| Payment post | 87 / 213 | 87 / 246 | 497 |
-| Bookings list | 26 / 86 | 27 / 114 | 198 |
+## 2 · Root causes found and fixed (round 3)
+| Cause | Fix |
+|---|---|
+| Overdue-reminder catch-up (≈ 110 letters / min, ~26 min after every fresh start) wrote reminder / letter / message audits; the read-model subscriber marked a booking for each and moved the shared version → nothing stayed cached (version +20 / 3 s with no user writes) | noise actions (`reminder.*`, `document.generated`, `message.*`, `notification.*`) mark no read model (`services/read_models`) — guard rail in §3 |
+| GZip level 9 cost 90 ms per 3 MB response | level 5 app-wide; Bills raised body compressed once per cached answer (level 1) |
+| Legacy `cached_report` keyed on the newest audit id → each open's own "viewed" row retired it | shared noise-free stamp (`routers/reports_i._data_stamp`) |
+| Background batch jobs took the whole loop | `run_isolated` duty cap 50 % (`KKT_JOB_DUTY`): a pause after each item in proportion to its work |
+| Redis SET awaited in the request, `json.dumps` of MB results on the loop | SET in the background; only results < 256 KB (`REDIS_SHARE_MAX_BYTES`) travel; larger families never GET; per-family hit-rate learner (< 5 % after 200 lookups → skip 10 min) |
+| Collections: two scans + a row re-read | one scan split by project into parallel aggregates (totals add; options per booking; page merged on the unique (day, receipt) order — 18/18 identical); option stand-ins ordered newest-first so a flat whose label differs between bookings takes the full path's label |
+| Payment behaviour / Outstanding waited for Customer status before their own reads | read beside it (superset of booking ids, per-booking figures); covering index `ledger_entries(booking_id, seq, date, cash/account paid-to-date)` |
+| Home: ageing ran before every widget; towers / stock / pipeline recomputed on every receipt | ageing beside the widgets (its demand reads in parallel); "Needs attention" reads in parallel; per-domain **bills** stamp (demand / booking / block / construction / stage writes) keeps next milestone, inventory, flat status, construction, pipeline ready across receipts on every server |
+| Legacy `/dashboard/home` sequential reads; pending projects refreshed one by one | reads started together; project / block refresh in parallel |
 
-Redis command projection (`load_redis_commands.md`, after making Redis frugal — only results that took > 100 ms to compute are shared; 1 GET per local miss, 1 SET per such compute, no deletes):
-measured **≈ 1.26 commands per request** (6,058 for 4,809 requests; 2.7 before the frugal rule). Hit rate only 2–6 % in this test because every payment post (5 % of requests, one every ~2 s) moves the data stamp.
-15 staff × 10 h × 26 days at **1 request / staff / minute ≈ 234,000 requests → ≈ 295,000 commands / month (Must ≤ 500,000: met)**; at 2 requests / minute ≈ 590,000 (not met). The load-test mix (≈ 11 requests / user / minute) is far above real office use.
-Gates after the code was final: tie-out 0 FAIL (preview / medium / volume), report tie-out 219 / 219 / 217 PASS, As-of replay 0 mismatches ×3, exports 50 × 2 formats 0 problems ×3 (`tieout_*`, `asof_replay_*`, `exports_*`). Full pytest sequential **952 passed, 0 failed** (`pytest_full_3i.log`, includes connection matrix, integrity, chronology and db-audit suites). ESLint 0, `CI=true yarn build` OK. The load tests ran on throw-away scratch copies (deleted after).
+## 3 · Guard rail — noise actions × surfaces (both servers)
+`tests/test_phase3i_noise_surfaces.py`, cells in `noise_matrix.md`: write on server A, read on A and on a second backend process B (both caches warm first). Bills raised `reminder_sent_at` 🟢🟢 · booking page "Letters & documents" 🟢🟢 · Customer 360 generated documents 🟢🟢 · notification bell count + list 🟢🟢 · Call list last follow-up (leads domain, rule) 🟢 · Payment behaviour reads no reminder / letter / message field (rule) 🟢.
 
-## 5 · Not done in 3I (honest)
-- Report figures kept ready in MongoDB (per-booking money snapshot + per-day receipt summaries updated by each save) — not built. The speed came from removing waste (GC stalls, double reads, N+1 queries, a full-scan plan, JSON round trips) plus an in-process per-booking row memo. Collections (reads 18k receipts each first open) and the Home first-after-save need that design.
-- Writes: trend refresh still recomputes 24 months over all receipts per scope (≈ 200 ms company scope) — incremental by month not built.
-- REQ-359/360 nightly "Report figures: in step" check + self-repair, M-01 unique keys, M-09 letters outbox, monthly move-to-archive for login records / notifications, M-12 engagement score, suite on a single-node replica set, 3G race + 2-process stale drills in both modes — not run / not built.
-- Memory growth under load (§2 Q-55).
+## 4 · Background jobs at 1,500 bookings (duty cap 0.5, one core) · single run across servers
+Table: `job_windows.md`. Overdue-reminder catch-up 1,513 s (final code; 1,577 s earlier run, 1,548 letters) vs 8 h send window — longer than the hourly loop gap, but the loop is sequential so the next run waits; it never overlaps · daily dues 5 s vs 600 s · nightly integrity 4 s vs 600 s · archive 0.1 s · overdue notifications, hold sweep, message send, snapshots < 1 s. Demo refresh acts on the demo company only (no data at 1,500 bookings); it is a leader loop like the others.
+Two-server proof found and fixed: (1) the hold-expiry sweep ran in **every** process — now leader-only, and release / 24 h warning act only when their own update changed the flat (no double notification); (2) a lease handover could leave the old leader's jobs running ≤ 20 s after a stall — the holder now fences itself (`leader.check()` at every job start and between job items; past TTL − renew − margin since its last renewal it stops, runs marked STOPPED), and a process taking over another's lease waits renew + margin before starting. Every run records its owner. `tests/test_phase3i_leader_fence.py`: two real processes, TTL 6 s, the first stalls 12 s → the job moves to the second with no overlap. Final code, 2 workers × 6 min on one database: every job run has one owner process, 0 overlapping runs (before the fix: hold sweep and message send showed two owners).
+
+## 5 · Tests
+Earlier failures and their root causes: disk full mid-run (ENOSPC, 8 files); 3 static-gate findings (md5, `[:10]` slice, import cycle letter_queue ↔ documents); order dependence (a test asserting another process's "all" mark; motor reused across event loops; Phase Y reading Sales and admin payloads while an xdist worker booked a flat between them — now compared against a Sales payload taken before and after); one invalid run was my own concurrent invocation on the test database (not repeated). Final single sequential run: `pytest_full_3i_final2.log` — **961 passed, 5 skipped, 0 failed** in 1,428.8 s.
+
+## 6 · Open (honest)
+- Home month first-after-save 221 ms and Bills raised 248 ms vs 200: both recompute every money widget / the full 2,763-bill register after a receipt. Next step: per-booking money snapshot + per-day receipt summaries kept in Mongo by each save (not built in 3I).
+- M-12 engagement score check on both servers, the suite on a single-node replica set, and the 3G race / stale drills in both modes were not run in 3I.
+- 10 → 20 min RSS without Redis rose 20 MB (274 → 294); the 60-min soak stays flat after minute 10.

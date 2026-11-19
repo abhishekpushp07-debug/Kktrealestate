@@ -370,6 +370,7 @@ async def _wipe_business_records():
     for c in STORY_WIPE:
         coll = db[c]
         await (coll.raw("story reseed wipe") if isinstance(coll, GuardedCollection) else coll).delete_many({})
+    await db.cache_stamps.delete_many({})  # 3I: a new epoch for every report data stamp
     await _reset_setup_state(db)
 
 

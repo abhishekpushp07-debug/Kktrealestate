@@ -50,11 +50,26 @@ def test_tower_sales_real_vs_display_masking():
         requests.get(f"{BASE}/api/projects/{pid}/tower-sales", headers=_hdr("employee@kkt.in"), timeout=30).status_code
         == 403
     )
-    admin_disp = requests.get(
-        f"{BASE}/api/projects/{pid}/tower-sales", params={"view": "display"}, headers=A, timeout=60
-    ).json()
     strip = lambda d: {k: v for k, v in d.items() if k != "can_toggle"}  # noqa: E731
-    assert strip(admin_disp) == strip(disp), "admin view=display must be byte-for-byte the Sales payload"
+
+    def sales():
+        return strip(
+            requests.get(
+                f"{BASE}/api/projects/{pid}/tower-sales", params={"view": "real"}, headers=S, timeout=60
+            ).json()
+        )
+
+    # other xdist workers book flats in this project: compare against a Sales payload taken right before AND after
+    for _ in range(5):
+        before = sales()
+        admin_disp = strip(
+            requests.get(
+                f"{BASE}/api/projects/{pid}/tower-sales", params={"view": "display"}, headers=A, timeout=60
+            ).json()
+        )
+        if before == sales():  # no write landed in between
+            break
+    assert admin_disp == before, "admin view=display must be byte-for-byte the Sales payload"
 
 
 def test_wizard_co_applicants_linked_on_letter_and_idempotent():

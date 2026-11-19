@@ -3,6 +3,7 @@
 Each definition has a machine form (python / mongo match) and a human form (DEFINITIONS, shown read-only in Settings → Definitions).
 """
 
+import asyncio
 from datetime import date, timedelta
 
 from services import clock
@@ -613,27 +614,24 @@ async def ageing_for_bookings(booking_match: dict, as_of: date | None = None) ->
 
     as_of = as_of or clock.today()
     proj = {"_id": 0, "id": 1, "summary": 1, "other_charges": 1}
-    per, chunk = {}, []
+    bks = await db.bookings.find(live_bookings_match(booking_match), proj).to_list(None)
+    chunks = [bks[i : i + 500] for i in range(0, len(bks), 500)]
 
-    async def flush():  # O(chunk) memory: demands for ≤500 bookings at a time, bands kept (6 ints per booking), demand rows dropped
+    async def demands(chunk):  # demands for ≤500 bookings per read; 3I: the reads run side by side
         dem = {}
         async for d in db.demands.find(
             {"booking_id": {"$in": [b["id"] for b in chunk]}, "voided": {"$ne": True}},
             {"_id": 0, "booking_id": 1, "due_date": 1, "cash_demand_paise": 1, "account_demand_paise": 1, "status": 1},
         ).batch_size(500):
             dem.setdefault(d["booking_id"], []).append(d)
+        return dem
+
+    per = {}
+    for chunk, dem in zip(chunks, await asyncio.gather(*(demands(c) for c in chunks))):
         for b in chunk:
             per[b["id"]] = ageing_bands(
                 b.get("summary") or {}, dem.get(b["id"], []), b.get("other_charges") or [], as_of
             )
-        chunk.clear()
-
-    async for b in db.bookings.find(live_bookings_match(booking_match), proj).batch_size(500):
-        chunk.append(b)
-        if len(chunk) >= 500:
-            await flush()
-    if chunk:
-        await flush()
     total = {k: sum(p[k] for p in per.values()) for k in BANDS}
     return total, per
 

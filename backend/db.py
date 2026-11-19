@@ -436,6 +436,24 @@ async def _indexes_phase3i():
     await _safe_index(db.job_runs, [("job", ASCENDING), ("started_at", DESCENDING)], "job_started")
     await _safe_index(db.doc_verifications, [("code", ASCENDING)], "code")
     await _safe_index(db.generated_documents, [("booking_id", ASCENDING), ("type", ASCENDING)], "booking_type")
+    await _safe_index(db.ledger_entries, [("type", ASCENDING), ("date", ASCENDING)], "type_date")  # refunds in a period
+    await _safe_index(  # 3I: Payment behaviour reads the paid-to-date running totals from the index alone
+        db.ledger_entries,
+        [
+            ("booking_id", ASCENDING),
+            ("seq", ASCENDING),
+            ("date", ASCENDING),
+            ("cash_paid_cum_paise", ASCENDING),
+            ("account_paid_cum_paise", ASCENDING),
+        ],
+        "paid_cum_covered",
+    )
+    await _safe_index(  # plan-change history for the bookings shown (Transfers report)
+        db.audit_logs,
+        [("company_id", ASCENDING), ("action", ASCENDING), ("entity_id", ASCENDING)],
+        "company_action_entity",
+    )
+    await _safe_index(db.letter_queue, [("done_at", ASCENDING), ("created_at", ASCENDING)], "undone_letters")  # M-09
     # received = cleared: the cheque / DD branch of definitions.received_match ranges on cleared_at (was a full scan)
     for name, day in (("received_mode_day", "payment_date"), ("received_instrument", "cleared_at")):
         await _safe_index(

@@ -131,6 +131,10 @@ async def _insert_audit(evt: dict) -> str:
         "propagated_complete": False,
     }
     await db.audit_logs.insert_one(doc)
+    from services import stamps, ttlcache
+
+    if not ttlcache._NOISE.match(evt["action"]):
+        await stamps.bump(evt.get("company_id"), evt["action"])  # 3I: per-domain report data versions
     return doc["id"]
 
 

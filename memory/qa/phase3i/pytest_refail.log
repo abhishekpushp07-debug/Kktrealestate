@@ -1,0 +1,13 @@
+......................................                                   [100%]
+=============================== warnings summary ===============================
+tests/test_startup_s1_s3_idempotent.py:71
+  /app/backend/tests/test_startup_s1_s3_idempotent.py:71: PytestUnknownMarkWarning: Unknown pytest.mark.timeout - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.timeout(900)
+
+tests/test_phase_k_ops.py::test_each_alert_rule_fires_on_synthetic_data
+  /root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12: PendingDeprecationWarning: Please use `import python_multipart` instead.
+    import multipart
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+38 passed, 2 warnings in 265.27s (0:04:25)
+exit 0

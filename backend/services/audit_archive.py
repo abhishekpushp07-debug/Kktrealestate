@@ -4,6 +4,7 @@ from datetime import timedelta
 
 from db import db
 from services import clock
+from services.immutable import GuardedCollection
 from utils import now_iso
 
 DEFAULT_RETENTION_MONTHS = 24
@@ -25,39 +26,58 @@ async def ensure_indexes():
     await coll.create_index("action")
 
 
-async def archive_old_rows(months: int | None = None, batch: int = 1000) -> dict:
-    """Idempotent: copy rows with created_at < cutoff into the archive (upsert by id), then remove them from the
-    hot collection only after the copy is confirmed.
-    """
-    await ensure_indexes()
-    months = months or await retention_months()
-    cutoff = (clock.today() - timedelta(days=30 * months)).isoformat()
+async def _move(name: str, cutoff: str, batch: int, extra: dict | None = None) -> int:
+    """Copy rows older than the cutoff into <name>_archive (upsert by id), then remove them from the hot collection
+    only after the copy is confirmed — rows move, never get deleted."""
+    src, dst = db[name], db[f"{name}_archive"]
+    await dst.create_index("id", unique=True)
+    await dst.create_index([("created_at", -1)])
+    q = {"created_at": {"$lt": cutoff}, **(extra or {})}
     moved = 0
     while True:
-        rows = (
-            await db.audit_logs.find({"created_at": {"$lt": cutoff}}, {"_id": 0})
-            .sort("created_at", 1)
-            .limit(batch)
-            .to_list(batch)
-        )
+        rows = await src.find(q, {"_id": 0}).sort("created_at", 1).limit(batch).to_list(batch)
         if not rows:
             break
         for r in rows:
-            await db.audit_logs_archive.replace_one({"id": r["id"]}, {**r, "archived_at": now_iso()}, upsert=True)
+            await dst.replace_one({"id": r["id"]}, {**r, "archived_at": now_iso()}, upsert=True)
         ids = [r["id"] for r in rows]
-        confirmed = await db.audit_logs_archive.count_documents({"id": {"$in": ids}})
-        if confirmed != len(ids):
+        if await dst.count_documents({"id": {"$in": ids}}) != len(ids):
             break
-        res = await db.audit_logs.raw("archive to cold storage").delete_many({"id": {"$in": ids}})
-        moved += res.deleted_count
+        hot = src.raw("archive to cold storage") if isinstance(src, GuardedCollection) else src
+        moved += (await hot.delete_many({"id": {"$in": ids}})).deleted_count
+    return moved
+
+
+async def archive_old_rows(months: int | None = None, batch: int = 1000) -> dict:
+    """Idempotent monthly move (M-06 / REQ-381): the activity log, login records and read notifications older than
+    the retention window move to their *_archive twins."""
+    await ensure_indexes()
+    months = months or await retention_months()
+    cutoff = (clock.today() - timedelta(days=30 * months)).isoformat()
+    moved = await _move("audit_logs", cutoff, batch)
+    logins = await _move("login_events", cutoff, batch)
+    notes = await _move("notifications", cutoff, batch, {"read": True})  # an unread note stays where it is seen
     await db.settings.update_one(
         {"key": "audit_archive_last_run"},
-        {"$set": {"value": {"at": now_iso(), "cutoff": cutoff, "moved": moved, "months": months}}},
+        {
+            "$set": {
+                "value": {
+                    "at": now_iso(),
+                    "cutoff": cutoff,
+                    "moved": moved,
+                    "logins_moved": logins,
+                    "notifications_moved": notes,
+                    "months": months,
+                }
+            }
+        },
         upsert=True,
     )
     return {
         "cutoff": cutoff,
         "moved": moved,
+        "logins_moved": logins,
+        "notifications_moved": notes,
         "months": months,
         "hot": await db.audit_logs.count_documents({}),
         "archived": await db.audit_logs_archive.count_documents({}),

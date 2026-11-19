@@ -1,6 +1,8 @@
 """Phase 3F Finance: extra row fields for filtering only (bank, mode, shares, days in hand, bands…). They are looked
 up from the same payments / bookings the existing report read; no money figure is changed or re-derived."""
 
+import asyncio
+
 from db import db
 from services import clock
 from services import definitions as D
@@ -95,8 +97,6 @@ async def outstanding_asof(user, ctx):
     D, ageing_bands as of D, incl. other-charge parts and waivers); bill raised / received = ledger Udhar / Jama to D."""
     from reports_v3.customers import BAND_KEYS, customer_status
 
-    rows = [r for r in await customer_status(user, ctx) if r["live"]]
-    q = {"booking_id": {"$in": [r["booking_id"] for r in rows]}, "date": {"$lte": ctx["as_of"].isoformat()}}
     wv = {"$in": ["$type", ["WAIVER", "WAIVER_REVERSAL"]]}
     grp = {
         "_id": "$booking_id",
@@ -104,9 +104,25 @@ async def outstanding_asof(user, ctx):
         "j": {"$sum": "$jama_paise"},
         "w": {"$sum": {"$cond": [wv, "$jama_paise", 0]}},
     }
-    led = {d["_id"]: d async for d in db.ledger_entries.aggregate([{"$match": q}, {"$group": grp}])}
+
+    async def ledger_sums():
+        # 3I: read beside customer_status for every booking booked by the as-of day (a superset of the live rows;
+        # sums are per booking, so only the live rows' values are looked up)
+        ids = await db.bookings.distinct(
+            "id", {"company_id": user["company_id"], "booking_date": {"$lte": ctx["as_of"].isoformat()}}
+        )
+        q = {"booking_id": {"$in": ids}, "date": {"$lte": ctx["as_of"].isoformat()}}
+        return await db.ledger_entries.aggregate([{"$match": q}, {"$group": grp}]).to_list(None)
+
+    status_rows, led_l, hand_l = await asyncio.gather(
+        customer_status(user, ctx),
+        ledger_sums(),
+        D.cheques_in_hand({"company_id": user["company_id"]}, ctx["as_of"].isoformat()),
+    )
+    rows = [r for r in status_rows if r["live"]]
+    led = {d["_id"]: d for d in led_l}
     hand: dict = {}  # REQ-334: dated on / before the day, cleared after it → in hand, still owed
-    for p in await D.cheques_in_hand({"company_id": user["company_id"]}, ctx["as_of"].isoformat()):
+    for p in hand_l:
         h = hand.setdefault(p["booking_id"], [0, 0])
         h[0], h[1] = h[0] + p["amount_paise"], h[1] + 1
     out = []

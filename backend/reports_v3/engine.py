@@ -41,22 +41,32 @@ def options(spec: dict, rows: list[dict]) -> dict:
             continue
         pf = par.get(f.get("parent")) if f.get("parent") else None
         seen = {}
+        fld, lf = f["field"], f.get("label_field", f["field"])
         for r in rows:
-            for v in r.get(f["field"]) if isinstance(r.get(f["field"]), list) else [r.get(f["field"])]:
+            x = r.get(fld)
+            for v in x if isinstance(x, list) else (x,):
                 if v is not None and v not in seen:
-                    lab = r.get(f.get("label_field", f["field"]))
+                    lab = r.get(lf)
                     seen[v] = {"value": v, "label": str(v if isinstance(lab, list) else lab or "—")}
                     if pf:
                         seen[v]["parent"] = r.get(pf["field"])
-        out[f["key"]] = sorted(seen.values(), key=lambda o: _natural(o["label"]))
+        out[f["key"]] = sorted(
+            seen.values(), key=lambda o: (_natural(o["label"]), str(o["value"]))
+        )  # ties: by value (stable across paths)
     return out
 
 
+ALL_TIME_FROM = "2000-01-01"  # a drill link that means "every date"
 _DIGITS = __import__("re").compile(r"(\d+)")
 
 
+@__import__("functools").lru_cache(maxsize=65536)
+def _nat(s: str) -> tuple:
+    return tuple(int(t) if t.isdigit() else t.lower() for t in _DIGITS.split(s))
+
+
 def _natural(s):
-    return [int(t) if t.isdigit() else t.lower() for t in _DIGITS.split(str(s))]
+    return _nat(str(s))
 
 
 def _num(v):
@@ -119,7 +129,17 @@ def apply_filters(spec: dict, rows: list[dict], p: dict) -> list[dict]:
         elif f["kind"] == "min" and p.get(k) not in (None, ""):
             out = [r for r in out if (r.get(field) or 0) >= float(p[k])]
         elif f["kind"] == "in_hand_on" and p.get(k):  # REQ-321: the cheques that were in hand on that day
-            out = [r for r in out if D.in_hand_on(r["_pay"], p[k])]
+            day = p[k]
+            out = [  # 3H note: each row reads as it stood on that day (copies — the cached rows stay as of today)
+                r
+                | {
+                    "status": "In hand",
+                    "cleared_on": None,
+                    "days_in_hand": (date.fromisoformat(day) - date.fromisoformat(r["_pay"]["payment_date"])).days,
+                }
+                for r in out
+                if D.in_hand_on(r["_pay"], day)
+            ]
         elif f["kind"] == "bool" and not p.get(k):
             out = [r for r in out if r.get(field)]
         elif f["kind"] == "only" and p.get(k):
@@ -170,6 +190,8 @@ def sentence(spec: dict, p: dict, opts: dict, n: int, as_of: date | None) -> str
             lab = {str(o["value"]): o["label"] for o in opts.get(k, [])}
             names = [lab.get(v, v) for v in p[k]]
             bits.append(", ".join(names[:3]) + (f" +{len(names) - 3}" if len(names) > 3 else ""))
+        elif f["kind"] == "date_range" and p.get(f"{k}_from") == ALL_TIME_FROM and not p.get(f"{k}_to"):
+            bits.append(f"{f['label'].lower()} all time")  # 3I: a line link that covers every date
         elif f["kind"] == "date_range" and (p.get(f"{k}_from") or p.get(f"{k}_to")):
             bits.append(
                 f"{f['label'].lower()} {fmt_date(p.get(f'{k}_from')) or '…'} – {fmt_date(p.get(f'{k}_to')) or '…'}"

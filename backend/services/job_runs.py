@@ -1,7 +1,9 @@
 """Phase K: durable job runs. Every scheduled job writes a job_runs record; per-item failures are captured and the run continues.
 Statuses: RUNNING → OK | FAILED (some items failed) | ABANDONED (stuck > 2× budget, marked by JOB_RUN_SWEEP)."""
 
+import asyncio
 import logging
+import os
 import time
 from datetime import datetime, timedelta, timezone
 
@@ -10,6 +12,8 @@ from services import clock
 from services.notify import notify_roles
 
 log = logging.getLogger("jobs")
+_ME = f"{__import__('socket').gethostname()}:{os.getpid()}"
+JOB_DUTY = float(os.environ.get("KKT_JOB_DUTY", "0.5"))
 BUDGET_S = {
     "DAILY_DUES": 600,
     "NIGHTLY_INTEGRITY": 600,
@@ -27,6 +31,9 @@ def _now():
 
 
 async def start(job: str, meta: dict | None = None) -> dict:
+    from services import leader
+
+    leader.check()  # 3I: a scheduler job never starts while its process can't vouch for the lease
     run = {
         "id": f"{job}-{int(time.time() * 1000)}",
         "job": job,
@@ -37,6 +44,7 @@ async def start(job: str, meta: dict | None = None) -> dict:
         "failed_items": 0,
         "errors": [],
         "budget_s": BUDGET_S.get(job, 600),
+        "owner": _ME,  # 3I: which server process ran it (single-leader proof)
         **(meta or {}),
     }
     await db.job_runs.insert_one({**run})
@@ -72,12 +80,25 @@ async def run_isolated(job: str, items, fn, item_id=lambda x: x.get("id", "?"), 
     """Run fn(item) for every item; one bad item never stops the run."""
     run = await start(job)
     acc = []
+    from services import leader
+
     async for it in items:
+        try:
+            leader.check()  # 3I: stop between items once the lease may have lapsed (the new holder carries on)
+        except leader.LeaseLost:
+            await db.job_runs.update_one(
+                {"id": run["id"]},
+                {"$set": {"status": "STOPPED", "finished_at": _now().isoformat(), "items": run["items"]}},
+            )
+            raise
         run["items"] += 1
+        t0 = time.perf_counter()
         try:
             acc.append(await fn(it))
         except Exception as e:  # noqa: BLE001 — isolation is the point
             await item_failed(run, item_id(it), e)
+        # 3I: a batch job takes at most JOB_DUTY of the process — users' requests get the rest of the loop
+        await asyncio.sleep(min(1.0, (time.perf_counter() - t0) * (1 - JOB_DUTY) / JOB_DUTY))
     return await finish(run, result_fn(acc) if result_fn else {"ok_items": len(acc)})
 
 

@@ -1,6 +1,8 @@
 """Phase P3 — Demand register: DAY → PROJECT → TOWER grouping with two-sided totals, calendar strip, KPIs, manual demand, void.
 Every figure is the demands collection (= ledger Udhar rows); paid comes from the ledger rebuild (demands.paid_paise)."""
 
+import asyncio
+import gzip
 import hashlib
 import json
 import re
@@ -106,6 +108,10 @@ def _row(d: dict, today: str) -> dict:
         "void_reason": d.get("void_reason"),
         "reminder_sent_at": d.get("reminder_sent_at"),
     }
+
+
+# 3I: fields a register row never reads stay in the database (bookkeeping stamps of the bill)
+_ROW_FIELDS = {"_id": 0, "created_at": 0, "posted_at": 0, "cumulative_percent": 0, "milestone_seq": 0, "company_id": 0}
 
 
 def _tot(rows: list[dict]) -> dict:
@@ -323,8 +329,17 @@ async def register(
     key = f"dreg:{user['company_id']}:{hash(repr(sorted(q.items(), key=str)))}:{per_group}:{source}:{int(bool(user.get('project_scope')))}"
 
     async def compute():
-        raw = await db.demands.find(q, {"_id": 0}).sort([(field, -1), ("demand_number", -1)]).limit(5000).to_list(None)
-        await _enrich(raw)
+        async def bills():
+            raw = (
+                await db.demands.find(q, _ROW_FIELDS)
+                .sort([(field, -1), ("demand_number", -1)])
+                .limit(5000)
+                .to_list(None)
+            )
+            return await _enrich(raw)
+
+        # 3I: the Outstanding bridge reads bookings, not the rows — read beside them
+        raw, rec = await asyncio.gather(bills(), _reconcile(user, project_id, block_id))
         rows = [_row(d, today) for d in raw]
         if source:
             rows = [r for r in rows if r["source"] == source]
@@ -377,11 +392,17 @@ async def register(
                 "rows_total_paise": sum(r["total_paise"] for r in rows if not r["voided"]),
                 "groups_total_paise": sum(g["totals"]["total_paise"] for g in out),
             },
-            "reconcile": await _reconcile(user, project_id, block_id),
+            "reconcile": rec,
         }
         # REQ-211: serialise + tag once per cached answer, not on every hit
         text = json.dumps(data, sort_keys=True, default=str)
-        return {"_rows": rows, "_body": text, "_etag": '"' + hashlib.sha256(text.encode()).hexdigest()[:16] + '"'}
+        raw_body = text.encode()
+        return {
+            "_rows": rows,
+            "_body": text,
+            "_gz": gzip.compress(raw_body, 1),  # 3I: compressed once per cached answer; level 1 ≈ ¼ the time of 5
+            "_etag": '"' + hashlib.sha256(raw_body).hexdigest()[:16] + '"',
+        }
 
     data = await ttlcache.cached(key, 30, compute)
     rows = data["_rows"]
@@ -416,10 +437,12 @@ async def register(
     etag = data["_etag"]
     if request.headers.get("if-none-match") == etag:
         return Response(status_code=304, headers={"ETag": etag})
+    gz = "gzip" in (request.headers.get("accept-encoding") or "")
     return Response(
-        content=data["_body"],
+        content=data["_gz"] if gz else data["_body"],
         media_type="application/json",
-        headers={"ETag": etag, "Cache-Control": "private, max-age=30"},
+        headers={"ETag": etag, "Cache-Control": "private, max-age=30", "Vary": "Accept-Encoding"}
+        | ({"Content-Encoding": "gzip"} if gz else {}),
     )
 
 

@@ -38,13 +38,35 @@ def pct(xs, p):
 
 def snapshot(src):
     url = os.environ["MONGO_URL"]
-    dump = subprocess.Popen(["mongodump", "--uri", url, "--db", src, "--archive", "--quiet"], stdout=subprocess.PIPE)
-    subprocess.run(
-        ["mongorestore", "--uri", url, "--archive", "--drop", "--quiet", f"--nsFrom={src}.*", f"--nsTo={SCRATCH_DB}.*"],
-        stdin=dump.stdout,
-        check=True,
-    )
-    dump.wait()
+    from pymongo import MongoClient as _MC
+
+    for attempt in range(3):  # 3I: a restore can trip over a dying worker's writes — start clean and retry
+        _MC(url).drop_database(SCRATCH_DB)
+        dump = subprocess.Popen(
+            ["mongodump", "--uri", url, "--db", src, "--archive", "--quiet"], stdout=subprocess.PIPE
+        )
+        r = subprocess.run(
+            [
+                "mongorestore",
+                "--uri",
+                url,
+                "--archive",
+                "--drop",
+                "--quiet",
+                f"--nsFrom={src}.*",
+                f"--nsTo={SCRATCH_DB}.*",
+            ],
+            stdin=dump.stdout,
+            capture_output=True,
+            text=True,
+        )
+        dump.wait()
+        if r.returncode == 0:
+            break
+        print("restore failed:", (r.stderr or "")[-400:], file=sys.stderr)
+        time.sleep(5)
+    else:
+        raise RuntimeError("scratch restore failed 3 times")
     from pymongo import MongoClient
 
     MongoClient(url)[SCRATCH_DB].leases.delete_many({})

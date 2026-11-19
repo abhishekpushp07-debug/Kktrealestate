@@ -13,6 +13,8 @@ from services import clock
 from services.money import present_money
 
 router = APIRouter(prefix="/home", tags=["home"])
+STATIC = ("next_milestone", "inventory", "flat_status", "construction", "pipeline")
+STATIC_DEPS = ("bills", "bookings", "inventory", "leads", "other")
 
 
 @router.get("/bundle")
@@ -23,7 +25,7 @@ async def bundle(
     user: dict = Depends(require("masters.project.view")),
 ):
     from db import db
-    from services import ttlcache
+    from services import stamps, ttlcache
 
     if project_id:
         ensure_project_access(user, project_id)
@@ -41,30 +43,67 @@ async def bundle(
         )
         rng = H.period_range(period, today)
         perms = set(user["permissions"])
-        per = None
         out = {}
-        if "ageing" in want or ("call_today" in want and "reports.outstanding.view" in perms):
-            res = await H.guarded(H.ageing, user, base, project_id, today)
+        need_age = "ageing" in want or ("call_today" in want and "reports.outstanding.view" in perms)
+
+        async def age():
+            return await H.guarded(H.ageing, user, base, project_id, today) if need_age else None
+
+        async def blk():
+            return (
+                await H._blocks(base) if want & {"next_milestone", "inventory", "flat_status", "construction"} else []
+            )
+
+        async def run(jobs: dict) -> dict:
+            ids = [i for i in jobs if i in want]
+            return dict(zip(ids, await asyncio.gather(*(H.guarded(*jobs[i]) for i in ids))))
+
+        async def money():
+            return await run(
+                {
+                    "money_today": (H.money_today, user, base, project_id, today),
+                    "due_vs_received": (H.due_vs_received, user, base, project_id, rng),
+                    "inflow_30": (H.inflow_30, user, base, project_id, today),
+                    "attention": (H.attention, user, base, project_id),
+                }
+            )
+
+        async def static_widgets():
+            async def compute_static():
+                blocks = await blk()
+                return await run(
+                    {
+                        "next_milestone": (H.next_milestone, user, base, blocks),
+                        "inventory": (H.inventory, user, base, blocks),
+                        "flat_status": (H.flat_status, user, base, blocks),
+                        "construction": (H.construction, user, base, blocks),
+                        "pipeline": (H.pipeline, user, base, project_id, rng),
+                    }
+                )
+
+            if not want & set(STATIC):
+                return {}
+            # 3I: kept ready across saves that don't touch them (a receipt never recomputes towers / stock / pipeline);
+            # the per-domain stamp is shared by every process, so another server's save is seen at once
+            st = await stamps.read(user["company_id"], STATIC_DEPS)
+            skey = f"home:static:{key}:{','.join(sorted(want & set(STATIC)))}:{st}"
+            return await ttlcache.cached(skey, 300, compute_static, stamped=True, stamp=st)
+
+        # 3I: ageing (needed only by Call today) runs beside every other widget instead of before them
+        res, m, s = await asyncio.gather(age(), money(), static_widgets())
+        others = m | s
+        per = None
+        if res is not None:
             if res["ok"]:
                 res["data"], per = res["data"]
             if "ageing" in want:
                 out["ageing"] = res
-        blocks = await H._blocks(base) if want & {"next_milestone", "inventory", "flat_status", "construction"} else []
-        jobs = {
-            "money_today": (H.money_today, user, base, project_id, today),
-            "due_vs_received": (H.due_vs_received, user, base, project_id, rng),
-            "call_today": (H.call_today, user, base, project_id, today, per),
-            "inflow_30": (H.inflow_30, user, base, project_id, today),
-            "next_milestone": (H.next_milestone, user, base, blocks),
-            "inventory": (H.inventory, user, base, blocks),
-            "flat_status": (H.flat_status, user, base, blocks),
-            "construction": (H.construction, user, base, blocks),
-            "pipeline": (H.pipeline, user, base, project_id, rng),
-            "attention": (H.attention, user, base, project_id),
-        }
-        ids = [i for i in jobs if i in want]
-        for i, r in zip(ids, await asyncio.gather(*(H.guarded(*jobs[i]) for i in ids))):
-            out[i] = r
+        if "call_today" in want:
+            out["call_today"] = await H.guarded(H.call_today, user, base, project_id, today, per)
+        out |= others
+        order = ("ageing", "money_today", "due_vs_received", "call_today", "inflow_30", "next_milestone", "inventory")
+        order += ("flat_status", "construction", "pipeline", "attention")
+        out = {i: out[i] for i in order if i in out}  # same key order as before
         projects = (
             await db.projects.find(
                 {"company_id": user["company_id"], "is_active": True, **report_scope_filter(user, "id")},

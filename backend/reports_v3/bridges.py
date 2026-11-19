@@ -12,6 +12,9 @@ async def customer_status(user, p, tot, narrowed):
     return {"br_bvc": b.get("live_paise", 0)}
 
 
+customer_status.independent = True  # reads only Demand vs collection — may run beside the provider
+
+
 async def _coll(user, p) -> dict:
     f, t = p.get("period_from") or "2000-01-01", p.get("period_to") or clock.today().isoformat()
     return (await LG.call(user, "collections-v2", {"from_date": f, "to_date": t, "group_by": "month"}))["totals"]

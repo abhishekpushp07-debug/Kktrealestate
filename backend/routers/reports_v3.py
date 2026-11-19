@@ -1,5 +1,6 @@
 """Phase 3F: /api/reports/v3 — hub, report sheet, options, exports. Read-only."""
 
+import asyncio
 import json
 import math
 import re
@@ -10,6 +11,7 @@ from fastapi import APIRouter, Depends, Request, Response
 from db import db
 from deps import get_current_user
 from reports_v3 import engine as E
+from reports_v3 import fast as FAST
 from reports_v3.registry import CATALOGUE, CONTROL_ROOM, REDIRECTS, REGISTRY, SEGMENTS
 from services import clock, ttlcache
 from services.pdf import company_for_pdf, inr
@@ -98,16 +100,42 @@ _NOISE = re.compile(
 )
 
 
-async def _data_stamp() -> str:
-    """Changes on every data write: the newest non-noise audit row (every write is audited) + the newest ledger row."""
-    a = await db.audit_logs.find_one({"action": {"$not": _NOISE}}, {"_id": 1}, sort=[("_id", -1)])
+_INVENTORY_ONLY = ("inventory-status", "stacking-plan", "price-list", "hold-register", "landowner", "parking")
+
+
+def _deps(spec: dict | None) -> tuple:
+    """3I: the data domains a report reads (services/stamps) — everything unless it provably reads less."""
+    from services import stamps
+
+    k = (spec or {}).get("key")
+    mod = getattr((spec or {}).get("provider"), "__module__", "")
+    if spec and spec.get("segment") == "Leads" and mod == "reports_v3.leads":
+        return ("leads", "bookings", "other")
+    if k in _INVENTORY_ONLY or k == "sales-velocity":
+        return ("inventory", "bookings", "other")
+    return stamps.DOMAINS
+
+
+async def _data_stamp(spec: dict | None = None, cid: str | None = None) -> str:
+    deps = _deps(spec)
+    return await ttlcache.memo_stamp(f"v3:{cid}:{','.join(deps)}", lambda: _data_stamp_read(deps, cid))
+
+
+async def _data_stamp_read(deps: tuple, cid: str | None) -> str:
+    """Moves on every write to a domain the report reads (stamps.bump runs beside every audited write) + the newest
+    ledger row for money reports (a ledger rebuild without an audit row still moves it)."""
+    from services import stamps
+
+    me = await stamps.read(cid, deps)
+    if "money" not in deps:
+        return me
     l = await db.ledger_entries.find_one({}, {"_id": 1}, sort=[("_id", -1)])
-    return f"{a and a['_id']}:{l and l['_id']}"
+    return f"{me}:{l and l['_id']}"
 
 
 async def _rows(spec: dict, user: dict, as_of: date, p: dict | None = None) -> list[dict]:
     """Provider rows cached per scope + as-of + pushed-down filters + data stamp (any write anywhere → recompute)."""
-    stamp = await _data_stamp()
+    stamp = await _data_stamp(spec, user["company_id"])
     push = {k: (p or {}).get(k) for k in spec.get("pushdown", [])}
     push |= {
         f["key"]: (p or {}).get(f["key"])
@@ -126,7 +154,7 @@ async def _rows(spec: dict, user: dict, as_of: date, p: dict | None = None) -> l
 async def _run(spec: dict, user: dict, p: dict) -> dict:
     """The filtered / sorted / totalled result is cached per viewer + params + data stamp, so a repeat (or the next page)
     only slices; any write anywhere changes the stamp and recomputes."""
-    stamp = await _data_stamp()
+    stamp = await _data_stamp(spec, user["company_id"])
     filt = json.dumps({k: v for k, v in p.items() if k not in ("page", "page_size")}, default=str, sort_keys=True)
     key = f"rpt3res:{spec['key']}:{user['id']}:{stamp}:{clock.today()}:{filt}"
     return await ttlcache.cached(key, 600, lambda: _compute(spec, user, p), stamped=True, stamp=stamp)
@@ -134,6 +162,13 @@ async def _run(spec: dict, user: dict, p: dict) -> dict:
 
 async def _compute(spec: dict, user: dict, p: dict) -> dict:
     need = spec.get("needs")
+    money = E.MONEY_PERM in user["permissions"]
+    br = spec.get("bridge") if money else None
+    early = (  # 3I: a bridge that reads only its sibling report runs beside the provider, not after it
+        asyncio.ensure_future(br(user, p, {}, E.narrowed(spec, p)))
+        if br and getattr(br, "independent", False)
+        else None
+    )
     rows = [] if need and not p.get(need["filter"]) else await _rows(spec, user, p["as_of"], p)
     opts = E.options(spec, rows)
     if spec.get("options_provider"):
@@ -148,9 +183,8 @@ async def _compute(spec: dict, user: dict, p: dict) -> dict:
         then = rest[0] if rest else None
     got = E.sort_rows(got, sort, desc, then)
     tot = E.totals(spec, got)
-    money = E.MONEY_PERM in user["permissions"]
-    if money and spec.get("bridge"):  # reconcile with the sibling report that counts on another basis
-        tot |= await spec["bridge"](user, p, tot, E.narrowed(spec, p))
+    if br:  # reconcile with the sibling report that counts on another basis
+        tot |= await early if early else await br(user, p, tot, E.narrowed(spec, p))
     if not money and not spec.get("public_money"):  # no money permission → no money totals either
         plain = {c["key"] for c in spec["columns"] if c["type"] != "money"}
         tot = {k: v for k, v in tot.items() if k in plain}
@@ -302,9 +336,34 @@ async def hub(user: dict = Depends(get_current_user)):
 async def report(key: str, request: Request, user: dict = Depends(get_current_user)):
     spec = _spec(key, user)
     p = _params(spec, request)
+    page, size = max(int(float(p.get("page") or 1)), 1), min(max(int(float(p.get("page_size") or 100)), 10), 500)
+    if FAST.applies(spec, user, p):  # 3I: default view from server-side totals + only this page of rows
+        stamp = await _data_stamp(spec, user["company_id"])
+        k = f"rpt3fast:{spec['key']}:{user['id']}:{stamp}:{clock.today()}:{p['period_from']}:{p['period_to']}:{page}:{size}"
+        fast = dict(
+            await ttlcache.cached(
+                k, 600, lambda: FAST.collections(spec, user, p, page, size), stamped=True, stamp=stamp
+            )
+        )
+        ids = not spec.get("no_customer_ids")
+        rows = [_strip(r, fast["cols"], ids) for r in fast.pop("rows")]
+        body = {
+            "meta": _meta(spec, user),
+            "as_of": p["as_of"].isoformat(),
+            "defaults": {
+                k: p[k] for k in ("period_from", "period_to", "_default_period") if p.get("_default_period") and k in p
+            },
+            "count": fast.pop("count"),
+            "page": page,
+            "page_size": size,
+            **fast,
+            "rows": rows,
+        }
+        return Response(
+            json.dumps(body, default=str), media_type="application/json", headers={"Cache-Control": "private, no-cache"}
+        )
     out = dict(await _run(spec, user, p))  # the cached result is shared; never mutate it
     rows, cols = out.pop("rows_all"), out["cols"]
-    page, size = max(int(float(p.get("page") or 1)), 1), min(max(int(float(p.get("page_size") or 100)), 10), 500)
     body = {
         "meta": _meta(spec, user),
         "as_of": p["as_of"].isoformat(),

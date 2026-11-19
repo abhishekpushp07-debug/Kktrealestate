@@ -216,7 +216,8 @@ async def go():
     b = await S.load_shared(0) and "{cid}" in S.dirty["customers"]
     S.dirty["customers"].discard("{cid}")
     await S.clear({{"customers": {{"{cid}"}}}}, datetime.now(UTC))
-    return [a, b, await S.shared_pending("c:{cid}")]
+    from db import db
+    return [a, b, await db.read_model_marks.find_one({{"_id": "c:{cid}"}}) is not None]  # its own mark; an "all" mark of another process may be pending
 print(json.dumps(asyncio.run(go())))
 """)
     assert out == [True, True, False]

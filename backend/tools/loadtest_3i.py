@@ -21,8 +21,8 @@ import perf_budget as PB  # noqa: E402
 
 R = random.Random(42)
 _B = "/app/.eqtmp/bin"  # a copy that survives the container resetting /usr (LD_LIBRARY_PATH for its libs)
-REDIS_SERVER = "redis-server" if os.path.exists("/usr/bin/redis-server") else f"{_B}/redis-server"
-REDIS_CLI = "redis-cli" if os.path.exists("/usr/bin/redis-cli") else f"{_B}/redis-cli"
+REDIS_SERVER = "/usr/bin/redis-server" if os.path.exists("/usr/bin/redis-server") else f"{_B}/redis-server"
+REDIS_CLI = "/usr/bin/redis-cli" if os.path.exists("/usr/bin/redis-cli") else f"{_B}/redis-cli"
 os.environ["LD_LIBRARY_PATH"] = _B + ":" + os.environ.get("LD_LIBRARY_PATH", "")
 
 
@@ -99,6 +99,8 @@ async def main(a):
                     weights=[20, 15, 15, 10, 25, 10, 5],
                 )[0]
 
+            relogins = [0]
+
             async def user(i):
                 await asyncio.sleep(R.uniform(0, 10))
                 while time.monotonic() < end:
@@ -107,7 +109,17 @@ async def main(a):
                     s = time.perf_counter()
                     try:
                         r = await c.request(m, path, json=body, headers=hh)
-                        if r.status_code >= 500:
+                        if r.status_code == 401:  # access token expired mid-run: sign in again, count it
+                            tok = (
+                                await c.post(
+                                    "/api/auth/login",
+                                    json={"email": "admin@kkt.in", "password": PB.DEMO_PASSWORD},
+                                    headers={"X-Rate-Limit-Bypass": PB.BYPASS},
+                                )
+                            ).json()
+                            h["Authorization"] = f"Bearer {tok['access_token']}"
+                            relogins[0] += 1
+                        elif r.status_code >= 500 or r.status_code in (400, 403, 429):
                             errs[f"{name} {r.status_code}"] += 1
                     except httpx.HTTPError as e:
                         errs[f"{name} {type(e).__name__}"] += 1
@@ -118,6 +130,8 @@ async def main(a):
                 while time.monotonic() < end:
                     await asyncio.sleep(5)
                     el = time.monotonic() - t0
+                    if el >= 300 * (len(rss.setdefault("curve", [])) + 1):  # RSS every 5 min (memory curve)
+                        rss["curve"].append((round(el / 60), rss_mb(proc.pid)))
                     if "10min" not in rss and el >= 600:
                         rss["10min"] = rss_mb(proc.pid)
                         if a.redis:
@@ -126,7 +140,7 @@ async def main(a):
                             await asyncio.sleep(60)
                             subprocess.run(
                                 [
-                                    "redis-server",
+                                    REDIS_SERVER,
                                     "--daemonize",
                                     "yes",
                                     "--port",
@@ -141,7 +155,9 @@ async def main(a):
 
             await asyncio.gather(ticker(), *(user(i) for i in range(a.users)))
             rss["20min"] = rss_mb(proc.pid)
-            ops = (await c.get("/api/admin/ops", headers=h)).json()
+            rss["relogins"] = relogins[0]
+            r_ops = await c.get("/api/admin/ops", headers=h)
+            ops = r_ops.json() if r_ops.status_code == 200 else {"status": r_ops.status_code, "body": r_ops.text[:200]}
     finally:
         proc.terminate()
         proc.wait(timeout=30)
@@ -166,11 +182,15 @@ async def main(a):
         )
     lines += [
         "",
-        f"RSS MB per worker: start {rss.get('start')} · 10 min {rss.get('10min')} · 20 min {rss.get('20min')}",
+        f"RSS MB per worker: start {rss.get('start')} · 10 min {rss.get('10min')} · end ({a.minutes:g} min) {rss.get('20min')}",
+        f"Re-sign-ins after token expiry: {rss.get('relogins')}",
+        "RSS curve (minute, MB per process): " + " · ".join(f"{m}: {v}" for m, v in rss.get("curve", [])),
     ]
     if a.redis:
         lines += [
-            f"Redis stopped at {rss.get('redis_stopped_at_s')} s, back at {rss.get('redis_back_at_s')} s. Redis card (one process): {red}"
+            f"Redis stopped at {rss.get('redis_stopped_at_s')} s, back at {rss.get('redis_back_at_s')} s. "
+            f"Redis card (one process): {red if red is not None else ops}",
+            f"Redis commandstats since it came back: {stats or '—'}",
         ]
     open(a.out, "w").write("\n".join(lines) + "\n")
     print("\n".join(lines))

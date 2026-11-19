@@ -32,11 +32,14 @@ function DateRange({ f, sp, set, defaults }) {
   const to = sp.get(`${f.key}_to`) || (dflt ? dflt.period_to : "");
   const preset =
     sp.get(`${f.key}_preset`) || (dflt ? dflt._default_period : from || to ? "custom" : "");
-  const label = preset
-    ? preset === "custom"
-      ? `${fmtDate(from) || "…"} – ${fmtDate(to) || "…"}`
-      : Object.fromEntries(DATE_PRESETS)[preset]
-    : "Any date";
+  const allTime = from === "2000-01-01" && !to; // a drill link that covers every date
+  const label = allTime
+    ? "All time"
+    : preset
+      ? preset === "custom"
+        ? `${fmtDate(from) || "…"} – ${fmtDate(to) || "…"}`
+        : Object.fromEntries(DATE_PRESETS)[preset]
+      : "Any date";
   const pick = (p) => {
     let n = setParam(sp, `${f.key}_preset`, p);
     const r = presetRange(p);

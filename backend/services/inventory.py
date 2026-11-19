@@ -378,7 +378,7 @@ async def expire_holds(actor: dict | None = None) -> dict:
         h = f.get("hold") or {}
         owners = [u for u in (h.get("for_user_id"), h.get("created_by")) if u]
         if h["expires_at"] <= now_s:
-            await db.flats.update_one(
+            done = await db.flats.update_one(
                 {"id": f["id"], "status": "Hold"},
                 {
                     "$set": {
@@ -392,6 +392,8 @@ async def expire_holds(actor: dict | None = None) -> dict:
                     "$inc": {"version": 1},
                 },
             )
+            if not done.modified_count:  # 3I: released already (another server's sweep / a user) — say it once
+                return "noop"
             await write_audit(
                 actor or {"id": None, "company_id": f["company_id"], "full_name": "Hold expiry sweep"},
                 "flat.hold_expired",
@@ -412,7 +414,12 @@ async def expire_holds(actor: dict | None = None) -> dict:
             )
             return "released"
         if not h.get("expiry_warned"):
-            await db.flats.update_one({"id": f["id"]}, {"$set": {"hold.expiry_warned": True}})
+            w = await db.flats.update_one(
+                {"id": f["id"], "status": "Hold", "hold.expiry_warned": {"$ne": True}},
+                {"$set": {"hold.expiry_warned": True}},
+            )
+            if not w.modified_count:  # 3I: warned already — once per hold
+                return "noop"
             await notify_users(
                 f["company_id"],
                 owners,

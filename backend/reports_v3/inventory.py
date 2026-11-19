@@ -100,7 +100,11 @@ async def flats(user: dict, ctx: dict) -> list[dict]:
 
     who = "real" if real else f"display:{me}"
     return await ttlcache.cached(
-        f"rpt3:flats:{ttlcache.scope_key(user)}:{who}:{ctx.get('stamp')}", 600, load, stamped=True
+        f"rpt3:flats:{ttlcache.scope_key(user)}:{who}:{ctx.get('stamp')}",
+        600,
+        load,
+        stamped=True,
+        stamp=ctx.get("stamp"),
     )
 
 

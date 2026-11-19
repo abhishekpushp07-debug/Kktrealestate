@@ -1,5 +1,6 @@
 """Phase I reports: every number comes from definitions / the two-sided ledger / read models. Shared shape: KPI strip + table + totals + drill links."""
 
+import asyncio
 import hashlib
 import json
 from collections import Counter
@@ -35,12 +36,11 @@ def etag_respond(request: Request, out):
 
 
 async def _data_stamp() -> str:
-    """Changes on every write: each write is audited (outbox) and every money change rebuilds ledger rows (new ids)."""
-    out = []
-    for coll in (db.audit_logs, db.ledger_entries):
-        d = await coll.find_one({}, {"_id": 1}, sort=[("_id", -1)])
-        out.append(str(d["_id"]) if d else "-")
-    return ":".join(out)
+    """Moves on every business write on any worker (3I: the shared noise-free stamp — a report open writes a
+    "viewed" audit row, which used to retire this very cache on every read)."""
+    from services import ttlcache
+
+    return await ttlcache.data_stamp()
 
 
 async def cached_report(request: Request, name: str, user: dict, params: list, make):
@@ -131,22 +131,19 @@ async def received_rows(user, f, t, date_basis="cleared", project_id=None, block
     every reversal (negative) on its reversal day. Returns ({booking_id: booking}, rows, receipts read)."""
     cid = user["company_id"]
     bq = {**_scope(user, project_id, block_id)}
-    bids = {
-        b["id"]: b
-        for b in await db.bookings.find(
-            bq,
-            {
-                "_id": 0,
-                "id": 1,
-                "booking_number": 1,
-                "project_id": 1,
-                "block_id": 1,
-                "sales_user_id": 1,
-                "customer_name": 1,
-                "customer_id": 1,
-            },
-        ).to_list(None)
-    }
+    bfind = db.bookings.find(
+        bq,
+        {
+            "_id": 0,
+            "id": 1,
+            "booking_number": 1,
+            "project_id": 1,
+            "block_id": 1,
+            "sales_user_id": 1,
+            "customer_name": 1,
+            "customer_id": 1,
+        },
+    ).to_list(None)
 
     # Jama side from receipts: status Cleared (pending excluded) + reversed receipts (their receipt, then a negative row on the reversal date)
     def on(p):  # effective date by basis; default "cleared" = REQ-319 (cheque / DD on its clearing day)
@@ -160,20 +157,19 @@ async def received_rows(user, f, t, date_basis="cleared", project_id=None, block
         f
     )  # REQ-211: only receipts that can touch the period (dated, posted, cleared or reversed in it)
     st = {"$in": ["Cleared", "Reversed"]}  # each branch is index-backed (posted_at is restamped at clearance)
-    pays = [
-        p
-        for p in await db.payments.find(
-            {
-                "$or": [
-                    {"company_id": cid, "status": st, "payment_date": {"$gte": f}},
-                    {"company_id": cid, "status": st, "posted_at": {"$gte": since}},
-                    {"company_id": cid, "status": "Reversed", "reversal.at": {"$gte": since}},
-                ]
-            },
-            dict.fromkeys(_COLL_FIELDS, 1) | {"_id": 0},
-        ).to_list(None)
-        if p["booking_id"] in bids
-    ]
+    pfind = db.payments.find(
+        {
+            "$or": [
+                {"company_id": cid, "status": st, "payment_date": {"$gte": f}},
+                {"company_id": cid, "status": st, "posted_at": {"$gte": since}},
+                {"company_id": cid, "status": "Reversed", "reversal.at": {"$gte": since}},
+            ]
+        },
+        dict.fromkeys(_COLL_FIELDS, 1) | {"_id": 0},
+    ).to_list(None)
+    bl, pl = await asyncio.gather(bfind, pfind)  # 3I: the two reads are independent
+    bids = {b["id"]: b for b in bl}
+    pays = [p for p in pl if p["booking_id"] in bids]
     from services.definitions import receipt_parts
 
     rows = []
@@ -190,26 +186,31 @@ async def received_rows(user, f, t, date_basis="cleared", project_id=None, block
     return bids, rows, pays
 
 
+async def refunds_in(bids, f: str, t: str) -> dict:
+    """Refund rows dated in the period for these bookings (index type+date: refunds are few; no 1,500-id $in)."""
+    keep = set(bids)
+    rows = await db.ledger_entries.find(
+        {"type": "REFUND", "date": {"$gte": f, "$lte": t}}, {"_id": 0, "booking_id": 1, "jama_paise": 1}
+    ).to_list(None)
+    mine = [r for r in rows if r.get("booking_id") in keep]
+    return {"j": sum(r.get("jama_paise") or 0 for r in mine), "n": len(mine)}
+
+
 async def money_lines(rows: list[dict], bids: set, scope: dict, f: str, t: str) -> dict:
     """REQ-320/323/327: the named lines beside Received — by mode (Bank-wise + Cash = Collections), cheques in hand at
     the period end (never inside Received) and refunds paid out in the period (never netted from Received)."""
     cash = sum(r["_amt"] for r in rows if r.get("payment_mode_code") == "CASH")
     rev = -sum(r["_amt"] for r in rows if r["_rev"])
     hand = [p for p in await definitions.cheques_in_hand(scope, t) if p["booking_id"] in bids]
-    ref = await db.ledger_entries.aggregate(
-        [
-            {"$match": {"booking_id": {"$in": list(bids)}, "type": "REFUND", "date": {"$gte": f, "$lte": t}}},
-            {"$group": {"_id": None, "j": {"$sum": "$jama_paise"}, "n": {"$sum": 1}}},
-        ]
-    ).to_list(1)
+    ref = await refunds_in(bids, f, t)
     return {
         "cash_mode_paise": cash,
         "bank_mode_paise": sum(r["_amt"] for r in rows) - cash,
         "reversed_in_period_paise": rev,
         "in_hand_paise": sum(p["amount_paise"] for p in hand),
         "in_hand_n": len(hand),
-        "refunds_paid_paise": abs(ref[0]["j"]) if ref else 0,
-        "refunds_paid_n": ref[0]["n"] if ref else 0,
+        "refunds_paid_paise": abs(ref["j"]),
+        "refunds_paid_n": ref["n"],
     }
 
 
@@ -217,13 +218,8 @@ async def _received_bridge(pays: list[dict], live_ids: list[str], f: str, t: str
     """Collections (receipt date) → carried "received in period" (ledger / clearance date), term by term."""
     # the ledger dates a receipt row on its received day (ledger._row_day = definitions.received_on), no ledger read
     day = {p["receipt_number"]: definitions.received_on(p) for p in pays if p.get("receipt_number")}
-    ref_rows = await db.ledger_entries.aggregate(
-        [
-            {"$match": {"booking_id": {"$in": live_ids}, "type": "REFUND", "date": {"$gte": f, "$lte": t}}},
-            {"$group": {"_id": None, "j": {"$sum": "$jama_paise"}}},
-        ]
-    ).to_list(1)
-    return definitions.receipts_bridge(pays, day, set(live_ids), f, t, ref_rows[0]["j"] if ref_rows else 0)
+    ref = await refunds_in(live_ids, f, t)
+    return definitions.receipts_bridge(pays, day, set(live_ids), f, t, ref["j"])
 
 
 @router.get("/collections-v2")
@@ -325,20 +321,29 @@ async def _collections_v2(request, from_date, to_date, project_id, block_id, gro
                 }
             )
     out = sorted(g.values(), key=lambda e: e["group"] if group_by in ("day", "week", "month") else -e["total_paise"])
-    pend = await db.payments.aggregate(
-        maxTimeMS=REPORT_MS,
-        pipeline=[
-            {"$match": {**_scope(user, project_id, block_id), "status": "Pending"}},
-            {"$group": {"_id": None, "n": {"$sum": 1}, "amt": {"$sum": "$amount_paise"}}},
-        ],
-    ).to_list(1)
+
+    async def live_side():
+        ids = [b["id"] async for b in db.bookings.find({**bq, "status": {"$in": LIVE}}, {"_id": 0, "id": 1})]
+        return ids, await definitions.carried(ids, f, t), await _received_bridge(pays, ids, f, t)
+
+    pend, lines, (_live, carried, rbridge) = await asyncio.gather(  # 3I: independent reads, side by side
+        db.payments.aggregate(
+            maxTimeMS=REPORT_MS,
+            pipeline=[
+                {"$match": {**_scope(user, project_id, block_id), "status": "Pending"}},
+                {"$group": {"_id": None, "n": {"$sum": 1}, "amt": {"$sum": "$amount_paise"}}},
+            ],
+        ).to_list(1),
+        money_lines(rows, set(bids), _scope(user, project_id, block_id), f, t),
+        live_side(),
+    )
     totals = {
         k: sum(e[k] for e in out)
         for k in ("count", "cash_paise", "account_paise", "other_paise", "reversal_paise", "total_paise")
     }
     totals["pending_instruments"] = pend[0]["n"] if pend else 0
     totals["pending_paise"] = pend[0]["amt"] if pend else 0
-    totals |= await money_lines(rows, set(bids), _scope(user, project_id, block_id), f, t)
+    totals |= lines
     label = {
         "day": "Day",
         "week": "Week",
@@ -377,11 +382,9 @@ async def _collections_v2(request, from_date, to_date, project_id, block_id, gro
         "receipt": "Date basis: receipt date",
         "clearance": "Date basis: clearance date",
     }[date_basis]
-    live_ids = [b["id"] async for b in db.bookings.find({**bq, "status": {"$in": LIVE}}, {"_id": 0, "id": 1})]
-    carried = await definitions.carried(live_ids, f, t)
     payload = {
         "carried": carried,
-        "received_bridge": await _received_bridge(pays, live_ids, f, t),
+        "received_bridge": rbridge,
         "purpose": (
             "What money came in (Received side), sliced any way you need. Cleared receipts only; a reversal is netted out of its own "
             "Cash / Account / Other bucket on the reversal date, so Cash + Account + Other = Net received."

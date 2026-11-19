@@ -86,6 +86,22 @@
    ]
   ]
  },
+ "audit_logs.company_action_entity": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "action",
+    1
+   ],
+   [
+    "entity_id",
+    1
+   ]
+  ]
+ },
  "audit_logs.company_id_1_created_at_-1": {
   "key": [
    [
@@ -2073,6 +2089,54 @@
    ]
   ],
   "unique": true
+ },
+ "ledger_entries.paid_cum_covered": {
+  "key": [
+   [
+    "booking_id",
+    1
+   ],
+   [
+    "seq",
+    1
+   ],
+   [
+    "date",
+    1
+   ],
+   [
+    "cash_paid_cum_paise",
+    1
+   ],
+   [
+    "account_paid_cum_paise",
+    1
+   ]
+  ]
+ },
+ "ledger_entries.type_date": {
+  "key": [
+   [
+    "type",
+    1
+   ],
+   [
+    "date",
+    1
+   ]
+  ]
+ },
+ "letter_queue.undone_letters": {
+  "key": [
+   [
+    "done_at",
+    1
+   ],
+   [
+    "created_at",
+    1
+   ]
+  ]
  },
  "locks.name_1": {
   "key": [

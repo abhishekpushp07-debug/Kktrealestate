@@ -795,6 +795,14 @@ async def get_customer(
         )
         customer_id = hit["id"] if hit else customer_id
     doc = await get_or_404(db.customers, customer_id, "Customer", {"company_id": user["company_id"]})
+    from services.read_model_state import shared_pending
+
+    if await shared_pending(f"c:{doc['id']}"):  # M-12: a save on the other server is still pending → same score here
+        from services.read_models import refresh_customer
+
+        s = await refresh_customer(doc["id"])
+        if s:
+            doc |= {"engagement_score": s["engagement_score"], "lifecycle_stage": s["lifecycle_stage"]}
     do_reveal = reveal and "sales.kyc.reveal" in user["permissions"]
     if reveal and not do_reveal:
         raise ApiError(

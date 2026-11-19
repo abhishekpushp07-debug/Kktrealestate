@@ -383,12 +383,13 @@ async def finish_raise(
             "role": "system",
             "project_scope": ["*"],
         }
-        from services import after_commit
+        from services import after_commit, letter_queue
 
+        await letter_queue.mark(booking["id"], [d["id"] for d in created], who_docs)  # M-09: survives a server stop
         for d in created:  # REQ-111: demand letters are best-effort PDFs → after the response, one call per booking
             await after_commit.defer(
                 ("demand_docs", booking["id"]),
-                lambda ids, bid=booking["id"]: auto_register(bid, ["demand"], who_docs, demand_ids=ids),
+                lambda ids, bid=booking["id"]: letter_queue.run(bid, ids, who_docs, auto_register),
                 d["id"],
             )
     for d in created:

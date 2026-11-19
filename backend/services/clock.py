@@ -68,10 +68,18 @@ def day_of(ts: str | datetime | None) -> str | None:
     if isinstance(ts, str):
         if len(ts) <= 10:
             return ts
-        ts = datetime.fromisoformat(ts)
+        return _day_of_str(ts, business_tz())  # 3I: report reads convert the same stored timestamps many times
     if ts.tzinfo is None:
         ts = ts.replace(tzinfo=UTC)
     return ts.astimezone(business_tz()).date().isoformat()
+
+
+@__import__("functools").lru_cache(maxsize=200_000)
+def _day_of_str(ts: str, tz) -> str:
+    d = datetime.fromisoformat(ts)
+    if d.tzinfo is None:
+        d = d.replace(tzinfo=UTC)
+    return d.astimezone(tz).date().isoformat()
 
 
 def day_start_utc(d: date | str | None = None) -> str:

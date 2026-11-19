@@ -148,7 +148,7 @@ async def base(user: dict, stamp: str | None = None) -> list[dict]:
         return out
 
     key = f"rpt3:leads:{ttlcache.scope_key(user)}:{stamp}"
-    return await ttlcache.cached(key, 600 if stamp else 60, load, stamped=bool(stamp))
+    return await ttlcache.cached(key, 600 if stamp else 60, load, stamped=bool(stamp), stamp=stamp)
 
 
 async def options(user):

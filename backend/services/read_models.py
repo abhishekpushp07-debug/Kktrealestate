@@ -4,6 +4,7 @@ Maintained by the event bus (debounced ≤2 s) + a 60 s sweep; `recompute_all()`
 
 import asyncio
 import hashlib
+import importlib
 import logging
 from datetime import UTC, datetime, timedelta
 
@@ -14,6 +15,7 @@ from db import db
 from events import bus, reconcile_outbox
 from services import clock
 from services import read_model_state as _state
+from services import ttlcache as _ttl
 
 log = logging.getLogger("kkt.readmodels")
 _dirty = _state.dirty
@@ -119,7 +121,7 @@ ENTITY_LOOKUP = {
 @bus.subscribe("entity.changed", "read_models")
 async def _on_change(evt: dict):
     spec = ENTITY_LOOKUP.get(evt.get("entity_type"))
-    if not spec:
+    if not spec or _ttl._NOISE.match(evt.get("action") or ""):  # 3I: reminders / letters / messages move no figure
         return
     coll, (pf, bf, cf) = spec
     doc = await coll.find_one(
@@ -433,10 +435,10 @@ async def compute_dashboard(company_id: str, scope: list[str] | None) -> dict:
 async def get_dashboard(company_id: str, scope: list[str] | None) -> dict:
     if await _state.shared_pending():  # 3G: a write on any replica is not flushed yet → figures from source
         pf = {} if not scope or "*" in scope else {"id": {"$in": scope}}
-        for bid in await _state.marked("blocks"):
-            await refresh_block(bid)  # tower progress / units feed the project summary
-        for p in await db.projects.find({"company_id": company_id, **pf}, {"_id": 0, "id": 1}).to_list(None):
-            await refresh_project(p["id"])  # project_summaries feed the dashboard: recompute them first
+        # tower progress / units feed the project summary; project_summaries feed the dashboard: recompute them first
+        await asyncio.gather(*(refresh_block(bid) for bid in await _state.marked("blocks")))  # 3I: in parallel
+        ps = await db.projects.find({"company_id": company_id, **pf}, {"_id": 0, "id": 1}).to_list(None)
+        await asyncio.gather(*(refresh_project(p["id"]) for p in ps))
         return await compute_dashboard(company_id, scope)
     snap = await db.dashboard_snapshots.find_one(
         {"company_id": company_id, "scope_hash": scope_hash(scope)}, {"_id": 0}
@@ -469,6 +471,13 @@ async def recompute_all() -> dict:
     return out
 
 
+async def _reconcile_letters():
+    from services import letter_queue
+
+    auto_register = importlib.import_module("services.documents").auto_register  # lazy, as in dues_engine
+    return await letter_queue.reconcile(auto_register)
+
+
 async def sweep_loop():
     while True:
         await asyncio.sleep(60)
@@ -477,6 +486,7 @@ async def sweep_loop():
             await _state.load_shared(older_than_s=DEBOUNCE_S + 3)  # marks of a crashed process / another replica
             await timed_job("read_model_flush", flush)
             await timed_job("outbox_reconcile", reconcile_outbox)
+            await timed_job("letter_reconcile", _reconcile_letters)
             for p in await db.project_summaries.find(
                 {"computed_at": {"$lt": (clock.now() - timedelta(minutes=10)).isoformat()}}, {"_id": 0, "project_id": 1}
             ).to_list(50):

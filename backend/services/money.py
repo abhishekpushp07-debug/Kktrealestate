@@ -31,14 +31,27 @@ _LEGACY = (
 )  # legacy key stems → English (one-release compatibility aliases)
 
 
+_PLAN: dict[tuple, tuple] = {}
+
+
+def _plan(d: dict) -> tuple:
+    """3I: rows share key sets — find the legacy-stem keys once per key set, not per row."""
+    keys = tuple(d)
+    plan = _PLAN.get(keys)
+    if plan is None:
+        plan = tuple((k, k.replace(o, n)) for k in keys for o, n in _LEGACY if o in k)
+        if len(_PLAN) < 4096:
+            _PLAN[keys] = plan
+    return plan
+
+
 def _english_aliases(d: dict) -> dict:
     """Legacy ledger keys (udhar_*/jama_*) stay for one release; English twins (bill_raised_*/received_*) are added, plus the signed
     balance (received − bill raised) and its status whenever both totals are present (see definitions.two_sided)."""
     extra = {}
-    for k, v in d.items():
-        for old, new in _LEGACY:
-            if old in k and isinstance(v, int):
-                extra[k.replace(old, new)] = v
+    for k, nk in _plan(d):
+        if isinstance(d[k], int):
+            extra[nk] = d[k]
     tu, tj = d.get("total_udhar_paise", d.get("udhar_paise")), d.get("total_jama_paise", d.get("jama_paise"))
     if isinstance(d.get("total_jama_paise"), int) and d.get("waived_paise"):  # REQ-253: Jama = received + waived
         extra["total_received_paise"] = d["total_jama_paise"] - d["waived_paise"]
@@ -55,6 +68,14 @@ def present_money(obj, twins: bool = True):
     if isinstance(obj, list):
         return [present_money(x, twins) for x in obj]
     if isinstance(obj, dict):
+        if not twins and not _plan(
+            obj
+        ):  # 3I fast path: no legacy-stem key ⇒ no alias, copy and recurse only into containers
+            out = dict(obj)
+            for k, v in out.items():
+                if type(v) in (dict, list):
+                    out[k] = present_money(v, False)
+            return out
         src = {**obj, **_english_aliases(obj)}
         out = {}
         for k, v in src.items():

@@ -1,17 +1,404 @@
-.........................................s.............................. [  7%]
-........................................................................ [ 15%]
+....................................F....s...........................F.. [  7%]
+.................................................F...................... [ 14%]
 ......................................................................s. [ 22%]
-........................................................................ [ 30%]
+........................................................................ [ 29%]
 ........................................................................ [ 37%]
-........................................................................ [ 45%]
+........................................................................ [ 44%]
 ........................................................................ [ 52%]
-........................................................................ [ 60%]
+........................................................................ [ 59%]
 ........................................................................ [ 67%]
-..................................................s..................... [ 75%]
+...................................................................FF... [ 74%]
 ........................................................................ [ 82%]
-........................................................................ [ 90%]
-.................................................................sss.... [ 97%]
-......................                                                   [100%]
+........................................................................ [ 89%]
+...........F...........................................FFFFFF.......sss. [ 97%]
+.........................                                                [100%]
+=================================== FAILURES ===================================
+___________________ test_no_utc_derived_dates_in_server_code ___________________
+
+    def test_no_utc_derived_dates_in_server_code():
+        hits = [h for f in server_files() if f.name != "clock.py" for h in scan(f)]
+>       assert not hits, "UTC-derived dates (use services.clock):\n" + "\n".join(hits)
+E       AssertionError: UTC-derived dates (use services.clock):
+E         server.py:949: value sliced to a date (a stored timestamp is UTC: use clock.day_of): for st in tracemalloc.take_snapshot().compare_to(base, "lineno")[:10]:
+E       assert not ['server.py:949: value sliced to a date (a stored timestamp is UTC: use clock.day_of): for st in tracemalloc.take_snapshot().compare_to(base, "lineno")[:10]:']
+
+tests/test_business_day_guard.py:49: AssertionError
+______________________ test_no_source_line_over_160_chars ______________________
+
+    def test_no_source_line_over_160_chars():
+        files = _tracked(BACKEND, "*.py") + [
+            f for f in _tracked(FRONTEND, "src") if f.endswith((".js", ".jsx", ".ts", ".tsx", ".css"))
+        ]
+        long = []
+        for f in files:
+            with open(f, encoding="utf-8") as fh:
+                long += [
+                    f"{os.path.relpath(f, BACKEND)}:{i}" for i, ln in enumerate(fh, 1) if len(ln.rstrip("\n")) > MAX_LINE
+                ]
+>       assert not long, f"{len(long)} lines > {MAX_LINE} chars: {long[:20]}"
+E       AssertionError: 1 lines > 160 chars: ['tools/loadtest_3i.py:191']
+E       assert not ['tools/loadtest_3i.py:191']
+
+tests/test_format_gate.py:49: AssertionError
+_______ test_no_import_cycles_including_function_level_among_app_layers ________
+
+    def test_no_import_cycles_including_function_level_among_app_layers():
+        """CR-4.1: DFS/SCC over ALL imports (module + function level) restricted to routers/, services/, core/ → no cycle.
+        The one deliberate lazy edge (services.dues_engine → services.documents via importlib) is not an `import` statement."""
+        mods = {m: p for m, p in _modules().items() if m.split(".")[0] in ("routers", "services", "core")}
+        local = set(mods)
+        graph = {m: {d for d in _imports(p, local, top_level_only=False)} for m, p in mods.items()}
+>       assert _sccs(graph) == []
+E       AssertionError: assert [['services.d...etter_queue']] == []
+E         
+E         Left contains one more item: ['services.documents', 'services.dues_engine', 'services.letter_queue']
+E         Use -v to get more diff
+
+tests/test_import_hygiene.py:147: AssertionError
+____________ test_backup_manifest_and_restore_drill_records_job_run ____________
+
+    def test_backup_manifest_and_restore_drill_records_job_run():
+        """Deterministic under xdist: snapshot the (busy) test DB into a quiescent copy first, then back up + drill that copy so verify compares like with like."""
+        import subprocess
+    
+        from pymongo import MongoClient
+    
+        from tools.backup import run_backup
+    
+        src, quiet = os.environ["DB_NAME"], "kkt_drill_src_test"
+        MongoClient(os.environ["MONGO_URL"]).drop_database(quiet)
+        # F3: stream dump -> restore through an OS pipe; buffering the archive in this worker cost ~850 MB RSS
+        dump = subprocess.Popen(
+            ["mongodump", f"--uri={os.environ['MONGO_URL']}", f"--db={src}", "--archive", "--quiet"],
+            stdout=subprocess.PIPE,
+        )
+        restore = subprocess.run(
+            [
+                "mongorestore",
+                f"--uri={os.environ['MONGO_URL']}",
+                "--archive",
+                f"--nsFrom={src}.*",
+                f"--nsTo={quiet}.*",
+                "--quiet",
+            ],
+            stdin=dump.stdout,
+            capture_output=True,
+            timeout=600,
+        )
+        dump.stdout.close()
+>       assert dump.wait(timeout=600) == 0 and restore.returncode == 0, restore.stderr[-500:]
+E       AssertionError: b''
+E       assert (0 == 0 and 1 == 0)
+E        +  where 0 = wait(timeout=600)
+E        +    where wait = <Popen: returncode: 0 args: ['mongodump', '--uri=mongodb://localhost:27017',...>.wait
+E        +  and   1 = CompletedProcess(args=['mongorestore', '--uri=mongodb://localhost:27017', '--archive', '--nsFrom=kkt_test.*', '--nsTo=kkt_drill_src_test.*', '--quiet'], returncode=1, stdout=b'', stderr=b'').returncode
+
+tests/test_phase_k_ops.py:42: AssertionError
+_____________________ test_ops_has_backup_and_alerts_cards _____________________
+
+admin_headers = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzMzlkNmM0ZS1lYTU1LTRmNjMtYjRjZi0xYjk1NzgwODA...iYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzk1MDc3NjYxLCJleHAiOjE3OTUwODEyNjF9.qm71kTs5ZjpSeqgyuq6WmYi1e2B9pGIRYmMVKR_5ASI'}
+
+    def test_ops_has_backup_and_alerts_cards(admin_headers):
+        j = requests.get(f"{BASE}/api/admin/ops", headers=admin_headers).json()
+>       assert "backup" in j and "stale" in j["backup"] and "alerts" in j and "firing" in j["alerts"]
+E       AssertionError: assert ('backup' in {'detail': 'Internal server error', 'code': 'INTERNAL_ERROR', 'request_id': 'd7b0d97979854ec4', 'error': {'code': 'INTERNAL_ERROR', 'message': 'Internal server error', 'details': [], 'request_id': 'd7b0d97979854ec4'}})
+
+tests/test_phase_k_ops.py:76: AssertionError
+____________ test_reseed_leaves_every_counter_at_or_above_previous _____________
+
+    @pytest.mark.load_sensitive
+    def test_reseed_leaves_every_counter_at_or_above_previous():
+        url = os.environ["MONGO_URL"]
+        cli = MongoClient(url)
+>       _copy_db(url, os.environ["DB_NAME"])
+
+tests/test_reseed_counters.py:61: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_reseed_counters.py:23: in _copy_db
+    subprocess.run(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+input = None, capture_output = False, timeout = None, check = True
+popenargs = (['mongorestore', '--uri', 'mongodb://localhost:27017', '--archive', '--drop', '--quiet', ...],)
+kwargs = {'stdin': <_io.BufferedReader name=52>}
+
+    def run(*popenargs,
+            input=None, capture_output=False, timeout=None, check=False, **kwargs):
+        """Run command with arguments and return a CompletedProcess instance.
+    
+        The returned instance will have attributes args, returncode, stdout and
+        stderr. By default, stdout and stderr are not captured, and those attributes
+        will be None. Pass stdout=PIPE and/or stderr=PIPE in order to capture them,
+        or pass capture_output=True to capture both.
+    
+        If check is True and the exit code was non-zero, it raises a
+        CalledProcessError. The CalledProcessError object will have the return code
+        in the returncode attribute, and output & stderr attributes if those streams
+        were captured.
+    
+        If timeout is given, and the process takes too long, a TimeoutExpired
+        exception will be raised.
+    
+        There is an optional argument "input", allowing you to
+        pass bytes or a string to the subprocess's stdin.  If you use this argument
+        you may not also use the Popen constructor's "stdin" argument, as
+        it will be used internally.
+    
+        By default, all communication is in bytes, and therefore any "input" should
+        be bytes, and the stdout and stderr will be bytes. If in text mode, any
+        "input" should be a string, and stdout and stderr will be strings decoded
+        according to locale encoding, or by "encoding" if set. Text mode is
+        triggered by setting any of text, encoding, errors or universal_newlines.
+    
+        The other arguments are the same as for the Popen constructor.
+        """
+        if input is not None:
+            if kwargs.get('stdin') is not None:
+                raise ValueError('stdin and input arguments may not both be used.')
+            kwargs['stdin'] = PIPE
+    
+        if capture_output:
+            if kwargs.get('stdout') is not None or kwargs.get('stderr') is not None:
+                raise ValueError('stdout and stderr arguments may not be used '
+                                 'with capture_output.')
+            kwargs['stdout'] = PIPE
+            kwargs['stderr'] = PIPE
+    
+        with Popen(*popenargs, **kwargs) as process:
+            try:
+                stdout, stderr = process.communicate(input, timeout=timeout)
+            except TimeoutExpired as exc:
+                process.kill()
+                if _mswindows:
+                    # Windows accumulates the output in a single blocking
+                    # read() call run on child threads, with the timeout
+                    # being done in a join() on those threads.  communicate()
+                    # _after_ kill() is required to collect that and add it
+                    # to the exception.
+                    exc.stdout, exc.stderr = process.communicate()
+                else:
+                    # POSIX _communicate already populated the output so
+                    # far into the TimeoutExpired exception.
+                    process.wait()
+                raise
+            except:  # Including KeyboardInterrupt, communicate handled that.
+                process.kill()
+                # We don't call process.wait() as .__exit__ does that for us.
+                raise
+            retcode = process.poll()
+            if check and retcode:
+>               raise CalledProcessError(retcode, process.args,
+                                         output=stdout, stderr=stderr)
+E               subprocess.CalledProcessError: Command '['mongorestore', '--uri', 'mongodb://localhost:27017', '--archive', '--drop', '--quiet', '--nsFrom=kkt_test.*', '--nsTo=kkt_test_ctrtest.*']' returned non-zero exit status 1.
+
+/usr/local/lib/python3.11/subprocess.py:571: CalledProcessError
+_______ test_startup_twice_on_db_copy_is_idempotent_and_non_destructive ________
+
+self = Connection(<pymongo.network_layer.NetworkingInterface object at 0xf886f86a3210>) CLOSED at 273258577008272
+request_id = 985778828
+
+    def receive_message(self, request_id: Optional[int]) -> _OpMsg:
+        """Receive a raw BSON message or raise ConnectionFailure.
+    
+        If any exception is raised, the socket is closed.
+        """
+        try:
+>           return receive_message(self, request_id, self.max_message_size)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+/root/.venv/lib/python3.11/site-packages/pymongo/synchronous/pool.py:446: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/root/.venv/lib/python3.11/site-packages/pymongo/network_layer.py:777: in receive_message
+    length, _, response_to, op_code = _UNPACK_HEADER(receive_data(conn, 16, deadline))
+                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/pymongo/network_layer.py:354: in receive_data
+    chunk_length = conn.conn.recv_into(mv[bytes_read:])
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <pymongo.network_layer.NetworkingInterface object at 0xf886f86a3210>
+buffer = <memory at 0xf886f8613f40>
+
+    def recv_into(self, buffer: bytes | memoryview) -> int:
+>       return self.conn.recv_into(buffer)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       ConnectionResetError: [Errno 104] Connection reset by peer
+
+/root/.venv/lib/python3.11/site-packages/pymongo/network_layer.py:472: ConnectionResetError
+
+The above exception was the direct cause of the following exception:
+
+    @pytest.mark.timeout(900)
+    def test_startup_twice_on_db_copy_is_idempotent_and_non_destructive():
+        loop = asyncio.new_event_loop()
+>       cl = loop.run_until_complete(_clone())
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_startup_s1_s3_idempotent.py:74: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/usr/local/lib/python3.11/asyncio/base_events.py:654: in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+tests/test_startup_s1_s3_idempotent.py:35: in _clone
+    await dst[name].insert_many(batch)
+/usr/local/lib/python3.11/concurrent/futures/thread.py:58: in run
+    result = self.fn(*self.args, **self.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/pymongo/_csot.py:126: in csot_wrapper
+    return func(self, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/pymongo/synchronous/collection.py:959: in insert_many
+    blk.execute(write_concern, session, _Op.INSERT)
+/root/.venv/lib/python3.11/site-packages/pymongo/synchronous/bulk.py:609: in execute
+    return self.execute_command(generator, write_concern, session, operation)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/pymongo/synchronous/bulk.py:470: in execute_command
+    _ = client._retryable_write(
+/root/.venv/lib/python3.11/site-packages/pymongo/synchronous/mongo_client.py:2099: in _retryable_write
+    return self._retry_with_session(retryable, func, s, bulk, operation, operation_id)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/pymongo/synchronous/mongo_client.py:1969: in _retry_with_session
+    return self._retry_internal(
+/root/.venv/lib/python3.11/site-packages/pymongo/_csot.py:126: in csot_wrapper
+    return func(self, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/pymongo/synchronous/mongo_client.py:2022: in _retry_internal
+    ).run()
+      ^^^^^
+/root/.venv/lib/python3.11/site-packages/pymongo/synchronous/mongo_client.py:2890: in run
+    res = self._read() if self._is_read else self._write()
+                                             ^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/pymongo/synchronous/mongo_client.py:3103: in _write
+    return self._func(self._session, conn, self._retryable)  # type: ignore
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/pymongo/synchronous/bulk.py:460: in retryable_bulk
+    self._execute_command(
+/root/.venv/lib/python3.11/site-packages/pymongo/synchronous/bulk.py:404: in _execute_command
+    result, to_send = self._execute_batch(bwc, cmd, ops, client)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/pymongo/synchronous/bulk.py:328: in _execute_batch
+    result = self.write_command(bwc, cmd, request_id, msg, to_send, client)  # type: ignore[arg-type]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/pymongo/synchronous/helpers.py:51: in inner
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/pymongo/synchronous/bulk.py:246: in write_command
+    result_docs, _, _ = run_bulk_write_command(
+/root/.venv/lib/python3.11/site-packages/pymongo/synchronous/command_runner.py:269: in run_bulk_write_command
+    return _run_command(
+/root/.venv/lib/python3.11/site-packages/pymongo/synchronous/command_runner.py:192: in _run_command
+    reply = conn.receive_message(request_id)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/root/.venv/lib/python3.11/site-packages/pymongo/synchronous/pool.py:449: in receive_message
+    self._raise_connection_failure(error)
+/root/.venv/lib/python3.11/site-packages/pymongo/synchronous/pool.py:565: in _raise_connection_failure
+    _raise_connection_failure(self.address, error, timeout_details=details)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+address = ('localhost', 27017)
+error = ConnectionResetError(104, 'Connection reset by peer'), msg_prefix = None
+timeout_details = {'connectTimeoutMS': 20000.0}
+
+    def _raise_connection_failure(
+        address: Any,
+        error: Exception,
+        msg_prefix: Optional[str] = None,
+        timeout_details: Optional[dict[str, float]] = None,
+    ) -> NoReturn:
+        """Convert a socket.error to ConnectionFailure and raise it."""
+        host, port = address
+        # If connecting to a Unix socket, port will be None.
+        if port is not None:
+            msg = f"{host}:{port}: {error}"
+        else:
+            msg = f"{host}: {error}"
+        if msg_prefix:
+            msg = msg_prefix + msg
+        if "configured timeouts" not in msg:
+            msg += format_timeout_details(timeout_details)
+        if isinstance(error, socket.timeout) or (
+            isinstance(error, SSLErrors) and "timed out" in str(error)
+        ):
+            raise NetworkTimeout(msg) from error
+        else:
+>           raise AutoReconnect(msg) from error
+E           pymongo.errors.AutoReconnect: localhost:27017: [Errno 104] Connection reset by peer (configured timeouts: connectTimeoutMS: 20000.0ms)
+
+/root/.venv/lib/python3.11/site-packages/pymongo/pool_shared.py:168: AutoReconnect
+_______________ test_ruff_undefined_unused_bugbear_whole_backend _______________
+
+    def test_ruff_undefined_unused_bugbear_whole_backend():
+        r = _ruff("--select", "F821,F841,F811,B002,B006,B015,B018,B020,B023,B032", ".")
+>       assert r.returncode == 0, r.stdout[-3000:]
+E       AssertionError: 
+E       assert 2 == 0
+E        +  where 2 = CompletedProcess(args=['/root/.venv/bin/python', '-m', 'ruff', 'check', '--output-format', 'concise', '--select', 'F82...emporary file.\n  Cause: No space left on device (os error 28) at path "/app/backend/.ruff_cache/0.17.3/.tmpQmWGvk"\n').returncode
+
+tests/test_static_gates.py:45: AssertionError
+______________________ test_ruff_complexity_runtime_code _______________________
+
+    def test_ruff_complexity_runtime_code():
+        r = _ruff("--select", "C901", "--config", "lint.mccabe.max-complexity=25", *RUNTIME)
+>       assert r.returncode == 0, r.stdout[-3000:]
+E       AssertionError: 
+E       assert 2 == 0
+E        +  where 2 = CompletedProcess(args=['/root/.venv/bin/python', '-m', 'ruff', 'check', '--output-format', 'concise', '--select', 'C90...emporary file.\n  Cause: No space left on device (os error 28) at path "/app/backend/.ruff_cache/0.17.3/.tmpRrZG4H"\n').returncode
+
+tests/test_static_gates.py:50: AssertionError
+_________________ test_no_dynamic_code_execution_or_weak_hash __________________
+
+    def test_no_dynamic_code_execution_or_weak_hash():
+        pat = re.compile(r"(?<![\w.])(eval|exec)\(|pickle\.loads|yaml\.load\(|hashlib\.md5|\bmd5\(")
+        hits = []
+        for dp, dn, fn in os.walk(ROOT):
+            dn[:] = [d for d in dn if d not in ("tests", "e1_tests", "venv", ".venv", "__pycache__", "node_modules")]
+            for f in fn:
+                if f.endswith(".py"):
+                    p = os.path.join(dp, f)
+                    with open(p) as fh:
+                        for i, line in enumerate(fh, 1):
+                            if pat.search(line):
+                                hits.append(f"{os.path.relpath(p, ROOT)}:{i}: {line.strip()[:100]}")
+>       assert hits == [], hits
+E       AssertionError: ['services/ttlcache.py:173: sig = __import__("hashlib").md5(repr(st).encode()).hexdigest()[:12]']
+E       assert ['services/tt...igest()[:12]'] == []
+E         
+E         Left contains one more item: 'services/ttlcache.py:173: sig = __import__("hashlib").md5(repr(st).encode()).hexdigest()[:12]'
+E         Use -v to get more diff
+
+tests/test_static_gates.py:65: AssertionError
+_____________________ test_ruff_complexity_core_layers_15 ______________________
+
+    def test_ruff_complexity_core_layers_15():
+        """CR-4.3: services/, core/, events.py, migrate_phase7.py keep every function at cyclomatic complexity ≤ 15."""
+        r = _ruff(
+            "--select",
+            "C901",
+            "--config",
+            "lint.mccabe.max-complexity=15",
+            "services",
+            "core",
+            "events.py",
+            "migrate_phase7.py",
+        )
+>       assert r.returncode == 0, r.stdout
+E       AssertionError: 
+E       assert 2 == 0
+E        +  where 2 = CompletedProcess(args=['/root/.venv/bin/python', '-m', 'ruff', 'check', '--output-format', 'concise', '--select', 'C90...emporary file.\n  Cause: No space left on device (os error 28) at path "/app/backend/.ruff_cache/0.17.3/.tmpc9gALl"\n').returncode
+
+tests/test_static_gates.py:80: AssertionError
+___________________ test_cash_bucket_cap_rejected_on_anchor ____________________
+
+admin_headers = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzMzlkNmM0ZS1lYTU1LTRmNjMtYjRjZi0xYjk1NzgwODA...iYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzk1MDc3NjYxLCJleHAiOjE3OTUwODEyNjF9.qm71kTs5ZjpSeqgyuq6WmYi1e2B9pGIRYmMVKR_5ASI'}
+work_booking = {'kyc_completeness': {'done': 0, 'total': 0, 'missing': [], 'complete': False}, 'lead_id': '98018841-365a-4bed-9297-335f3b1ebb7d', 'account_agreed': 2980800.0, 'account_agreed_paise': 298080000, ...}
+
+    def test_cash_bucket_cap_rejected_on_anchor(admin_headers, work_booking):
+        b = requests.get(f"{API}/bookings/{work_booking['id']}", headers=admin_headers).json()
+>       room = b["cash_agreed_paise"] - b["summary"]["cash_paid_paise"]
+               ^^^^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'cash_agreed_paise'
+
+tests/test_story_behaviours.py:34: KeyError
 =============================== warnings summary ===============================
 ../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
   /root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12: PendingDeprecationWarning: Please use `import python_multipart` instead.
@@ -51,5 +438,18 @@ tests/test_phase_q.py: 10 warnings
     self.replace_contents(ContentStream(new_content_array, self.pdf))
 
 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-952 passed, 6 skipped, 19 warnings in 1386.36s (0:23:06)
-exit 0
+=========================== short test summary info ============================
+FAILED tests/test_business_day_guard.py::test_no_utc_derived_dates_in_server_code
+FAILED tests/test_format_gate.py::test_no_source_line_over_160_chars - Assert...
+FAILED tests/test_import_hygiene.py::test_no_import_cycles_including_function_level_among_app_layers
+FAILED tests/test_phase_k_ops.py::test_backup_manifest_and_restore_drill_records_job_run
+FAILED tests/test_phase_k_ops.py::test_ops_has_backup_and_alerts_cards - Asse...
+FAILED tests/test_reseed_counters.py::test_reseed_leaves_every_counter_at_or_above_previous
+FAILED tests/test_startup_s1_s3_idempotent.py::test_startup_twice_on_db_copy_is_idempotent_and_non_destructive
+FAILED tests/test_static_gates.py::test_ruff_undefined_unused_bugbear_whole_backend
+FAILED tests/test_static_gates.py::test_ruff_complexity_runtime_code - Assert...
+FAILED tests/test_static_gates.py::test_no_dynamic_code_execution_or_weak_hash
+FAILED tests/test_static_gates.py::test_ruff_complexity_core_layers_15 - Asse...
+FAILED tests/test_story_behaviours.py::test_cash_bucket_cap_rejected_on_anchor
+12 failed, 944 passed, 5 skipped, 19 warnings in 1116.73s (0:18:36)
+pytest exit 1

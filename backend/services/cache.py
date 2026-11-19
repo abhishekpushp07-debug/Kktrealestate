@@ -35,8 +35,12 @@ STATE = {"down_until": 0.0, "last_log": 0.0, "last_error": None, "hits": 0, "mis
 _pending = {"n": 0, "at": time.monotonic()}
 
 
+DAILY_CAP = int(os.environ.get("REDIS_DAILY_COMMANDS", "19000"))  # 500,000 a month ÷ 26 working days
+
+
 def redis_on() -> bool:
-    return _redis is not None and time.monotonic() >= STATE["down_until"]
+    """Up, and today's shared command count under the daily budget (over it → Mongo / memory, silently)."""
+    return _redis is not None and time.monotonic() >= STATE["down_until"] and STATE.get("capped_day") != clock.today()
 
 
 async def _count(n: int = 1):
@@ -47,7 +51,11 @@ async def _count(n: int = 1):
         return
     k, _pending["n"], _pending["at"] = _pending["n"], 0, time.monotonic()
     day = clock.today().isoformat()
-    await db.redis_usage.update_one({"day": day}, {"$inc": {"commands": k}}, upsert=True)
+    d = await db.redis_usage.find_one_and_update(
+        {"day": day}, {"$inc": {"commands": k}}, upsert=True, return_document=True
+    )
+    if (d or {}).get("commands", 0) >= DAILY_CAP:
+        STATE["capped_day"] = clock.today()
 
 
 def _down(e: Exception):
@@ -121,7 +129,14 @@ async def health() -> dict:
     looked = STATE["hits"] + STATE["misses"]
     return {
         "configured": _redis is not None,
-        "state": "off" if _redis is None else ("ok" if redis_on() else "down — using Mongo"),
+        "state": "off"
+        if _redis is None
+        else "ok"
+        if redis_on()
+        else "daily budget reached — using Mongo"
+        if STATE.get("capped_day") == clock.today()
+        else "down — using Mongo",
+        "daily_budget": DAILY_CAP,
         "hit_rate": round(STATE["hits"] / looked, 3) if looked else None,
         "commands_today": today,
         "commands_month": month,

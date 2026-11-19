@@ -1,0 +1,199 @@
+=== equivalence 11:25:02
+Preparing worktree (detached HEAD 4c6094e)
+Updating files:  44% (2520/5690)Updating files:  45% (2561/5690)Updating files:  46% (2618/5690)Updating files:  47% (2675/5690)Updating files:  48% (2732/5690)Updating files:  49% (2789/5690)Updating files:  50% (2845/5690)Updating files:  51% (2902/5690)Updating files:  52% (2959/5690)Updating files:  53% (3016/5690)Updating files:  54% (3073/5690)Updating files:  55% (3130/5690)Updating files:  56% (3187/5690)Updating files:  57% (3244/5690)Updating files:  58% (3301/5690)Updating files:  59% (3358/5690)Updating files:  60% (3414/5690)Updating files:  61% (3471/5690)Updating files:  62% (3528/5690)Updating files:  63% (3585/5690)Updating files:  64% (3642/5690)Updating files:  65% (3699/5690)Updating files:  66% (3756/5690)Updating files:  67% (3813/5690)Updating files:  68% (3870/5690)Updating files:  69% (3927/5690)Updating files:  70% (3983/5690)Updating files:  71% (4040/5690)Updating files:  72% (4097/5690)Updating files:  73% (4154/5690)Updating files:  74% (4211/5690)Updating files:  75% (4268/5690)Updating files:  76% (4325/5690)Updating files:  77% (4382/5690)Updating files:  78% (4439/5690)Updating files:  79% (4496/5690)Updating files:  80% (4552/5690)Updating files:  81% (4609/5690)Updating files:  82% (4666/5690)Updating files:  83% (4723/5690)Updating files:  84% (4780/5690)Updating files:  85% (4837/5690)Updating files:  86% (4894/5690)Updating files:  87% (4951/5690)Updating files:  88% (5008/5690)Updating files:  89% (5065/5690)Updating files:  90% (5121/5690)Updating files:  91% (5178/5690)Updating files:  92% (5235/5690)Updating files:  93% (5292/5690)Updating files:  94% (5349/5690)Updating files:  95% (5406/5690)Updating files:  95% (5425/5690)Updating files:  96% (5463/5690)Updating files:  97% (5520/5690)Updating files:  98% (5577/5690)Updating files:  99% (5634/5690)Updating files: 100% (5690/5690)Updating files: 100% (5690/5690), done.
+HEAD is now at 4c6094e 3H: refunds line opens all cancellations (iteration 53 HIGH); tester spot scripts moved out of tests/
+kkt_medium equiv: 411 vs 411 requests · 1 differences | cancellations requests 10 · label cells changed 2 · fields ['unit'] · money/count differences 0
+kkt_volume equiv: 411 vs 411 requests · 1 differences | cancellations requests 10 · label cells changed 1 · fields ['unit'] · money/count differences 0
+test_database equiv: 411 vs 411 requests · 1 differences | cancellations requests 10 · label cells changed 2 · fields ['unit'] · money/count differences 0
+=== elite budget 11:27:01
+# Perf budget — 2026-11-19 11:28 UTC
+
+Scratch copy of the preview DB, private backend (2 worker(s), CPUs 0,1, no reload), 30 warm requests per path after 2 warm-ups; server time = `Server-Timing: total`.
+
+| Kind | Path | Endpoint | p50 ms | p95 ms | first ms | Budget p95 | Within |
+|---|---|---|---|---|---|---|---|
+| hot | Home Command Center (month) | `/api/home/bundle?period=month` | 7.1 | 7.6 | 256.8 | ≤ 200 | yes |
+| hot | Home Command Center (FY) | `/api/home/bundle?period=fy` | 7.1 | 8.1 | 187.0 | ≤ 200 | yes |
+| hot | Home Command Center (Today, project) | `/api/home/bundle?period=today&project_id=40d134fe-edbd-4103-a07e-a7c7b1e24060` | 5.2 | 8.2 | 102.9 | ≤ 200 | yes |
+| hot | Home legacy snapshot | `/api/dashboard/home` | 4.4 | 5.9 | 166.3 | ≤ 200 | yes |
+| hot | Project list | `/api/projects?page_size=50` | 35.8 | 39.0 | 36.0 | ≤ 200 | yes |
+| hot | Project detail | `/api/projects/40d134fe-edbd-4103-a07e-a7c7b1e24060` | 16.2 | 21.3 | 21.3 | ≤ 200 | yes |
+| hot | Booking detail | `/api/bookings/0005e168-15b5-46f1-9e33-c750f1c43a17` | 5.3 | 7.0 | 5.7 | ≤ 200 | yes |
+| hot | Customer 360 | `/api/customers/156b29a3-ad82-4b3c-93c6-52e39fc044b7` | 7.9 | 8.8 | 9.5 | ≤ 200 | yes |
+| hot | Bills raised page | `/api/demands/register?page_size=50` | 4.2 | 6.1 | 288.8 | ≤ 200 | yes |
+| hot | Unit grid | `/api/flats?block_id=54e7ef57-ef1c-4639-8ae3-abd23bf0ad59&page_size=200` | 6.4 | 11.6 | 10.7 | ≤ 200 | yes |
+| hot | Catalogues bundle | `/api/catalogues` | 5.7 | 9.8 | 29.4 | ≤ 200 | yes |
+| report | FY collections | `/api/reports/collections-v2?from_date=2026-04-01&to_date=2026-11-19` | 4.0 | 5.0 | 382.6 | ≤ 100 | yes |
+| report | Outstanding & ageing | `/api/reports/outstanding-v2` | 19.0 | 22.3 | 242.9 | ≤ 100 | yes |
+| write | Post payment (auto allocation + ledger) | `POST /api/payments` | 79.3 | 116.0 |  | ≤ 600 | yes |
+| write | Create booking | `POST /api/bookings` | 184.2 | 242.8 |  | ≤ 600 | yes |
+| write | Stage complete (33 bookings) | `POST /api/blocks/{id}/construction/stage` | 477.2 | 587.8 |  | ≤ 600 | yes |
+
+Reports: `first` = first call (uncached budget ≤ 800 ms); p50/p95 = cached repeats (budget ≤ 100 ms).
+
+Initial JS (gzip, scripts in build/index.html): **112.7 KB** (budget ≤ 250 KB) — /static/js/main.8cd2334f.js
+
+budget exit 0
+=== reports no Redis run 1 11:28:32
+customer-status          first p95   208.7  cached p95   13.6
+customer-statement       first p95    22.0  cached p95    9.0
+customer-ageing          first p95   182.4  cached p95   16.3
+advance-holders          first p95   189.9  cached p95   12.8
+call-list                first p95   214.6  cached p95   18.5
+kyc-pending              first p95   202.6  cached p95   12.4
+payment-behaviour        first p95   242.3  cached p95    7.7
+customer-directory       first p95   190.4  cached p95    9.1
+cancelled-customers      first p95    27.3  cached p95    4.7
+collections              first p95   251.7  cached p95   15.6
+day-book                 first p95    84.7  cached p95    3.4
+bank-receipts            first p95   119.3  cached p95    4.5
+cheques                  first p95   142.5  cached p95   12.1
+bills-vs-collection      first p95   150.4  cached p95    5.5
+outstanding              first p95   177.4  cached p95   12.9
+cash-vs-account          first p95   122.8  cached p95   12.7
+other-charges            first p95   134.5  cached p95   15.6
+receivables-forecast     first p95   224.3  cached p95   13.5
+waivers                  first p95    45.3  cached p95    6.2
+booking-register         first p95   204.0  cached p95   12.7
+sales-summary            first p95   185.7  cached p95    4.8
+discount-register        first p95    49.8  cached p95    5.2
+plan-position            first p95   197.3  cached p95   14.1
+agreements               first p95   197.9  cached p95   16.1
+cancellations            first p95    44.2  cached p95    3.5
+transfers                first p95   194.1  cached p95    3.7
+sales-team               first p95   208.4  cached p95    3.0
+realised-rate            first p95   195.2  cached p95   12.4
+booking-health           first p95   194.2  cached p95   12.9
+project-statement        first p95    59.1  cached p95    4.6
+inventory-status         first p95   168.9  cached p95   14.8
+stacking-plan            first p95   159.6  cached p95   13.5
+price-list               first p95   146.9  cached p95    5.8
+hold-register            first p95   137.4  cached p95    2.9
+landowner                first p95   137.6  cached p95    2.7
+parking                  first p95    18.4  cached p95    3.2
+construction-vs-plan     first p95   130.5  cached p95    3.5
+stage-bills              first p95   150.3  cached p95    3.4
+sales-velocity           first p95   142.5  cached p95    3.1
+lead-funnel              first p95   107.3  cached p95    2.6
+lead-register            first p95    63.9  cached p95    3.0
+source-performance       first p95   106.7  cached p95    2.9
+follow-ups               first p95    55.4  cached p95    2.7
+visit-register           first p95    56.6  cached p95    2.7
+visit-conversion         first p95    48.1  cached p95    3.5
+lost-leads               first p95    59.5  cached p95    2.7
+response-time            first p95    59.6  cached p95    3.2
+team-pipeline            first p95   107.3  cached p95    2.7
+lead-ageing              first p95    56.0  cached p95    2.9
+service-sla              first p95    46.4  cached p95    3.1
+50/50 within budget []
+reports run 1 exit 0
+=== reports no Redis run 2 11:30:09
+customer-status          first p95   221.4  cached p95   15.2
+customer-statement       first p95    21.8  cached p95    9.9
+customer-ageing          first p95   182.9  cached p95   13.9
+advance-holders          first p95   181.0  cached p95   12.8
+call-list                first p95   200.5  cached p95   12.9
+kyc-pending              first p95   202.3  cached p95   13.3
+payment-behaviour        first p95   243.4  cached p95    9.5
+customer-directory       first p95   188.1  cached p95   13.7
+cancelled-customers      first p95    21.0  cached p95    7.1
+collections              first p95   239.5  cached p95   19.4
+day-book                 first p95    88.4  cached p95    3.3
+bank-receipts            first p95   135.4  cached p95    5.9
+cheques                  first p95   137.7  cached p95   12.4
+bills-vs-collection      first p95   153.3  cached p95    6.3
+outstanding              first p95   176.2  cached p95   14.3
+cash-vs-account          first p95   118.2  cached p95   15.4
+other-charges            first p95   135.8  cached p95   16.8
+receivables-forecast     first p95   218.2  cached p95   15.8
+waivers                  first p95    51.4  cached p95    5.5
+booking-register         first p95   196.8  cached p95   14.7
+sales-summary            first p95   188.2  cached p95    3.4
+discount-register        first p95    52.8  cached p95    5.1
+plan-position            first p95   207.8  cached p95   16.4
+agreements               first p95   209.3  cached p95   12.6
+cancellations            first p95    42.7  cached p95    5.0
+transfers                first p95   199.0  cached p95    3.2
+sales-team               first p95   219.3  cached p95    3.4
+realised-rate            first p95   200.4  cached p95   15.8
+booking-health           first p95   208.6  cached p95   16.9
+project-statement        first p95    63.2  cached p95    8.8
+inventory-status         first p95   170.2  cached p95   16.2
+stacking-plan            first p95   174.0  cached p95   13.0
+price-list               first p95   155.1  cached p95   10.3
+hold-register            first p95   144.9  cached p95    6.5
+landowner                first p95   147.2  cached p95    4.8
+parking                  first p95    21.2  cached p95    3.2
+construction-vs-plan     first p95   150.8  cached p95    5.9
+stage-bills              first p95   166.4  cached p95    3.7
+sales-velocity           first p95   159.4  cached p95    8.2
+lead-funnel              first p95   115.1  cached p95    2.7
+lead-register            first p95    66.0  cached p95    6.0
+source-performance       first p95   119.6  cached p95    3.3
+follow-ups               first p95    59.6  cached p95    3.0
+visit-register           first p95    54.7  cached p95    2.9
+visit-conversion         first p95    47.0  cached p95    4.4
+lost-leads               first p95    64.8  cached p95    3.5
+response-time            first p95    65.9  cached p95    5.8
+team-pipeline            first p95   110.0  cached p95    5.0
+lead-ageing              first p95    61.7  cached p95    2.9
+service-sla              first p95    45.3  cached p95    7.1
+50/50 within budget []
+reports run 2 exit 0
+=== reports Redis run 3 11:31:50
+customer-status          first p95   301.0  cached p95   23.6
+customer-statement       first p95    35.1  cached p95   17.7
+customer-ageing          first p95   295.9  cached p95   13.7
+advance-holders          first p95   264.4  cached p95   32.3
+call-list                first p95   265.4  cached p95   13.1
+kyc-pending              first p95   518.3  cached p95   35.5
+payment-behaviour        first p95   451.8  cached p95   39.9
+customer-directory       first p95   425.9  cached p95   24.7
+cancelled-customers      first p95    22.1  cached p95    3.8
+collections              first p95   260.3  cached p95   22.9
+day-book                 first p95   110.0  cached p95    5.9
+bank-receipts            first p95   134.4  cached p95    5.4
+cheques                  first p95   203.5  cached p95   18.3
+bills-vs-collection      first p95   178.4  cached p95   13.1
+outstanding              first p95   258.2  cached p95   21.0
+cash-vs-account          first p95   161.5  cached p95   21.0
+other-charges            first p95   174.1  cached p95   26.3
+receivables-forecast     first p95   294.2  cached p95   21.1
+waivers                  first p95    51.2  cached p95   12.4
+booking-register         first p95   268.0  cached p95   12.6
+sales-summary            first p95   214.5  cached p95    4.3
+discount-register        first p95    69.2  cached p95    9.6
+plan-position            first p95   260.8  cached p95   21.2
+agreements               first p95   272.4  cached p95   12.9
+cancellations            first p95    52.9  cached p95   12.0
+transfers                first p95   221.2  cached p95   12.3
+sales-team               first p95   231.4  cached p95   11.4
+realised-rate            first p95   262.1  cached p95   21.1
+booking-health           first p95   274.5  cached p95   21.0
+project-statement        first p95    58.3  cached p95    4.7
+inventory-status         first p95   224.4  cached p95   22.9
+stacking-plan            first p95   225.8  cached p95   21.4
+price-list               first p95   182.2  cached p95   15.4
+hold-register            first p95   179.4  cached p95   11.1
+landowner                first p95   166.9  cached p95    9.5
+parking                  first p95    31.8  cached p95    6.1
+construction-vs-plan     first p95   184.2  cached p95   12.7
+stage-bills              first p95   184.5  cached p95   11.3
+sales-velocity           first p95   170.1  cached p95    3.1
+lead-funnel              first p95   129.5  cached p95    3.9
+lead-register            first p95    76.9  cached p95   11.2
+source-performance       first p95   118.7  cached p95    3.8
+follow-ups               first p95    73.7  cached p95    5.0
+visit-register           first p95    72.4  cached p95    6.4
+visit-conversion         first p95    57.8  cached p95    4.5
+lost-leads               first p95    57.5  cached p95    2.9
+response-time            first p95    69.6  cached p95    3.9
+team-pipeline            first p95   130.9  cached p95    9.6
+lead-ageing              first p95    65.5  cached p95    2.8
+service-sla              first p95    43.9  cached p95    3.2
+46/50 within budget ['customer-status', 'kyc-pending', 'payment-behaviour', 'customer-directory']
+reports run 3 (redis) exit 1
+{ ok: 1, dropped: 'kkt_perf_scratch' }
+=== pytest 11:33:50
+pytest exit 143
+FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF...CLOSE4 DONE 11:35:23
