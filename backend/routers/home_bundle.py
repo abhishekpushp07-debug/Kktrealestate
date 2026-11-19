@@ -89,17 +89,25 @@ async def bundle(
             skey = f"home:static:{key}:{','.join(sorted(want & set(STATIC)))}:{st}"
             return await ttlcache.cached(skey, 300, compute_static, stamped=True, stamp=st)
 
-        # 3I: ageing (needed only by Call today) runs beside every other widget instead of before them
-        res, m, s = await asyncio.gather(age(), money(), static_widgets())
+        # 3I: ageing runs beside every other widget; Call today starts at once and waits only for ageing's list
+        age_task = asyncio.ensure_future(age())
+
+        async def per():
+            res = await age_task
+            return res["data"][1] if res is not None and res["ok"] else None
+
+        async def call():
+            return await H.guarded(H.call_today, user, base, project_id, today, per) if "call_today" in want else None
+
+        res, m, s, ct = await asyncio.gather(age_task, money(), static_widgets(), call())
         others = m | s
-        per = None
         if res is not None:
             if res["ok"]:
-                res["data"], per = res["data"]
+                res["data"] = res["data"][0]
             if "ageing" in want:
                 out["ageing"] = res
-        if "call_today" in want:
-            out["call_today"] = await H.guarded(H.call_today, user, base, project_id, today, per)
+        if ct is not None:
+            out["call_today"] = ct
         out |= others
         order = ("ageing", "money_today", "due_vs_received", "call_today", "inflow_30", "next_milestone", "inventory")
         order += ("flat_status", "construction", "pipeline", "attention")

@@ -72,6 +72,16 @@ def snapshot(src):
     MongoClient(url)[SCRATCH_DB].leases.delete_many({})
 
 
+def _killpg(proc):
+    import signal
+
+    try:
+        os.killpg(proc.pid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+    proc.wait()
+
+
 def start_backend():
     env = {
         **os.environ,
@@ -102,7 +112,9 @@ def start_backend():
             env=env,
             stdout=log,
             stderr=subprocess.STDOUT,
+            start_new_session=True,  # 3I: stop() kills the whole group — workers never outlive the run
         )
+    proc.kill = lambda: _killpg(proc)
     for _ in range(120):
         try:
             if httpx.get(f"http://127.0.0.1:{PORT}/api/health", timeout=2).json().get("startup", {}).get("done"):

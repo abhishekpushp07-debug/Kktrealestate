@@ -54,6 +54,11 @@ def setup():
 
 
 def start(port, extra=None, cpus=None):
+    import socket
+
+    with socket.socket() as s:  # 3I: a server left from an earlier run would answer instead of this one
+        if s.connect_ex(("127.0.0.1", port)) == 0:
+            raise RuntimeError(f"port {port} already in use — stop the old drill server first")
     env = {**os.environ, "DB_NAME": SCRATCH, "LOGIN_RATE_LIMIT_BYPASS_TOKEN": BYPASS, "KKT_ROLE": "test",
            "BACKUP_ENABLED": "0", "DEMO_AUTO_REFRESH": "false", "ACCESS_TOKEN_MINUTES": "120", **(extra or {})}  # fmt: skip
     env.pop("REDIS_URL", None) if not (extra or {}).get("REDIS_URL") else None
@@ -484,6 +489,8 @@ def fpj(j):
 SURFACES = [
     ("Home", "/api/home/bundle?period=fy", lambda j, ctx: fpj(j)),
     ("Home legacy", "/api/dashboard/home", lambda j, ctx: fpj(j)),
+    ("Home month", "/api/home/bundle?period=month", lambda j, ctx: fpj(j)),  # 3I: money + bills stamps
+    ("Unit grid", "/api/blocks/{blk_id}/grid", lambda j, ctx: fpj(j)),  # 3I: inventory / bookings stamps
     ("Booking page", "/api/bookings/{bid}", lambda j, ctx: fpj(j.get("summary"))),
     ("Customer 360", "/api/customers/{cid}", lambda j, ctx: fpj(j)),
     ("Bills raised", "/api/demands/register?booking_id={bid}&page_size=50", lambda j, ctx: fpj(j)),
@@ -546,7 +553,8 @@ def stale(label, reps, redis_url=None):
                 if not blk:
                     continue
             cid = db.bookings.find_one({"id": bid})["customer_id"]
-            ctx = {"bid": bid, "cid": cid, "fy0": fy0, "today": TODAY}
+            blk_id = db.bookings.find_one({"id": bid})["block_id"]
+            ctx = {"bid": bid, "cid": cid, "fy0": fy0, "today": TODAY, "blk_id": blk_id}
             _read_all(B, ctx)  # warm B's caches with the old figures
             _read_all(B, ctx)
             if kind == "receipt":
@@ -701,10 +709,10 @@ def main():
     elif a.what == "teardown":
         MongoClient(URL).drop_database(SCRATCH)
     elif a.what == "races":
-        procs = [start(p) for p in PORTS]
+        procs = [start(p, {"REDIS_URL": a.redis} if a.redis else None) for p in PORTS]
         try:
             [wait_up(p) for p in PORTS]
-            races(a.label, a.reps)
+            races(a.label + ("_redis" if a.redis else ""), a.reps)
         finally:
             [p.kill() for p in procs]
     elif a.what == "stale":

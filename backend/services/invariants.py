@@ -69,6 +69,37 @@ BUSINESS_KEYS = [
         "uniq_ticket_number",
         {"ticket_number": {"$type": "string"}},
     ),
+    # 3I M-01 round 3 (0 duplicates on preview / medium / volume). Not keys by design: doc_verifications.number (one
+    # document number, several verification codes) and generated_documents.number (labels). Master codes (plan /
+    # mode / flat type) stay app-checked only: no 409 path exists yet, a DB refusal would surface as an error.
+    (
+        "document verification code",
+        "doc_verifications",
+        [("code", ASCENDING)],
+        "uniq_doc_verification_code",
+        {"code": {"$type": "string"}},
+    ),
+    (
+        "member number per project",
+        "bookings",
+        [("project_id", ASCENDING), ("member_no", ASCENDING)],
+        "uniq_member_no",
+        {"member_no": {"$type": "number"}},
+    ),
+    (
+        "company short code",
+        "companies",
+        [("short_code", ASCENDING)],
+        "uniq_company_short_code",
+        {"short_code": {"$type": "string"}},
+    ),
+    (
+        "role name per company",
+        "roles",
+        [("company_id", ASCENDING), ("name", ASCENDING)],
+        "uniq_role_name",
+        {"is_active": True},
+    ),
 ]
 NOT_APPLIED = "Uniqueness rule not applied — duplicates found"
 

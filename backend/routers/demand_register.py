@@ -144,8 +144,9 @@ async def _dead_booking_ids(company_id: str) -> list[str]:
 
 async def _live_only(q: dict, company_id: str) -> dict:
     dead = await _dead_booking_ids(company_id)
-    if dead:
-        q["booking_id"] = {"$nin": dead}
+    if dead:  # 3I: keep an earlier exclusion (stale_days' "no recent receipt") — it was overwritten before
+        prev = (q.get("booking_id") or {}).get("$nin", []) if isinstance(q.get("booking_id"), dict) else []
+        q["booking_id"] = {"$nin": list(dict.fromkeys([*prev, *dead]))}
     return q
 
 
@@ -202,25 +203,28 @@ def _filter(
     return q, field, today
 
 
-async def _enrich(rows: list[dict]):
+_NAMES = {
+    "_id": 0,
+    "id": 1,
+    "customer_name": 1,
+    "booking_number": 1,
+    "flat_snapshot.flat_number": 1,
+    "project_name": 1,
+    "block_name": 1,
+    "payment_plan_snapshot.name": 1,
+}
+
+
+async def _names(flt: dict) -> dict:
+    return {b["id"]: b for b in await db.bookings.find(flt, _NAMES).to_list(None)}
+
+
+async def _enrich(rows: list[dict], known: dict | None = None):
     """Demands store ids; attach the names the register shows (bookings carry customer/flat/project/tower names)."""
-    bids = list({r["booking_id"] for r in rows})
-    bs = {
-        b["id"]: b
-        for b in await db.bookings.find(
-            {"id": {"$in": bids}},
-            {
-                "_id": 0,
-                "id": 1,
-                "customer_name": 1,
-                "booking_number": 1,
-                "flat_snapshot.flat_number": 1,
-                "project_name": 1,
-                "block_name": 1,
-                "payment_plan_snapshot.name": 1,
-            },
-        ).to_list(None)
-    }
+    bs = dict(known or {})
+    missing = list({r["booking_id"] for r in rows} - set(bs))
+    if missing:
+        bs |= await _names({"id": {"$in": missing}})
     for r in rows:
         b = bs.get(r["booking_id"]) or {}
         r.setdefault("customer_name", b.get("customer_name"))
@@ -250,17 +254,18 @@ async def _reconcile(user: dict, project_id: str | None, block_id: str | None) -
         **({"project_id": project_id} if project_id else {}),
         **({"block_id": block_id} if block_id else {}),
     }
-    live, bills, other, out = [], 0, 0, 0
-    async for b in db.bookings.find(definitions.live_bookings_match(scope), {"_id": 0, "id": 1, "summary": 1}):
-        live.append(b["id"])
+    from services.money_snapshot import bills_for
+
+    bills, other, out = 0, 0, 0
+    bks = await db.bookings.find(
+        definitions.live_bookings_match(scope), {"_id": 0, "id": 1, "summary": 1, "money_rev": 1, "money_snapshot": 1}
+    ).to_list(None)
+    for b in bks:
         o = definitions.outstanding(b.get("summary") or {})
         other += o["other_charges_paise"]
         out += o["total_paise"]
-    async for d in db.demands.find(
-        definitions.open_demands_match({"booking_id": {"$in": live}}),
-        {"_id": 0, "total_demand_paise": 1, "paid_paise": 1},
-    ):
-        bills += definitions.demand_balance(d)
+    for ds in (await bills_for(bks)).values():  # 3I REQ-355: kept-ready bills (open ones = open_demands_match)
+        bills += sum(definitions.demand_balance(d) for d in ds if d.get("status") in definitions.OPEN_DEMAND_STATUSES)
     return {
         "basis": "Raised bills only (instalment bills). Outstanding also includes billed other charges.",
         "bills_open_paise": bills,
@@ -330,13 +335,14 @@ async def register(
 
     async def compute():
         async def bills():
-            raw = (
-                await db.demands.find(q, _ROW_FIELDS)
-                .sort([(field, -1), ("demand_number", -1)])
-                .limit(5000)
-                .to_list(None)
+            # 3I: the scope's booking names are read beside the bills (any booking outside it is fetched after)
+            scope = {"company_id": user["company_id"], **report_scope_filter(user)}
+            scope |= {k: v for k, v in (("project_id", project_id), ("block_id", block_id)) if v}
+            raw, known = await asyncio.gather(
+                db.demands.find(q, _ROW_FIELDS).sort([(field, -1), ("demand_number", -1)]).limit(5000).to_list(None),
+                _names(scope),
             )
-            return await _enrich(raw)
+            return await _enrich(raw, known)
 
         # 3I: the Outstanding bridge reads bookings, not the rows — read beside them
         raw, rec = await asyncio.gather(bills(), _reconcile(user, project_id, block_id))
@@ -395,7 +401,7 @@ async def register(
             "reconcile": rec,
         }
         # REQ-211: serialise + tag once per cached answer, not on every hit
-        text = json.dumps(data, sort_keys=True, default=str)
+        text = json.dumps(data, default=str, separators=(",", ":"))  # 3I: dict order is already fixed
         raw_body = text.encode()
         return {
             "_rows": rows,
@@ -872,3 +878,13 @@ async def reminder_sent(demand_id: str, request: Request, user: dict = Depends(r
         ip=client_ip(request),
     )
     return {"ok": True, "reminder_sent_at": ts}
+
+
+async def stale_count(user: dict, days: int, project_id: str | None) -> int:
+    """Home "Needs attention": the register's `stale_days` filter (same _filter + live-only), counted in Mongo."""
+    from services.home_filters import stale_part_paid_match
+
+    q, _, _ = _filter(user, project_id, None, None, None, None, None, None, "raised", None, None, None, False)
+    q.update(await stale_part_paid_match(user["company_id"], days))
+    await _live_only(q, user["company_id"])
+    return await db.demands.count_documents(q)

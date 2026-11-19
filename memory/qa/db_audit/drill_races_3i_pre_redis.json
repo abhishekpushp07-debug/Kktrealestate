@@ -1,0 +1,71 @@
+{
+ "R1 same receipt + same key at once": {
+  "receipts=1 codes=201/201 same_receipt=True": 20,
+  "integrity_bad": 0
+ },
+ "R2 two receipts on one booking at once": {
+  "codes=409/409": 7,
+  "409 reason=BUCKET_EXCEEDS_AGREED": 26,
+  "integrity_bad": 0,
+  "codes=201/409": 8,
+  "codes=409/201": 4,
+  "codes=201/201": 1,
+  "examples": []
+ },
+ "R7 receipt during cancellation": {
+  "codes pay/cancel=201/409 accounted=True": 4,
+  "codes pay/cancel=409/200 accounted=True": 6,
+  "examples": []
+ },
+ "R8 two ledger rebuilds on one booking at once": {
+  "codes=201/200": 20,
+  "integrity_bad": 0,
+  "examples": []
+ },
+ "R3 two bookings on one flat at once": {
+  "live_bookings=1 codes=201/409": 17,
+  "loser says: Flat A-103 was just taken by another booking": 1,
+  "bookings_total_for_flat": 20,
+  "bills_after": 84,
+  "loser says: Flat A-404 was just taken by another booking": 1,
+  "loser says: Flat A-602 is Booked": 1,
+  "live_bookings=1 codes=409/201": 3,
+  "loser says: Flat A-604 was just taken by another booking": 1,
+  "loser says: Flat A-703 was just taken by another booking": 1,
+  "loser says: Flat A-802 was just taken by another booking": 1,
+  "loser says: Flat B-102 was just taken by another booking": 1,
+  "loser says: Flat B-201 is Booked": 1,
+  "loser says: Flat B-302 is Booked": 1,
+  "loser says: Flat B-304 is Booked": 1,
+  "loser says: Flat B-403 was just taken by another booking": 1,
+  "loser says: Flat B-404 was just taken by another booking": 1,
+  "loser says: Flat B-604 was just taken by another booking": 1,
+  "loser says: Flat B-703 is Booked": 1,
+  "loser says: Flat B-704 is Booked": 1,
+  "loser says: Flat B-801 was just taken by another booking": 1,
+  "loser says: Flat B-804 was just taken by another booking": 1,
+  "loser says: Flat V1 is Booked": 1,
+  "loser says: Flat V4 was just taken by another booking": 1,
+  "loser says: Flat V6 was just taken by another booking": 1
+ },
+ "R4 same waiver approved twice at once (+ approve vs reject)": {
+  "codes=200/409 approval_audits=1": 16,
+  "loser says: Already approved": 20,
+  "approve/reject codes=409/200 final=Rejected cn=False": 18,
+  "codes=409/200 approval_audits=1": 4,
+  "approve/reject codes=200/409 final=Approved cn=True": 2
+ },
+ "R5 two waivers approved at once": {
+  "codes=200/200 distinct_cn=True": 20
+ },
+ "R5 duplicate credit-note numbers": 0,
+ "R6 stage completed twice at once": {
+  "codes=200/409 dup_bills=0 dup_gst_parts=0": 5,
+  "bills_raised_total": 165,
+  "bookings_in_towers": 179,
+  "codes=409/200 dup_bills=0 dup_gst_parts=0": 1
+ },
+ "R9 direct duplicate ledger (booking, seq) insert": "refused: DuplicateKeyError",
+ "R10 direct duplicate waiver_number": "refused: DuplicateKeyError",
+ "R10 direct duplicate cn_number": "refused: DuplicateKeyError"
+}

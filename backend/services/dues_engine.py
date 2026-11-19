@@ -206,6 +206,21 @@ async def _raised_state(booking: dict, existing: list[dict] | None = None) -> tu
     return raised, raised_names, cum
 
 
+_DUE_DAYS: dict = {}
+
+
+async def _due_days(company_id: str) -> dict | None:
+    """3I: a stage complete reads the company's days-to-pay once, not once per booking (shared for 2 s)."""
+    import time
+
+    hit = _DUE_DAYS.get(company_id)
+    if hit and time.monotonic() - hit[0] < 2:
+        return hit[1]
+    c = await db.companies.find_one({"id": company_id}, {"_id": 0, "demand_due_days": 1})
+    _DUE_DAYS[company_id] = (time.monotonic(), c)
+    return c
+
+
 async def _after_raise(
     booking: dict, created: list[dict], cum: float, block: dict, possession_hit: bool, posted_at: str
 ) -> None:
@@ -213,7 +228,7 @@ async def _after_raise(
     if created or booking.get("raised_percent") != cum:
         from services.definitions import due_on
 
-        company = await db.companies.find_one({"id": booking["company_id"]}, {"_id": 0, "demand_due_days": 1})
+        company = await _due_days(booking["company_id"])
         due = due_on(clock.day_of(posted_at), days_to_pay(company))
         upd = {"raised_percent": cum, "construction_percent": cum, "updated_at": now_iso()}
         if possession_hit or (_possession_stage(block) or {}).get("status") == "Completed":

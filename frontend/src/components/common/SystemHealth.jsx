@@ -166,6 +166,16 @@ function FastCache({ r }) {
   );
 }
 
+function ReportFigures({ r }) {
+  if (!r) return null;
+  return (
+    <p className="mt-1 text-sm text-txt-muted" data-testid="ops-report-figures">
+      {r.label} · {r.checked.toLocaleString("en-IN")} bookings checked · last check{" "}
+      {new Date(r.at).toLocaleString("en-IN")}
+    </p>
+  );
+}
+
 function OpsSummary({ d, groups }) {
   return (
     <>
@@ -405,6 +415,7 @@ export function SystemHealthCard() {
           <OpsSummary d={d} groups={groups} />
           <UniquenessRules rules={d.uniqueness} />
           <FastCache r={d.caches?.redis} />
+          <ReportFigures r={d.report_figures} />
           <div className="mt-5 grid gap-4 md:grid-cols-2 [&>*]:min-w-0">
             <OpsJobs d={d} jobs={jobs} />
             <div data-testid="ops-slow">

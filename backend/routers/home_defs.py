@@ -234,76 +234,19 @@ async def call_today(user, base, pid, today, per):
     from routers.visits import list_visits
 
     perms = set(user["permissions"])
-    top = []
-    if per is not None:
-        ov = sorted(((overdue_of(b), bid) for bid, b in per.items() if overdue_of(b) > 0), reverse=True)[:6]
-        bk = {
-            b["id"]: b
-            for b in await db.bookings.find(
-                {"id": {"$in": [i for _, i in ov]}},
-                {
-                    "_id": 0,
-                    "id": 1,
-                    "customer_id": 1,
-                    "customer_name": 1,
-                    "booking_number": 1,
-                    "block_name": 1,
-                    "flat_snapshot.flat_number": 1,
-                },
-            ).to_list(None)
-        }
-        from services.definitions import overdue_days
+    d = today.isoformat()
 
-        full = {
-            b["id"]: b
-            for b in await db.bookings.find(
-                {"id": {"$in": [i for _, i in ov]}}, {"_id": 0, "id": 1, "summary": 1, "other_charges": 1}
-            ).to_list(None)
-        }
-        dem = {}
-        async for dm in db.demands.find(
-            {"booking_id": {"$in": [i for _, i in ov]}, "voided": {"$ne": True}},
-            {"_id": 0, "booking_id": 1, "due_date": 1, "cash_demand_paise": 1, "account_demand_paise": 1, "status": 1},
-        ):
-            dem.setdefault(dm["booking_id"], []).append(dm)
-        days = {  # REQ-209: the same "overdue N days" as the card / customer page / booking page
-            bid: overdue_days(f.get("summary") or {}, dem.get(bid, []), f.get("other_charges") or [], today)
-            for bid, f in full.items()
-        }
-        cust = {
-            c["id"]: c
-            for c in await db.customers.find(
-                {"id": {"$in": [b["customer_id"] for b in bk.values()]}},
-                {"_id": 0, "id": 1, "phone": 1, "full_name": 1},
-            ).to_list(None)
-        }
-        for amt, bid in ov:
-            b = bk.get(bid, {})
-            c = cust.get(b.get("customer_id"), {})
-            top.append(
-                {
-                    "customer_id": b.get("customer_id"),
-                    "name": c.get("full_name") or b.get("customer_name"),
-                    "phone": c.get("phone"),
-                    "booking_number": b.get("booking_number"),
-                    "booking_id": bid,
-                    "overdue_paise": amt,
-                    "flat": " · ".join(
-                        x for x in (b.get("block_name"), (b.get("flat_snapshot") or {}).get("flat_number")) if x
-                    ),
-                    "overdue_days": days.get(bid),
-                }
-            )
-    fu = (
-        await _count(
+    async def follow_ups():
+        if "sales.lead.view" not in perms:
+            return None
+        return await _count(
             list_leads, user, status=None, assigned_to=None, project_id=pid, due_today=True, source=None, unread=False
         )
-        if "sales.lead.view" in perms
-        else None
-    )
-    d = today.isoformat()
-    vis = (
-        await _count(
+
+    async def visits():
+        if "sales.site_visit.view" not in perms:
+            return None
+        return await _count(
             list_visits,
             user,
             project_id=pid,
@@ -313,9 +256,79 @@ async def call_today(user, base, pid, today, per):
             date_to=d,
             lead_id=None,
         )
-        if "sales.site_visit.view" in perms
-        else None
-    )
+
+    async def overdue_top():
+        p = (await per()) if callable(per) else per  # 3I: the bundle passes ageing's result as it arrives
+        return await _overdue_top(p, today) if p is not None else []
+
+    top, fu, vis = await asyncio.gather(overdue_top(), follow_ups(), visits())  # 3I: side by side
+    return _call_today_out(top, fu, vis, pid, d)
+
+
+async def _overdue_top(per, today):
+    top = []
+    ov = sorted(((overdue_of(b), bid) for bid, b in per.items() if overdue_of(b) > 0), reverse=True)[:6]
+    bk = {
+        b["id"]: b
+        for b in await db.bookings.find(
+            {"id": {"$in": [i for _, i in ov]}},
+            {
+                "_id": 0,
+                "id": 1,
+                "customer_id": 1,
+                "customer_name": 1,
+                "booking_number": 1,
+                "block_name": 1,
+                "flat_snapshot.flat_number": 1,
+            },
+        ).to_list(None)
+    }
+    from services.definitions import overdue_days
+
+    full = {
+        b["id"]: b
+        for b in await db.bookings.find(
+            {"id": {"$in": [i for _, i in ov]}}, {"_id": 0, "id": 1, "summary": 1, "other_charges": 1}
+        ).to_list(None)
+    }
+    dem = {}
+    async for dm in db.demands.find(
+        {"booking_id": {"$in": [i for _, i in ov]}, "voided": {"$ne": True}},
+        {"_id": 0, "booking_id": 1, "due_date": 1, "cash_demand_paise": 1, "account_demand_paise": 1, "status": 1},
+    ):
+        dem.setdefault(dm["booking_id"], []).append(dm)
+    days = {  # REQ-209: the same "overdue N days" as the card / customer page / booking page
+        bid: overdue_days(f.get("summary") or {}, dem.get(bid, []), f.get("other_charges") or [], today)
+        for bid, f in full.items()
+    }
+    cust = {
+        c["id"]: c
+        for c in await db.customers.find(
+            {"id": {"$in": [b["customer_id"] for b in bk.values()]}},
+            {"_id": 0, "id": 1, "phone": 1, "full_name": 1},
+        ).to_list(None)
+    }
+    for amt, bid in ov:
+        b = bk.get(bid, {})
+        c = cust.get(b.get("customer_id"), {})
+        top.append(
+            {
+                "customer_id": b.get("customer_id"),
+                "name": c.get("full_name") or b.get("customer_name"),
+                "phone": c.get("phone"),
+                "booking_number": b.get("booking_number"),
+                "booking_id": bid,
+                "overdue_paise": amt,
+                "flat": " · ".join(
+                    x for x in (b.get("block_name"), (b.get("flat_snapshot") or {}).get("flat_number")) if x
+                ),
+                "overdue_days": days.get(bid),
+            }
+        )
+    return top
+
+
+def _call_today_out(top, fu, vis, pid, d):
     return {
         "overdue_customers": top,
         "followups": None
@@ -344,51 +357,66 @@ async def call_today(user, base, pid, today, per):
 # ---------------------------------------------------------------- 5 Next 30 days inflow
 async def inflow_30(user, base, pid, today):
     f, t = (today + timedelta(days=1)).isoformat(), (today + timedelta(days=30)).isoformat()
-    bal = 0
-    async for x in db.demands.aggregate(
-        [
-            {
-                "$match": {
-                    **base,
-                    "voided": {"$ne": True},
-                    "status": {"$nin": ["Voided", "Cancelled"]},
-                    "due_date": {"$gte": f, "$lte": t},
-                }
-            },
-            {
-                "$group": {
-                    "_id": None,
-                    "s": {
-                        "$sum": {"$max": [{"$subtract": ["$total_demand_paise", {"$ifNull": ["$paid_paise", 0]}]}, 0]}
-                    },
-                }
-            },
-        ]
-    ):
-        bal = x["s"]
-    n, amt = await _pay_totals(user, pid, "Pending")
-    done = {
-        b["id"]: {s["stage_id"] for s in b.get("construction_stages") or [] if s.get("status") == "Completed"}
-        async for b in db.blocks.find(
-            {k: v for k, v in base.items() if k != "project_id"}
-            | ({"project_id": base["project_id"]} if "project_id" in base else {}),
-            {"_id": 0, "id": 1, "construction_stages": 1},
-        )
-    }
-    awaiting = 0
-    seqs = {
-        r["_id"]: set(r["s"])
-        for r in await db.demands.aggregate(
+
+    async def balance():
+        async for x in db.demands.aggregate(
             [
-                {"$match": {**base, "voided": {"$ne": True}}},
-                {"$group": {"_id": "$booking_id", "s": {"$addToSet": "$installment_seq"}}},
+                {
+                    "$match": {
+                        **base,
+                        "voided": {"$ne": True},
+                        "status": {"$nin": ["Voided", "Cancelled"]},
+                        "due_date": {"$gte": f, "$lte": t},
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": None,
+                        "s": {
+                            "$sum": {
+                                "$max": [{"$subtract": ["$total_demand_paise", {"$ifNull": ["$paid_paise", 0]}]}, 0]
+                            }
+                        },
+                    }
+                },
             ]
+        ):
+            return x["s"]
+        return 0
+
+    async def done_stages():
+        return {
+            b["id"]: {s["stage_id"] for s in b.get("construction_stages") or [] if s.get("status") == "Completed"}
+            async for b in db.blocks.find(
+                {k: v for k, v in base.items() if k != "project_id"}
+                | ({"project_id": base["project_id"]} if "project_id" in base else {}),
+                {"_id": 0, "id": 1, "construction_stages": 1},
+            )
+        }
+
+    async def raised_seqs():
+        return {
+            r["_id"]: set(r["s"])
+            for r in await db.demands.aggregate(
+                [
+                    {"$match": {**base, "voided": {"$ne": True}}},
+                    {"$group": {"_id": "$booking_id", "s": {"$addToSet": "$installment_seq"}}},
+                ]
+            ).to_list(None)
+        }
+
+    async def plans():
+        return await db.bookings.find(
+            {**base, "status": {"$in": LIVE_BOOKING_STATUSES}},
+            {"_id": 0, "id": 1, "block_id": 1, "payment_plan_snapshot.installments": 1},
         ).to_list(None)
-    }
-    async for b in db.bookings.find(
-        {**base, "status": {"$in": LIVE_BOOKING_STATUSES}},
-        {"_id": 0, "id": 1, "block_id": 1, "payment_plan_snapshot.installments": 1},
-    ):
+
+    # 3I: the five reads are independent — side by side
+    bal, (n, amt), done, seqs, bks = await asyncio.gather(
+        balance(), _pay_totals(user, pid, "Pending"), done_stages(), raised_seqs(), plans()
+    )
+    awaiting = 0
+    for b in bks:
         raised = seqs.get(b["id"], set())
         awaiting += sum(
             1
@@ -723,7 +751,9 @@ async def attention(user, base, pid):
     async def stale():
         if "demands.register.view" not in perms:
             return None
-        return await register_totals(user, stale_days=STALE_DAYS, project_id=pid)
+        from routers.demand_register import stale_count
+
+        return {"count": await stale_count(user, STALE_DAYS, pid)}  # 3I: the register's own filter, counted in Mongo
 
     nh, bo, wv, st = await asyncio.gather(holds(), bounced(), waivers(), stale())  # 3I: in parallel
     out = {

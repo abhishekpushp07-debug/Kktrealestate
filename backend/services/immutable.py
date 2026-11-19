@@ -97,9 +97,13 @@ class GuardedDatabase:
     def __getattr__(self, item):
         if item in self.GUARDED:
             return GuardedCollection(getattr(self._db, item), item)
+        if item == "demands":  # 3I: bill writes invalidate the per-booking money snapshot
+            from services.money_snapshot import DemandsCollection
+
+            return DemandsCollection(self._db.demands, self._db)
         return getattr(self._db, item)
 
     def __getitem__(self, item):
-        if item in self.GUARDED:
-            return GuardedCollection(self._db[item], item)
+        if item in self.GUARDED or item == "demands":
+            return getattr(self, item)
         return self._db[item]

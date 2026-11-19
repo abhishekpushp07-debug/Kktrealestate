@@ -3,6 +3,35 @@
 from db import db
 from utils import base_doc, now_iso
 
+_ROLE_USERS: dict = {}
+
+
+async def _role_users(company_id: str, roles: tuple) -> list[dict]:
+    """3I: one stage complete notifies the same roles for every bill — the lookup is shared for 2 s."""
+    import time
+
+    hit = _ROLE_USERS.get((company_id, roles))
+    if hit and time.monotonic() - hit[0] < 2:
+        return hit[1]
+    role_ids = [
+        r["id"]
+        for r in await db.roles.find(
+            {"company_id": company_id, "name": {"$in": list(roles)}}, {"_id": 0, "id": 1}
+        ).to_list(None)
+    ]
+    users = await db.users.find(
+        {
+            "company_id": company_id,
+            "$or": [{"role_id": {"$in": role_ids}}, {"role_ids": {"$in": role_ids}}],
+            "is_active": True,
+        },
+        {"_id": 0, "id": 1},
+    ).to_list(None)
+    if len(_ROLE_USERS) > 256:
+        _ROLE_USERS.clear()
+    _ROLE_USERS[(company_id, roles)] = (time.monotonic(), users)
+    return users
+
 
 async def notify_roles(
     company_id: str,
@@ -15,24 +44,7 @@ async def notify_roles(
     link: str | None = None,
     exclude: set | None = None,
 ):
-    role_ids = [
-        r["id"]
-        for r in await db.roles.find({"company_id": company_id, "name": {"$in": roles}}, {"_id": 0, "id": 1}).to_list(
-            None
-        )
-    ]
-    users = [
-        u
-        for u in await db.users.find(
-            {
-                "company_id": company_id,
-                "$or": [{"role_id": {"$in": role_ids}}, {"role_ids": {"$in": role_ids}}],
-                "is_active": True,
-            },
-            {"_id": 0, "id": 1},
-        ).to_list(None)
-        if u["id"] not in (exclude or set())
-    ]
+    users = [u for u in await _role_users(company_id, tuple(sorted(roles))) if u["id"] not in (exclude or set())]
     if not users:
         return
     now = now_iso()

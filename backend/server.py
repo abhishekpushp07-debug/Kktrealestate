@@ -349,6 +349,7 @@ async def startup_tasks():
         ("price_paise_backfill", backfill_price_paise),
         ("backfill_paid_parts", _backfill_paid_parts),
         ("redate_receipt_rows", _redate_receipt_rows),
+        ("money_snapshots", _money_snapshots),
     ]
     if await db.settings.find_one(
         {"key": "story_mode", "value": True}
@@ -367,6 +368,14 @@ async def startup_tasks():
         phase="done", done=True, finished_at=__import__("datetime").datetime.now(__import__("datetime").UTC).isoformat()
     )
     logger.info("[startup] background tasks complete in %.1fs: %s", time.perf_counter() - t0, STARTUP["steps"])
+
+
+async def _money_snapshots():
+    """3I REQ-355: build any missing per-booking money snapshot once (a new database / first deploy); then a count."""
+    if await db.bookings.count_documents({"money_snapshot": {"$exists": False}}, limit=1):
+        from services.money_snapshot import in_step_check
+
+        await in_step_check()
 
 
 async def _warm_reports():
@@ -613,6 +622,13 @@ async def _dues_loop():
                 await _jr.item_failed(_run, "integrity_report", e)
                 await _jr.finish(_run)
                 raise
+            _run = await _jr.start("REPORT_FIGURES_CHECK")  # 3I REQ-360: kept-ready figures vs recompute
+            try:
+                rf = await __import__("services.money_snapshot", fromlist=["x"]).in_step_check()
+                await _jr.finish(_run, {"differences": rf["differences"], "checked": rf["checked"]})
+            except Exception as e:  # noqa: BLE001
+                await _jr.item_failed(_run, "report_figures", e)
+                await _jr.finish(_run)
             await _jr.sweep()
             await _jr.notify_stale_if_needed()
             if os.environ.get("BACKUP_ENABLED", "1") == "1":

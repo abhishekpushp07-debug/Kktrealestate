@@ -767,6 +767,14 @@ def _identity(a, b, c, rest=None):
     return out + ([_line("remainder", f"Unexplained remainder {_m(rest)}", tone="brick")] if rest else [])
 
 
+def _period_qs(p) -> str:
+    """The report's own period as a drill query (no period = every date → "All time" on the target)."""
+    f, t = (p or {}).get("period_from"), (p or {}).get("period_to")
+    if not f and not t:
+        return "period_from=2000-01-01"
+    return "&".join(f"{k}={v}" for k, v in (("period_from", f), ("period_to", t)) if v)
+
+
 def _hand_day(t, p):
     p = p or {}
     return (t.get("in_hand_day") or p.get("period_to") or str(p.get("as_of") or "")) or __import__(
@@ -1230,7 +1238,7 @@ REGISTRY |= {
                 _line(
                     "other-income",
                     f"Cancellation deductions kept — other income, not sales {_m(t['br_forfeit'])}",
-                    "/reports/v3/cancellations?period_from=2000-01-01",
+                    "/reports/v3/cancellations?" + _period_qs(p),  # 3I: the line's own period (deductions kept then)
                 )
             ]
             if t.get("br_forfeit")

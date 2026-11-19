@@ -373,7 +373,10 @@ async def _rebuild(booking_id: str) -> list[dict]:
         summary["outstanding_paise"] - summary["advance_paise"]
     )  # == balance_paise by the two-sided law
     # demand statuses: FIFO per bucket
+    from services import money_snapshot
+
     cum_c = cum_a = 0
+    snap, writes = [], []
     for d in sorted(demands, key=lambda x: x["posted_at"]):
         prev_c, prev_a = cum_c, cum_a
         cum_c += d["cash_demand_paise"]
@@ -391,17 +394,27 @@ async def _rebuild(booking_id: str) -> list[dict]:
             "account_paid_paise": paid_a,
             "account_open_paise": d["account_demand_paise"] - paid_a,
         }
+        snap.append(money_snapshot.bill(d, status=status, paid_paise=paid))
         if (d.get("status") != status) or d.get("paid_paise") != paid or d.get("paid_parts") != parts:
-            await db.demands.update_one(
-                {"id": d["id"]}, {"$set": {"status": status, "paid_paise": paid, "paid_parts": parts}}
-            )
+            writes.append((d["id"], {"status": status, "paid_paise": paid, "paid_parts": parts}))
+    rev0 = b.get("money_rev") or 0
+    if writes:  # 3I: rebuild's own bill writes do not invalidate; the final update below moves the rev once
+        tok = money_snapshot.SKIP.set(True)
+        try:
+            await asyncio.gather(*(db.demands.update_one({"id": did}, {"$set": upd}) for did, upd in writes))
+        finally:
+            money_snapshot.SKIP.reset(tok)
     await db.ledger_entries.raw("ledger projection rebuild").delete_many({"booking_id": booking_id})
     if rows:
         await db.ledger_entries.insert_many([dict(r) for r in rows])
-    await db.bookings.update_one(
-        {"id": booking_id},
-        {"$set": {"summary": summary, "other_charges": list(lines.values()), "ledger_rebuilt_at": now_iso()}},
-    )
+    done = {"summary": summary, "other_charges": list(lines.values()), "ledger_rebuilt_at": now_iso()}
+    bump = {"$inc": {"money_rev": 1}} if writes else {}
+    # 3I: the snapshot lands only if no other bill write moved the rev since this rebuild read the booking
+    flt = {"id": booking_id, "money_rev": rev0} if rev0 else {"id": booking_id, "money_rev": {"$in": [None, 0]}}
+    snapshot = {"rev": rev0 + (1 if writes else 0), "bills": snap}
+    r = await db.bookings.update_one(flt, {"$set": done | {"money_snapshot": snapshot}, **bump})
+    if not r.matched_count:
+        await db.bookings.update_one({"id": booking_id}, {"$set": done, **bump})
     return rows
 
 
