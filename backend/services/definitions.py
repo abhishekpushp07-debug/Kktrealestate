@@ -697,10 +697,31 @@ async def receipt_split(match: dict, key=None) -> list[dict]:
     """THE Cash / Account / Other split of the receipts matching `match` (callers add status Cleared), grouped by `key`."""
     from db import db
 
-    rows = await db.payments.aggregate([{"$match": match}, *receipt_parts_stages(), receipt_split_group(key)]).to_list(
-        None
-    )
-    return rows
+    tail = [*receipt_parts_stages(), receipt_split_group(key)]
+    ors = match.get("$or") or []
+    if len(ors) != 2 or not all("payment_mode_code" in b for b in ors):
+        return await db.payments.aggregate([{"$match": match}, *tail]).to_list(None)
+    # 3I: received_match's two branches (receipt day / clearing time) run as two index-led pipelines — the planner
+    # picked a full scan for the combined $or. The group fields are sums, so the halves add up exactly.
+    rest = {k: v for k, v in match.items() if k != "$or"}
+    out: dict = {}
+    for br, ix in zip(ors, ("received_mode_day", "received_instrument")):
+        hint = {"hint": ix} if "company_id" in rest and "status" in rest else {}
+        for r in await db.payments.aggregate([{"$match": {**rest, **br}}, *tail], **hint).to_list(None):
+            k = json_key(r["_id"])
+            if k in out:
+                for f, v in r.items():
+                    if f != "_id":
+                        out[k][f] = out[k].get(f, 0) + v
+            else:
+                out[k] = r
+    return list(out.values())
+
+
+def json_key(v) -> str:
+    import json
+
+    return json.dumps(v, sort_keys=True, default=str)
 
 
 async def carried(booking_ids: list[str], from_date: str, to_date: str) -> dict:

@@ -282,6 +282,18 @@ def _default_kpis(payload: dict, columns: list[tuple], totals: dict | None, rows
 
 
 INTERNAL_KEY = secrets.token_hex(16)  # Phase 3F: only in-process report providers know it (full rows, read-only)
+HANDOFF: dict = {}  # 3I: an in-process provider call takes the result object directly (no JSON encode / hash / parse)
+
+
+def handoff(request: Request, out):
+    """In-process report provider call: park the payload for legacy.call and answer with its token only."""
+    tok = request.headers.get("x-report-handoff")
+    if tok and request.headers.get("x-report-internal") == INTERNAL_KEY and isinstance(out, dict):
+        if out.get("handoff") == tok:  # already parked (respond → etag_respond)
+            return out
+        HANDOFF[tok] = out
+        return {"handoff": tok}
+    return out
 
 
 async def respond(
@@ -451,15 +463,22 @@ async def respond(
     view_rows = (
         rows if request.headers.get("x-report-internal") == INTERNAL_KEY else rows[:REPORT_VIEW_MAX]
     )  # Phase J.2: on-screen view is bounded; full data via CSV (sync ≤10k, else async export); 3F engine reads all
-    return present_money(
-        {
-            **payload,
-            "columns": [{"key": c[0], "label": c[1], "type": c[2]} for c in columns],
-            "rows": view_rows,
-            "totals": totals,
-            "total_rows": len(rows),
-            "truncated": len(rows) > len(view_rows),
-        }
+    internal = (
+        bool(request.headers.get("x-report-handoff")) and request.headers.get("x-report-internal") == INTERNAL_KEY
+    )
+    return handoff(
+        request,
+        present_money(
+            {
+                **payload,
+                "columns": [{"key": c[0], "label": c[1], "type": c[2]} for c in columns],
+                "rows": view_rows,
+                "totals": totals,
+                "total_rows": len(rows),
+                "truncated": len(rows) > len(view_rows),
+            },
+            twins=not internal,
+        ),
     )
 
 
@@ -1149,6 +1168,12 @@ async def inventory(
 
 
 # ---------- 8. Cheques ----------
+_CHQ_INFO = ("payment_date", "cleared_at", "status", "payment_mode_code", "bounced_at", "receipt_number")
+_CHQ_PROJ = {"_id": 0, "customer_name": 1, "booking_number": 1, "instrument": 1, "amount_paise": 1} | dict.fromkeys(
+    _CHQ_INFO, 1
+)
+
+
 @router.get("/cheques")
 async def cheques(
     request: Request,
@@ -1174,8 +1199,9 @@ async def cheques(
             "amount_paise": p["amount_paise"],
             "status": p["status"],
             "bounced_at": p.get("bounced_at"),
+            "pay_info": {k: p.get(k) for k in _CHQ_INFO},  # 3I: the v3 sheet needs no second read of receipts
         }
-        for p in await db.payments.find(q, {"_id": 0}).sort("instrument.date", 1).to_list(None)
+        for p in await db.payments.find(q, _CHQ_PROJ).sort("instrument.date", 1).to_list(None)
     ]
     cols = [
         ("receipt_number", "Receipt", "str", 1.1),

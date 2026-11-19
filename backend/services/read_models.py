@@ -85,7 +85,14 @@ async def flush():
             try:
                 from services import trends as _trends
 
-                cos = {c["id"] for c in await db.companies.find({}, {"_id": 0, "id": 1}).to_list(None)}
+                allp = ps | {
+                    b["project_id"]
+                    for b in await db.blocks.find({"id": {"$in": list(bs)}}, {"_id": 0, "project_id": 1}).to_list(None)
+                }
+                # 3I: only the companies that own a touched project / customer (was every company on every write)
+                cos = set(await db.projects.distinct("company_id", {"id": {"$in": list(allp)}})) | set(
+                    await db.customers.distinct("company_id", {"id": {"$in": list(cs)}})
+                )
                 await _trends.on_dirty(set(ps), set(cs), cos)
             except Exception:  # noqa: BLE001
                 __import__("logging").getLogger("kkt").exception("trends refresh")

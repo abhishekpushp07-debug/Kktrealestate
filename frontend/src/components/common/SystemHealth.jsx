@@ -154,6 +154,18 @@ function UniquenessRules({ rules }) {
   );
 }
 
+function FastCache({ r }) {
+  if (!r) return null;
+  const pct = r.hit_rate == null ? "—" : `${Math.round(r.hit_rate * 100)}%`;
+  return (
+    <p className="mt-2 text-sm text-txt-muted" data-testid="ops-fast-cache">
+      Fast cache (Redis): {r.state} · hit rate {pct} · commands today{" "}
+      {r.commands_today.toLocaleString("en-IN")} · this month{" "}
+      {r.commands_month.toLocaleString("en-IN")} of {r.month_budget.toLocaleString("en-IN")}
+    </p>
+  );
+}
+
 function OpsSummary({ d, groups }) {
   return (
     <>
@@ -392,6 +404,7 @@ export function SystemHealthCard() {
         <>
           <OpsSummary d={d} groups={groups} />
           <UniquenessRules rules={d.uniqueness} />
+          <FastCache r={d.caches?.redis} />
           <div className="mt-5 grid gap-4 md:grid-cols-2 [&>*]:min-w-0">
             <OpsJobs d={d} jobs={jobs} />
             <div data-testid="ops-slow">

@@ -44,7 +44,9 @@ async def main():
         print(
             f"{KEY}: status {r.status_code} rows {r.json().get('count')} cold {cold:.0f} ms warm {1000 * (time.perf_counter() - a):.0f} ms"
         )
-    pstats.Stats(pr).sort_stats("cumulative").print_stats(r"(routers|services|reports_v3|motor)", 30)
+    pstats.Stats(pr).sort_stats("cumulative").print_stats(
+        r"(routers|services|reports_v3|motor)", 30
+    ) if not os.environ.get("TOT") else pstats.Stats(pr).sort_stats("tottime").print_stats(25)
 
 
 asyncio.run(main())

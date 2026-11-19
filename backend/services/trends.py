@@ -96,15 +96,16 @@ async def compute(company_id: str, scope: str, sid: str | None, months: list[str
             ]
         ).to_list(None)
     }
-    cum_c = {
-        r["_id"]: r["v"]
+    cum_c: dict = {}
+    rm = received_match(None, hi)
+    for br in rm["$or"]:  # 3I: the two received branches as two index-led pipelines (one $or was a full scan)
         for r in await db.payments.aggregate(
             [
-                {"$match": {**bm, **received_match(None, hi)}},
+                {"$match": {**bm, "status": rm["status"], **br}},
                 {"$group": {"_id": {"$substr": [received_day_expr(), 0, 7]}, "v": {"$sum": "$amount_paise"}}},
             ]
-        ).to_list(None)
-    }
+        ).to_list(None):
+            cum_c[r["_id"]] = cum_c.get(r["_id"], 0) + r["v"]
     keys = sorted(set(cum_d) | set(cum_c))
     run_d = run_c = 0
     eom = {}
@@ -148,12 +149,19 @@ async def refresh(company_id: str, scope: str, sid: str | None, months: int = 24
         }
         for i, mo in enumerate(ms)
     ]
-    for d in docs:
-        await db.monthly_buckets.update_one(
-            {"company_id": company_id, "scope": scope, "scope_id": d["scope_id"], "month": d["month"]},
-            {"$set": d},
-            upsert=True,
-        )
+    from pymongo import UpdateOne
+
+    await db.monthly_buckets.bulk_write(  # 3I: one round trip for the 24 months (was 24)
+        [
+            UpdateOne(
+                {"company_id": company_id, "scope": scope, "scope_id": d["scope_id"], "month": d["month"]},
+                {"$set": d},
+                upsert=True,
+            )
+            for d in docs
+        ],
+        ordered=False,
+    )
     return {"months": ms, **series}
 
 

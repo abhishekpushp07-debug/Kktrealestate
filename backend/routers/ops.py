@@ -61,7 +61,7 @@ async def ops(window: int = 900, user: dict = Depends(require("admin.system_heal
         "jobs": snap["jobs"],
         "load_shed": loadshed.snapshot(),
         "pool": {**POOL_STATS, "max_pool_size": POOL["maxPoolSize"]},
-        "caches": {"ttlcache": ttlcache.snapshot()},
+        "caches": {"ttlcache": ttlcache.snapshot(), "redis": await __import__("services.cache").cache.health()},
         "alerts": alerts.LAST,
         "backup": await _backup_status(),
         "storage": await storage_usage(),

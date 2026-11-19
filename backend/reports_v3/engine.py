@@ -52,10 +52,11 @@ def options(spec: dict, rows: list[dict]) -> dict:
     return out
 
 
-def _natural(s):
-    import re
+_DIGITS = __import__("re").compile(r"(\d+)")
 
-    return [int(t) if t.isdigit() else t.lower() for t in re.split(r"(\d+)", str(s))]
+
+def _natural(s):
+    return [int(t) if t.isdigit() else t.lower() for t in _DIGITS.split(str(s))]
 
 
 def _num(v):

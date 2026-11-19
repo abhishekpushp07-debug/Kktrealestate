@@ -89,6 +89,7 @@ async def _prepare():
             continue
         async for docs in _batches(src[name].find({}, {"_id": 0})):  # bounded memory (audit_logs > 500 MB)
             await dst[name].insert_many(docs)
+    await dst.demands.delete_many({"trigger_type": "MANUAL"})  # a pre-phase-7 DB has no hand-raised bills (3G+)
     for coll, fields in STRIP.items():
         await dst[coll].update_many({}, {"$unset": {f: "" for f in fields}})
     await dst.settings.delete_many({"key": {"$in": SETTINGS_DROP}})

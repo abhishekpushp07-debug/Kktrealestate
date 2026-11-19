@@ -11,12 +11,14 @@ from pymongo.errors import OperationFailure
 load_dotenv(Path(__file__).parent / ".env")
 
 # Connection pool (Atlas-compatible; all tunable via env, documented in memory/qa/perf/load_report.md):
-#   MONGO_MAX_POOL (50)  max sockets per process      MONGO_MIN_POOL (5)   warm sockets kept open
+#   MONGO_MAX_POOL (40)  max sockets per process      MONGO_MIN_POOL (2)   warm sockets kept open
 #   MONGO_WAIT_QUEUE_MS (5000) wait for a free socket  MONGO_SST_MS (5000)  server selection timeout
 #   MONGO_CONNECT_MS (5000) TCP connect               MONGO_SOCKET_MS (30000) per-operation socket timeout
 POOL = {
-    "maxPoolSize": int(os.environ.get("MONGO_MAX_POOL", "100")),
-    "minPoolSize": int(os.environ.get("MONGO_MIN_POOL", "5")),
+    "maxPoolSize": int(
+        os.environ.get("MONGO_MAX_POOL", "40")
+    ),  # 3I M-10: 4 replicas × 2 workers × 40 ≤ 500 (Atlas shared)
+    "minPoolSize": int(os.environ.get("MONGO_MIN_POOL", "2")),
     "waitQueueTimeoutMS": int(os.environ.get("MONGO_WAIT_QUEUE_MS", "5000")),
     "serverSelectionTimeoutMS": int(os.environ.get("MONGO_SST_MS", "5000")),
     "connectTimeoutMS": int(os.environ.get("MONGO_CONNECT_MS", "5000")),
@@ -426,6 +428,21 @@ async def ensure_indexes():
     await _indexes_catalogues()
     await _indexes_business_compound()
     await _indexes_phase11a()
+    await _indexes_phase3i()
+
+
+async def _indexes_phase3i():
+    """3I (M-04): the three collection scans the 3G audit found."""
+    await _safe_index(db.job_runs, [("job", ASCENDING), ("started_at", DESCENDING)], "job_started")
+    await _safe_index(db.doc_verifications, [("code", ASCENDING)], "code")
+    await _safe_index(db.generated_documents, [("booking_id", ASCENDING), ("type", ASCENDING)], "booking_type")
+    # received = cleared: the cheque / DD branch of definitions.received_match ranges on cleared_at (was a full scan)
+    for name, day in (("received_mode_day", "payment_date"), ("received_instrument", "cleared_at")):
+        await _safe_index(
+            db.payments,
+            [("company_id", ASCENDING), ("status", ASCENDING), ("payment_mode_code", ASCENDING), (day, ASCENDING)],
+            name,
+        )
 
 
 async def _safe_index(coll, spec, name):

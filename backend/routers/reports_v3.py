@@ -120,7 +120,7 @@ async def _rows(spec: dict, user: dict, as_of: date, p: dict | None = None) -> l
     layer = "real" if can_see_real(user) else f"display:{user['id']}"
     key = f"rpt3:{spec['key']}:{ttlcache.scope_key(user)}:{layer}:{as_of}:{clock.today()}:{stamp}:{json.dumps(push, default=str)}"
     ctx = {"as_of": as_of, "stamp": stamp, "params": push}
-    return await ttlcache.cached(key, 600, lambda: spec["provider"](user, ctx), stamped=True)
+    return await ttlcache.cached(key, 600, lambda: spec["provider"](user, ctx), stamped=True, stamp=stamp)
 
 
 async def _run(spec: dict, user: dict, p: dict) -> dict:
@@ -129,7 +129,7 @@ async def _run(spec: dict, user: dict, p: dict) -> dict:
     stamp = await _data_stamp()
     filt = json.dumps({k: v for k, v in p.items() if k not in ("page", "page_size")}, default=str, sort_keys=True)
     key = f"rpt3res:{spec['key']}:{user['id']}:{stamp}:{clock.today()}:{filt}"
-    return await ttlcache.cached(key, 600, lambda: _compute(spec, user, p), stamped=True)
+    return await ttlcache.cached(key, 600, lambda: _compute(spec, user, p), stamped=True, stamp=stamp)
 
 
 async def _compute(spec: dict, user: dict, p: dict) -> dict:

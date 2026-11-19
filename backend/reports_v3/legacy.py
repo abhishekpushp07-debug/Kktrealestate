@@ -2,6 +2,7 @@
 (same code, same numbers — nothing re-derived) at its finest grouping, then adds the booking's location / customer /
 sales dimensions so the engine can filter, group and link rows."""
 
+import uuid
 from contextvars import ContextVar
 
 import httpx
@@ -20,14 +21,16 @@ def last(path: str) -> dict | None:
 
 
 async def call(user: dict, path: str, params: dict) -> dict:
-    from routers.reports import INTERNAL_KEY
+    from routers.reports import HANDOFF, INTERNAL_KEY
     from server import app
 
+    tok = uuid.uuid4().hex
     h = {"Authorization": f"Bearer {create_access_token(user, minutes=2)}", "x-report-internal": INTERNAL_KEY}
+    h["x-report-handoff"] = tok
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://internal") as c:
         r = await c.get(f"/api/reports/{path}", params={k: v for k, v in params.items() if v}, headers=h, timeout=120)
     r.raise_for_status()
-    return r.json()
+    return HANDOFF.pop(tok, None) or r.json()
 
 
 async def _booking_dims(user: dict) -> tuple[dict, dict]:

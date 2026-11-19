@@ -183,13 +183,36 @@ async def customer_status(user: dict, ctx: dict) -> list[dict]:
     return await ttlcache.cached(key, 600, lambda: _booking_rows(user, ctx["as_of"]), stamped=True)
 
 
+_ROW_MEMO: dict = {}  # booking id → (input fingerprint, row); per process, never trusted without the fingerprint
+
+
 async def _booking_rows(user: dict, as_of: date) -> list[dict]:
     """REQ-276…278: one row per booking; past dates read the ledger's share state of that day (definitions.shares_as_of)."""
     past = as_of < clock.today()
     bks, dem, floors, users, stages, paid_on = await _lookups(user, as_of)
     snap = await D.shares_as_of([b["id"] for b in bks], as_of) if past else {}
     rows = []
+    sfp = {k: repr(v) for k, v in stages.items()}
+    today = clock.today()
     for b in bks:
+        # 3I: a booking's row is recomputed only when one of its own inputs changed (fingerprint of exactly what it reads)
+        fp = hash(
+            (
+                repr(b),
+                repr(dem.get(b["id"])),
+                repr(snap.get(b["id"])),
+                floors.get(b.get("flat_id")),
+                users.get(b.get("sales_user_id")),
+                sfp.get(b.get("block_id")),
+                paid_on.get(b["id"]),
+                as_of,
+                today,
+            )
+        )
+        hit = _ROW_MEMO.get((b["id"], as_of))
+        if hit and hit[0] == fp:
+            rows.append(dict(hit[1]))
+            continue
         st = _live_at(b, as_of)
         s = snap.get(b["id"], {}) if past else (b.get("summary") or {})
         cut = as_of if past else None
@@ -236,6 +259,9 @@ async def _booking_rows(user: dict, as_of: date) -> list[dict]:
                 "live": live,
             }
         )
+        if len(_ROW_MEMO) > 12_000:
+            _ROW_MEMO.clear()
+        _ROW_MEMO[(b["id"], as_of)] = (fp, dict(rows[-1]))
     return rows
 
 

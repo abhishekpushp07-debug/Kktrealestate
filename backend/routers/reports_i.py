@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, Request, Response
 
 from db import db
 from deps import report_scope_filter, require
-from routers.reports import _company, _dates, _scope, _strict_params, respond
+from routers.reports import INTERNAL_KEY, _company, _dates, _scope, _strict_params, handoff, respond
 from services import clock, definitions
 from services import pdf as _pdf
 from services.budgets import REPORT_MS  # Phase K.8
@@ -22,6 +22,8 @@ LIVE = ["Active", "Completed"]
 def etag_respond(request: Request, out):
     if not isinstance(out, dict):
         return out
+    if request.headers.get("x-report-handoff"):
+        return handoff(request, out)
     tag = '"' + hashlib.sha1(json.dumps(out, sort_keys=True, default=str).encode()).hexdigest()[:20] + '"'
     if request.headers.get("if-none-match") == tag:
         return Response(status_code=304, headers={"ETag": tag})
@@ -46,6 +48,8 @@ async def cached_report(request: Request, name: str, user: dict, params: list, m
     makes the next read recompute; no TTL guesswork. `make()` returns the normal etag Response."""
     from services import ttlcache
 
+    if request.headers.get("x-report-internal") == INTERNAL_KEY:  # 3I: the v3 engine caches; never park a handoff
+        return await make()
     key = f"rep:{name}:{user['id']}:{json.dumps(params, default=str)}:{clock.today()}:{await _data_stamp()}"
     hit = ttlcache.get(key)
     if hit is None:
@@ -118,6 +122,7 @@ _COLL_FIELDS = (  # every receipt field Collections reads (rows, buckets, bridge
     "payment_mode_code",
     "payment_mode_name",
     "bank_account_name",
+    "instrument.bank",
 )
 
 
@@ -310,6 +315,12 @@ async def _collections_v2(request, from_date, to_date, project_id, block_id, gro
                     if r["_rev"]
                     else (r.get("payment_mode_name") or ""),
                     "date": r["_date"],
+                    "pay_info": {  # 3I: the receipt's mode / bank, so the v3 sheet needs no second read of receipts
+                        "payment_mode_code": r.get("payment_mode_code"),
+                        "payment_mode_name": r.get("payment_mode_name"),
+                        "bank_account_name": r.get("bank_account_name"),
+                        "instrument": {"bank": (r.get("instrument") or {}).get("bank")},
+                    },
                     "_link": f"/payments?q={r['receipt_number']}",
                 }
             )
@@ -805,6 +816,11 @@ async def receivables_forecast(
     q = {**_scope(user, project_id, block_id), "status": {"$in": LIVE}}
     today = clock.today()
     lines, per_booking = [], []
+    seqs: dict = {}  # 3I: one query for every booking's raised instalments (was one per booking)
+    async for d in db.demands.find(
+        {"company_id": cid, "voided": {"$ne": True}}, {"_id": 0, "booking_id": 1, "installment_seq": 1}
+    ):
+        seqs.setdefault(d["booking_id"], set()).add(d.get("installment_seq"))
     async for b in db.bookings.find(
         q,
         {
@@ -825,12 +841,7 @@ async def receivables_forecast(
         s = b.get("summary") or {}
         raised = s.get("total_order_raised_paise", 0)
         remaining = b["agreement_value_paise"] - raised
-        raised_seqs = {
-            d["installment_seq"]
-            for d in await db.demands.find(
-                {"booking_id": b["id"], "voided": {"$ne": True}}, {"_id": 0, "installment_seq": 1}
-            ).to_list(None)
-        }
+        raised_seqs = seqs.get(b["id"], set())
         pend = [
             i for i in (b.get("payment_plan_snapshot") or {}).get("installments") or [] if i["seq"] not in raised_seqs
         ]

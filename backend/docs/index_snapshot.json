@@ -1317,6 +1317,14 @@
   ],
   "unique": true
  },
+ "doc_verifications.code": {
+  "key": [
+   [
+    "code",
+    1
+   ]
+  ]
+ },
  "document_types.company_id_1_is_active_1_name_1": {
   "key": [
    [
@@ -1739,6 +1747,18 @@
   ],
   "unique": true
  },
+ "generated_documents.booking_type": {
+  "key": [
+   [
+    "booking_id",
+    1
+   ],
+   [
+    "type",
+    1
+   ]
+  ]
+ },
  "hold_reasons.company_id_1_code_1": {
   "key": [
    [
@@ -1795,6 +1815,18 @@
    ]
   ],
   "unique": true
+ },
+ "job_runs.job_started": {
+  "key": [
+   [
+    "job",
+    1
+   ],
+   [
+    "started_at",
+    -1
+   ]
+  ]
  },
  "leads.company_id_1_assigned_to_1_next_follow_up_at_1": {
   "key": [
@@ -2583,6 +2615,46 @@
    ]
   ],
   "unique": true
+ },
+ "payments.received_instrument": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "status",
+    1
+   ],
+   [
+    "payment_mode_code",
+    1
+   ],
+   [
+    "cleared_at",
+    1
+   ]
+  ]
+ },
+ "payments.received_mode_day": {
+  "key": [
+   [
+    "company_id",
+    1
+   ],
+   [
+    "status",
+    1
+   ],
+   [
+    "payment_mode_code",
+    1
+   ],
+   [
+    "payment_date",
+    1
+   ]
+  ]
  },
  "payments.status_date": {
   "key": [

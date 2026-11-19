@@ -15,9 +15,10 @@ async def _payments(user: dict, receipts: list[str]) -> dict:
 
 async def collections(user, rows, ctx):
     rn = {r["group"]: r["group"].removesuffix(" (reversal)") for r in rows}  # a reversal row keeps its receipt's mode
-    pays = await _payments(user, list(set(rn.values())))
+    ready = all("pay_info" in r for r in rows)
+    pays = {} if ready else await _payments(user, list(set(rn.values())))
     for r in rows:
-        p = pays.get(rn[r["group"]]) or {}
+        p = r.pop("pay_info", None) if ready else pays.get(rn[r["group"]]) or {}
         ins = p.get("instrument") or {}
         r["bank"] = ins.get("bank") or p.get("bank_account_name") or ("Cash" if r.get("cash_paise") else "Not recorded")
         r["mode"] = p.get("payment_mode_name") or r.get("tag") or "—"
@@ -29,10 +30,11 @@ async def collections(user, rows, ctx):
 
 
 async def cheques(user, rows, ctx):
-    pays = await _payments(user, [r["receipt_number"] for r in rows])
+    ready = all("pay_info" in r for r in rows)
+    pays = {} if ready else await _payments(user, [r["receipt_number"] for r in rows])
     today = ctx["as_of"]
     for r in rows:
-        p = pays.get(r["receipt_number"]) or {}
+        p = r.pop("pay_info", None) if ready else pays.get(r["receipt_number"]) or {}
         r["received_on"] = p.get("payment_date")
         r["_pay"] = {k: p.get(k) for k in ("payment_date", "status", "payment_mode_code", "cleared_at", "bounced_at")}
         r["cleared_on"] = clock.day_of(p.get("cleared_at"))

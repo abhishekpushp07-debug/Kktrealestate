@@ -25,9 +25,11 @@ async def persist(project_id=None, block_id=None, customer_id=None, all_=False):
     now = datetime.now(UTC)
     ids = [f"p:{project_id}" if project_id else None, f"b:{block_id}" if block_id else None,
            f"c:{customer_id}" if customer_id else None, "all" if all_ else None]  # fmt: skip
-    for i in filter(None, ids):
-        await db.read_model_marks.update_one({"_id": i}, {"$set": {"at": now}}, upsert=True)
-    await bump()
+    from pymongo import UpdateOne
+
+    ops = [UpdateOne({"_id": i}, {"$set": {"at": now}}, upsert=True) for i in filter(None, ids)]
+    # 3I: the marks and the version bump in one round trip (was one per mark + one for the bump)
+    await db.read_model_marks.bulk_write([*ops, UpdateOne({"_id": "__v"}, {"$inc": {"v": 1}}, upsert=True)])
 
 
 async def bump():

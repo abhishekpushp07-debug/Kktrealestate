@@ -117,3 +117,5 @@ backups/kkt_test_migtest-20261113T194709Z.archive.gz
 .emergent/.fork_pod_run_id
 .env
 *.env
+.wt_old/
+.eqtmp/

@@ -49,16 +49,17 @@ def _english_aliases(d: dict) -> dict:
     return extra
 
 
-def present_money(obj):
-    """Recursively add rupee twins for every *_paise key (amount_paise -> amount) and English ledger aliases."""
+def present_money(obj, twins: bool = True):
+    """Recursively add rupee twins for every *_paise key (amount_paise -> amount) and English ledger aliases.
+    twins=False (3I, in-process report providers): aliases only — the engine reads the *_paise keys."""
     if isinstance(obj, list):
-        return [present_money(x) for x in obj]
+        return [present_money(x, twins) for x in obj]
     if isinstance(obj, dict):
         src = {**obj, **_english_aliases(obj)}
         out = {}
         for k, v in src.items():
-            out[k] = present_money(v)
-            if k.endswith("_paise") and isinstance(v, int):
+            out[k] = present_money(v, twins) if isinstance(v, (dict, list)) else v
+            if twins and k.endswith("_paise") and isinstance(v, int):
                 out[k[:-6]] = to_rupees(v)
         return out
     return obj

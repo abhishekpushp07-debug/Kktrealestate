@@ -446,8 +446,7 @@ async def _blocks(base):
 async def next_milestone(user, base, blocks):
     from routers.masters_plus import preview_stage_completion
 
-    out = []
-    for b in blocks:
+    async def one(b):
         st = sorted(b.get("construction_stages") or [], key=lambda s: s["seq"])
         nxt = next((s for s in st if s.get("status") != "Completed"), None)
         row = {
@@ -472,8 +471,9 @@ async def next_milestone(user, base, blocks):
                     ),
                 },
             }
-        out.append(row)
-    return {"towers": out}
+        return row
+
+    return {"towers": list(await asyncio.gather(*(one(b) for b in blocks)))}  # 3I: towers in parallel
 
 
 # ---------------------------------------------------------------- 7 Inventory by tower / 8 Flat status
@@ -750,9 +750,15 @@ async def attention(user, base, pid):
     return out
 
 
+WIDGET_MS: dict = {}  # 3I dev: last compute time per widget (System Health / profiling)
+
+
 async def guarded(fn, *a):
+    t0 = __import__("time").perf_counter()
     try:
         return {"ok": True, "data": await fn(*a)}
     except Exception as e:  # noqa: BLE001 — one widget failing must never blank the others
         __import__("logging").getLogger("kkt").exception("home widget %s", getattr(fn, "__name__", fn))
         return {"ok": False, "error": "Couldn't load", "detail": type(e).__name__}
+    finally:
+        WIDGET_MS[getattr(fn, "__name__", "?")] = round(1000 * (__import__("time").perf_counter() - t0))

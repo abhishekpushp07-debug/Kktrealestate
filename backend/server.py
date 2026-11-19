@@ -318,6 +318,7 @@ async def startup_tasks():
         logging.getLogger(__name__).debug("handled error", exc_info=True)
         leader = False
     if not leader:
+        await _warm_reports()
         STARTUP.update(phase="follower", done=True, finished_at=STARTUP["started_at"])
         logger.info("[startup] another replica holds the startup lease; skipping migrations here")
         return
@@ -361,10 +362,44 @@ async def startup_tasks():
             await try_acquire("startup")  # renew lease between steps
         except Exception:
             logging.getLogger(__name__).debug("ignored non-fatal error", exc_info=True)
+    await _warm_reports()
     STARTUP.update(
         phase="done", done=True, finished_at=__import__("datetime").datetime.now(__import__("datetime").UTC).isoformat()
     )
     logger.info("[startup] background tasks complete in %.1fs: %s", time.perf_counter() - t0, STARTUP["steps"])
+
+
+async def _warm_reports():
+    """3I: open every report once in this process (per company, as its Super Admin) so the first real open after a
+    save only recomputes the bookings / receipts that changed (per-booking row fingerprints, warm code paths)."""
+    if os.environ.get("KKT_REPORT_WARMUP", "1") != "1":
+        return
+    import httpx
+
+    from deps import create_access_token
+    from reports_v3.registry import REGISTRY
+
+    STARTUP["phase"] = "warm_reports"
+    t0 = time.perf_counter()
+    try:
+        role_ids = await db.roles.distinct("id", {"name": "Super Admin"})
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://warm", timeout=120) as c:
+            async for u in db.users.aggregate(
+                [
+                    {"$match": {"role_id": {"$in": role_ids}, "is_active": {"$ne": False}}},
+                    {"$group": {"_id": "$company_id", "u": {"$first": "$$ROOT"}}},
+                ]
+            ):
+                h = {"Authorization": f"Bearer {create_access_token(u['u'], minutes=5)}"}
+                for key in REGISTRY:
+                    await c.get(f"/api/reports/v3/{key}", headers=h, params={"page_size": 50})
+    except Exception:  # noqa: BLE001 — warming is best effort; reports compute on demand anyway
+        logger.warning("[startup] report warm-up failed", exc_info=True)
+    STARTUP["steps"]["warm_reports"] = f"{time.perf_counter() - t0:.1f}s"
+    gc.collect()
+    th = [int(x) for x in os.environ.get("KKT_GC_THRESHOLD", "20000,20,20").split(",")]
+    gc.set_threshold(*th)  # 3I: fewer, cheaper young passes; a full pass over big report caches is rare
+    gc.freeze()  # 3I: long-lived startup objects leave the GC's scans, so a gen-2 pass no longer stalls a report
 
 
 async def _migrate_phase_g():
@@ -917,8 +952,9 @@ async def _tracemalloc_loop():
 
 async def _memory_loop():
     """Phase J.2: decoded-document cycles (cursor batches, request scopes) linger until gen-2 GC; collect + trim
-    every 20 s so RSS tracks live data, not history.
+    every KKT_GC_EVERY_S (3I: 120 s — a 20 s gen-2 pass stalled report opens; startup objects are gc.freeze()d).
     """
+    every = float(os.environ.get("KKT_GC_EVERY_S", "120"))
     while True:
-        await asyncio.sleep(20)
+        await asyncio.sleep(every)
         await asyncio.to_thread(_trim_memory)

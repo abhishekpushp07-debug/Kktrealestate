@@ -49,7 +49,6 @@ def invalidate(prefix: str):
 
 
 # ---- Phase E0: async read-through cache with event-bus invalidation (Redis when REDIS_URL, else in-process) ----
-import json  # noqa: E402
 import os  # noqa: E402
 
 HITS = {"hit": 0, "miss": 0}
@@ -94,19 +93,46 @@ async def data_stamp() -> str:
     return f"{a and a['_id']}.{led and led['_id']}.{await read_model_state.version()}"
 
 
-async def cached(key: str, ttl: float, compute, stamped: bool = False):
+SLOW_S = float(os.environ.get("REDIS_SHARE_MIN_MS", "100")) / 1000
+_SLOW: set[str] = set()  # key families whose compute once took > SLOW_S: the only ones that spend Redis commands
+_TAG: dict[str, tuple] = {}  # key → (stamp family, the data stamp it was computed at)
+_CUR: dict[str, str] = {}
+
+
+def _fam(key: str) -> str:
+    return "v3" if key.startswith("rpt3") else "ttl"  # the two stamp formats (reports v3 / shared data_stamp)
+
+
+def _retire(stamp: str, fam: str):
+    """3I: a new data stamp makes every entry keyed by an older stamp unreachable — free it now, not after its TTL
+    (under steady writes they piled up to GBs per worker)."""
+    if stamp == _CUR.get(fam):
+        return
+    _CUR[fam] = stamp
+    for k in [k for k, (f, st) in _TAG.items() if f == fam and st != stamp]:
+        _TAG.pop(k, None)
+        _store.pop(k, None)
+
+
+async def cached(key: str, ttl: float, compute, stamped: bool = False, stamp: str | None = None):
     """stamped=True: the key already carries a data stamp read before computing, so a write during the compute
     changes the next key — the result is still right for this key and is cached (Phase 3F reports).
     Otherwise (3G) the shared data stamp is appended here, so every cached read is cross-replica safe."""
     if not stamped:
-        key = f"{key}|{await data_stamp()}"
-    use_redis = os.environ.get("REDIS_URL")
-    if use_redis:
-        from services import cache
+        stamp = await data_stamp()
+        key = f"{key}|{stamp}"
+    if stamp:
+        _retire(stamp, _fam(key))
+    from services import cache
 
-        hit = await cache.get("ttl:" + key)
-    else:
-        hit = get(key)
+    fam = key.split(":", 2)[0] + ":" + key.split(":", 2)[1] if key.count(":") >= 2 else key.split("|")[0]
+    hit = get(key)  # 3I: process memory first (0 commands), then one Redis GET shared by every replica
+    if hit is None and cache.redis_on() and fam in _SLOW:
+        hit = await cache.rget("ttl:" + key)
+        if hit is not None:
+            put(key, hit, ttl)
+            if stamp:
+                _TAG[key] = (_fam(key), stamp)
     if hit is not None:
         HITS["hit"] += 1
         return hit
@@ -120,16 +146,19 @@ async def cached(key: str, ttl: float, compute, stamped: bool = False):
     _inflight[key] = fut
     gen = _gen[0]
     try:
+        t0 = time.monotonic()
         val = await compute()
+        slow = time.monotonic() - t0 > SLOW_S
+        if slow:
+            _SLOW.add(fam)
         if gen != _gen[0] and not stamped:  # invalidated while computing: serve it to this caller, never cache it
             fut.set_result(val)
             return val
-        if use_redis:
-            from services import cache
-
-            await cache.set("ttl:" + key, json.loads(json.dumps(val, default=str)), max(1, int(ttl)))
-        else:
-            put(key, val, ttl)
+        put(key, val, ttl)
+        if stamp and key in _store:
+            _TAG[key] = (_fam(key), stamp)
+        if slow and cache.redis_on():  # command-frugal: only results worth sharing (compute > SLOW_S) go to Redis
+            await cache.rset("ttl:" + key, val, ttl)
         fut.set_result(val)
         return val
     except BaseException as e:
@@ -151,12 +180,7 @@ def _subscribe():
             _ENTITY_PREFIXES.get(evt.get("entity_type"), ())
         )
         for p in prefixes:
-            invalidate(p)
-        if os.environ.get("REDIS_URL"):
-            from services import cache
-
-            for p in prefixes:
-                await cache.delete("ttl:" + p)
+            invalidate(p)  # Redis keys carry the data stamp: nothing to delete there (3I, command-frugal)
 
 
 _subscribe()

@@ -17,22 +17,23 @@ def hold_expiry_cutoff() -> str:
 
 async def unreplaced_bounced_ids(match: dict) -> list[str]:
     """A bounced receipt is replaced once its booking has a later Cleared/Pending receipt of at least its amount."""
-    out = []
-    async for p in db.payments.find(
+    bounced = await db.payments.find(
         {**match, "status": "Bounced"},
         {"_id": 0, "id": 1, "booking_id": 1, "amount_paise": 1, "bounced_at": 1, "posted_at": 1},
+    ).to_list(None)
+    later: dict = {}  # 3I: one read of the candidate replacements (was one query per bounced receipt)
+    async for r in db.payments.find(
+        {"booking_id": {"$in": list({p["booking_id"] for p in bounced})}, "status": {"$in": ["Cleared", "Pending"]}},
+        {"_id": 0, "booking_id": 1, "posted_at": 1, "amount_paise": 1},
     ):
+        later.setdefault(r["booking_id"], []).append(r)
+    out = []
+    for p in bounced:
         since = p.get("bounced_at") or p.get("posted_at") or ""
-        rep = await db.payments.find_one(
-            {
-                "booking_id": p["booking_id"],
-                "status": {"$in": ["Cleared", "Pending"]},
-                "posted_at": {"$gt": since},
-                "amount_paise": {"$gte": p["amount_paise"]},
-            },
-            {"_id": 1},
-        )
-        if not rep:
+        if not any(
+            (r.get("posted_at") or "") > since and r["amount_paise"] >= p["amount_paise"]
+            for r in later.get(p["booking_id"], ())
+        ):
             out.append(p["id"])
     return out
 
