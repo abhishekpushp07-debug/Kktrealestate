@@ -22,7 +22,7 @@ BUILD = os.path.join(BACKEND, "..", "frontend", "build")
 SCRATCH_DB = "kkt_perf_scratch"
 PORT = 8031
 BYPASS = os.environ.get("LOGIN_RATE_LIMIT_BYPASS_TOKEN", "kkt-test-bypass-local")
-BUDGET = {"hot": 200, "write": 600, "report": 800, "report_cached": 100}
+BUDGET = {"hot": 200, "write": 600, "report": 800, "report_cached": 100, "after_save": 200}
 CFG = {"workers": 1, "cpus": None, "v3": False}  # 3G Elite baseline: --workers 2 --cpus 0,1 --reports-v3
 
 
@@ -216,6 +216,34 @@ def _pick_write_targets(c):
     return pay_bk, modes, stage_blk, flats
 
 
+def after_save(c, reps=10):
+    """3I: the open that follows a save (receipt posted → page opened → receipt reversed), p95 over `reps` saves."""
+    bks = c.get("/api/bookings", params={"page_size": 100, "status": "Active"}).json()["items"]
+    pay_bk = next(b for b in bks if (b.get("summary") or {}).get("outstanding_paise", 1) > 0)
+    modes = {m["code"]: m["id"] for m in c.get("/api/master/payment-modes").json()["items"]}
+    body = {
+        "booking_id": pay_bk["id"],
+        "amount": 1000,
+        "payment_date": date.today().isoformat(),
+        "payment_mode_id": modes["CASH"],
+        "allocation": "auto",
+        "remarks": "perf after-save",
+    }
+    out = []
+    for name, path in (
+        ("Home Command Center (month) — first after a save", "/api/home/bundle?period=month"),
+        ("Bills raised page — first after a save", "/api/demands/register?page_size=50"),
+    ):
+        xs = []
+        for _ in range(reps):
+            p = c.post("/api/payments", json=body, headers={"Idempotency-Key": uuid.uuid4().hex}).json()
+            xs.append(server_ms(c.get(path)))
+            c.post(f"/api/payments/{p['id']}/reverse", json={"reason": "perf meter"})
+            time.sleep(0.5)
+        out.append(("after_save", name, path, xs, None))
+    return out
+
+
 def writes(c, runs, only=None):
     pay_bk, modes, stage_blk, flats = _pick_write_targets(c)
     today = date.today().isoformat()
@@ -364,7 +392,7 @@ def main():
         rows = (
             [r for r in writes(c, a.runs, only=a.only) if r[1] == "Create booking"]
             if a.only
-            else reads(c, a.runs) + writes(c, a.runs)
+            else reads(c, a.runs) + after_save(c) + writes(c, a.runs)
         )
     finally:
         proc.kill()

@@ -280,6 +280,9 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
         stoken = _timing.SPANS.set(spans)
         pending = {}
         ptoken = _after_commit.PENDING.set(pending)
+        from services import duty as _duty
+
+        _duty.INFLIGHT[0] += 1
         try:
             budget = (
                 900.0
@@ -298,6 +301,7 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
             logger.exception(json.dumps({"request_id": rid, "path": request.url.path, "error": "unhandled"}))
             response = _err_json(500, "INTERNAL_ERROR", "Internal server error", rid)
         finally:
+            _duty.INFLIGHT[0] -= 1
             DB_MS.reset(token)
             _timing.SPANS.reset(stoken)
             _after_commit.PENDING.reset(ptoken)

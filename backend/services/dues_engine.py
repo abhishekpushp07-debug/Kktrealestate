@@ -211,14 +211,19 @@ _DUE_DAYS: dict = {}
 
 async def _due_days(company_id: str) -> dict | None:
     """3I: a stage complete reads the company's days-to-pay once, not once per booking (shared for 2 s)."""
+    import asyncio
     import time
 
     hit = _DUE_DAYS.get(company_id)
     if hit and time.monotonic() - hit[0] < 2:
-        return hit[1]
-    c = await db.companies.find_one({"id": company_id}, {"_id": 0, "demand_due_days": 1})
-    _DUE_DAYS[company_id] = (time.monotonic(), c)
-    return c
+        return await asyncio.shield(hit[1])  # 3I: single-flight — the tower's bills run concurrently
+    t = asyncio.ensure_future(db.companies.find_one({"id": company_id}, {"_id": 0, "demand_due_days": 1}))
+    _DUE_DAYS[company_id] = (time.monotonic(), t)
+    try:
+        return await asyncio.shield(t)
+    except Exception:
+        _DUE_DAYS.pop(company_id, None)
+        raise
 
 
 async def _after_raise(
@@ -259,8 +264,7 @@ async def _after_raise(
             booking, cum, posted_at, None, due
         ):  # any remainder (e.g. raised_percent drift) stays attributable to no stage
             upd["other_charges"] = booking["other_charges"]
-        await db.bookings.update_one({"id": booking["id"]}, {"$set": upd})
-        await rebuild(booking["id"])
+        await rebuild(booking["id"], also_set=upd)  # 3I: one booking write (was: this $set, then the rebuild's)
 
 
 async def raise_due_installments(

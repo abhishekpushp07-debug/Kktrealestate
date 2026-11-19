@@ -8,11 +8,25 @@ _ROLE_USERS: dict = {}
 
 async def _role_users(company_id: str, roles: tuple) -> list[dict]:
     """3I: one stage complete notifies the same roles for every bill — the lookup is shared for 2 s."""
+    import asyncio
     import time
 
-    hit = _ROLE_USERS.get((company_id, roles))
+    key = (company_id, roles)
+    hit = _ROLE_USERS.get(key)
     if hit and time.monotonic() - hit[0] < 2:
-        return hit[1]
+        return await asyncio.shield(hit[1])  # 3I: single-flight — concurrent bills of one stage share the lookup
+    if len(_ROLE_USERS) > 256:
+        _ROLE_USERS.clear()
+    t = asyncio.ensure_future(_load_role_users(company_id, roles))
+    _ROLE_USERS[key] = (time.monotonic(), t)
+    try:
+        return await asyncio.shield(t)
+    except Exception:
+        _ROLE_USERS.pop(key, None)
+        raise
+
+
+async def _load_role_users(company_id: str, roles: tuple) -> list[dict]:
     role_ids = [
         r["id"]
         for r in await db.roles.find(
@@ -27,9 +41,6 @@ async def _role_users(company_id: str, roles: tuple) -> list[dict]:
         },
         {"_id": 0, "id": 1},
     ).to_list(None)
-    if len(_ROLE_USERS) > 256:
-        _ROLE_USERS.clear()
-    _ROLE_USERS[(company_id, roles)] = (time.monotonic(), users)
     return users
 
 

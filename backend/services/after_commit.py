@@ -36,12 +36,17 @@ def flush(q: dict | None):
     batch = list(q.values())
 
     async def run():
+        from services import duty
+
         async with _lock():
+            await duty.idle()
+            t0 = duty.start()
             for fn, items in batch:
                 try:
                     await fn(items)
                 except Exception:  # noqa: BLE001 — follow-up work never fails the request that queued it
                     log.exception("after-commit task failed")
+                t0 = await duty.breathe(t0)  # 3I: requests on this worker go first
 
     t = asyncio.create_task(run())
     _TASKS.add(t)

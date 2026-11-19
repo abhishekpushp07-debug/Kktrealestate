@@ -3,6 +3,7 @@
 Each definition has a machine form (python / mongo match) and a human form (DEFINITIONS, shown read-only in Settings → Definitions).
 """
 
+import asyncio
 from datetime import date, timedelta
 
 from services import clock
@@ -617,10 +618,11 @@ async def ageing_for_bookings(booking_match: dict, as_of: date | None = None) ->
     proj = {"_id": 0, "id": 1, "summary": 1, "other_charges": 1, "money_rev": 1, "money_snapshot": 1}
     bks = await db.bookings.find(live_bookings_match(booking_match), proj).to_list(None)
     dem = await bills_for(bks)  # 3I REQ-355: kept-ready bills per booking (bills read only for out-of-date ones)
-    per = {
-        b["id"]: ageing_bands(b.get("summary") or {}, dem.get(b["id"], []), b.get("other_charges") or [], as_of)
-        for b in bks
-    }
+    per = {}
+    for i, b in enumerate(bks):
+        per[b["id"]] = ageing_bands(b.get("summary") or {}, dem.get(b["id"], []), b.get("other_charges") or [], as_of)
+        if i % 250 == 249:
+            await asyncio.sleep(0)  # 3I: a company-wide pass lets waiting requests in between slices
     total = {k: sum(p[k] for p in per.values()) for k in BANDS}
     return total, per
 

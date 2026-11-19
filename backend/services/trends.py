@@ -198,12 +198,17 @@ async def backfill_once() -> dict:
 
 async def on_dirty(project_ids: set, customer_ids: set, company_ids: set):
     """Called from read_models.flush: recompute the touched scopes only."""
+    from services import duty
+
+    t0 = duty.start()
     for cid in company_ids:
         await refresh(cid, "company", None)
+        t0 = await duty.breathe(t0)
     for pid in project_ids:
         p = await db.projects.find_one({"id": pid}, {"_id": 0, "company_id": 1})
         if p:
             await refresh(p["company_id"], "project", pid)
+            t0 = await duty.breathe(t0)
     for cu in customer_ids:
         c = await db.customers.find_one({"id": cu}, {"_id": 0, "company_id": 1})
         if c:

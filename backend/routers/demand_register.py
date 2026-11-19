@@ -110,21 +110,29 @@ def _row(d: dict, today: str) -> dict:
     }
 
 
-# 3I: fields a register row never reads stay in the database (bookkeeping stamps of the bill)
-_ROW_FIELDS = {"_id": 0, "created_at": 0, "posted_at": 0, "cumulative_percent": 0, "milestone_seq": 0, "company_id": 0}
+# 3I: exactly the fields a register row reads (_row / _why / _status / _source / _age_band / paid_detail / _enrich)
+_ROW_FIELDS = dict.fromkeys(
+    (
+        "id", "demand_number", "demand_date", "due_date", "customer_id", "customer_name", "booking_id",
+        "booking_number", "flat_number", "project_id", "project_name", "block_id", "block_name", "plan_name",
+        "milestone_name", "installment_name", "percent", "trigger", "trigger_type", "installment_seq", "source",
+        "cash_demand_paise", "account_demand_paise", "other_demand_paise", "total_demand_paise", "paid_paise",
+        "paid_parts", "voided", "status", "void_reason", "reminder_sent_at",
+    ),
+    1,
+) | {"_id": 0}  # fmt: skip
+_SUMS = ("cash_paise", "account_paise", "other_paise", "total_paise", "paid_paise", "balance_paise")
 
 
-def _tot(rows: list[dict]) -> dict:
-    live = [r for r in rows if not r["voided"]]
-    return {
-        "count": len(rows),
-        "cash_paise": sum(r["cash_paise"] for r in live),
-        "account_paise": sum(r["account_paise"] for r in live),
-        "other_paise": sum(r["other_paise"] for r in live),
-        "total_paise": sum(r["total_paise"] for r in live),
-        "paid_paise": sum(r["paid_paise"] for r in live),
-        "balance_paise": sum(r["balance_paise"] for r in live),
-    }
+def _tot0() -> dict:
+    return {"count": 0, **dict.fromkeys(_SUMS, 0)}
+
+
+def _add(t: dict, r: dict):
+    t["count"] += 1
+    if not r["voided"]:
+        for k in _SUMS:
+            t[k] += r[k]
 
 
 async def _dead_booking_ids(company_id: str) -> list[str]:
@@ -350,19 +358,31 @@ async def register(
         if source:
             rows = [r for r in rows if r["source"] == source]
         days: dict = {}
-        for r in rows:
+        grand = _tot0()
+        for r in rows:  # 3I: one pass — every group's totals add up as its rows are placed (was re-summed per group)
             dkey = r["due_date"] if basis == "due" else r["demand_date"]
-            dg = days.setdefault(dkey, {"date": dkey, "projects": {}, "rows": []})
-            dg["rows"].append(r)
-            pg = dg["projects"].setdefault(
-                r["project_id"],
-                {"project_id": r["project_id"], "project_name": r["project_name"], "towers": {}, "rows": []},
-            )
-            pg["rows"].append(r)
-            tg = pg["towers"].setdefault(
-                r["block_id"], {"block_id": r["block_id"], "block_name": r["block_name"], "rows": []}
-            )
+            dg = days.get(dkey)
+            if dg is None:
+                dg = days[dkey] = {"date": dkey, "projects": {}, "t": _tot0()}
+            pg = dg["projects"].get(r["project_id"])
+            if pg is None:
+                pg = dg["projects"][r["project_id"]] = {
+                    "project_id": r["project_id"],
+                    "project_name": r["project_name"],
+                    "towers": {},
+                    "t": _tot0(),
+                }
+            tg = pg["towers"].get(r["block_id"])
+            if tg is None:
+                tg = pg["towers"][r["block_id"]] = {
+                    "block_id": r["block_id"],
+                    "block_name": r["block_name"],
+                    "rows": [],
+                    "t": _tot0(),
+                }
             tg["rows"].append(r)
+            for t in (grand, dg["t"], pg["t"], tg["t"]):
+                _add(t, r)
         out = []
         for dg in sorted(days.values(), key=lambda x: x["date"], reverse=True):
             projects = []
@@ -371,7 +391,7 @@ async def register(
                     {
                         "block_id": tg["block_id"],
                         "block_name": tg["block_name"],
-                        "totals": _tot(tg["rows"]),
+                        "totals": tg["t"],
                         "rows": tg["rows"][:per_group],
                         "more": max(0, len(tg["rows"]) - per_group),
                     }
@@ -381,16 +401,16 @@ async def register(
                     {
                         "project_id": pg["project_id"],
                         "project_name": pg["project_name"],
-                        "totals": _tot(pg["rows"]),
+                        "totals": pg["t"],
                         "towers": towers,
                     }
                 )
-            out.append({"date": dg["date"], "totals": _tot(dg["rows"]), "projects": projects})
+            out.append({"date": dg["date"], "totals": dg["t"], "projects": projects})
         data = {
             "basis": basis,
             "as_of": today,
             "groups": out,
-            "totals": _tot(rows),
+            "totals": grand,
             "row_count": len(rows),
             "statuses": list(STATUSES),
             "sources": SOURCES,

@@ -70,19 +70,27 @@ async def flush():
             return
         ps, bs, cs = _dirty["projects"], _dirty["blocks"], _dirty["customers"]
         _dirty.update({"projects": set(), "blocks": set(), "customers": set()})
+        from services import duty
+
+        await duty.idle()
+        t0 = duty.start()  # 3I: each refresh is one step; the worker's requests run between steps
         for bid in bs:
             await refresh_block(bid)
+            t0 = await duty.breathe(t0)
         for pid in ps | {
             b["project_id"]
             for b in await db.blocks.find({"id": {"$in": list(bs)}}, {"_id": 0, "project_id": 1}).to_list(None)
         }:
             await refresh_project(pid)
+            t0 = await duty.breathe(t0)
         for cid in cs:
             await refresh_customer(cid)
+            t0 = await duty.breathe(t0)
         if ps or bs or cs:
             await refresh_dashboards()
             await _state.clear({"projects": ps, "blocks": bs, "customers": cs}, started)
             await _invalidate_read_caches()
+            t0 = await duty.breathe(t0)
         if ps or bs or cs:
             try:
                 from services import trends as _trends

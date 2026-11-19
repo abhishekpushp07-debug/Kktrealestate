@@ -237,24 +237,27 @@ class _Running:
 _REBUILD_LOCKS: dict[str, asyncio.Lock] = {}
 
 
-async def rebuild(booking_id: str) -> list[dict]:
+async def rebuild(booking_id: str, also_set: dict | None = None) -> list[dict]:
     """Serialised per booking across processes (3G: Mongo lease) and within one (asyncio lock): two overlapping
-    rebuilds must not interleave delete + insert (duplicate seqs) or let the older read land last."""
+    rebuilds must not interleave delete + insert (duplicate seqs) or let the older read land last.
+    also_set: booking fields the caller changes, written with the rebuild's own final update (one booking write)."""
     from services.booking_lock import booking_lock
 
     lock = _REBUILD_LOCKS.setdefault(booking_id, asyncio.Lock())
     try:
         async with booking_lock(booking_id), lock:
-            return await _rebuild(booking_id)
+            return await _rebuild(booking_id, also_set or {})
     finally:
         if not lock.locked() and not getattr(lock, "_waiters", None):
             _REBUILD_LOCKS.pop(booking_id, None)
 
 
-async def _rebuild(booking_id: str) -> list[dict]:
+async def _rebuild(booking_id: str, also_set: dict | None = None) -> list[dict]:
+    also_set = also_set or {}
     b = await db.bookings.find_one({"id": booking_id}, {"_id": 0, "money_snapshot": 0})
     if not b:
         return []
+    b.update(also_set)
     demands = await db.demands.find({"booking_id": booking_id, "voided": {"$ne": True}}, {"_id": 0}).to_list(None)
     payments = await db.payments.find(
         {"booking_id": booking_id, "status": {"$in": ["Cleared", "Reversed"]}}, {"_id": 0}
@@ -407,7 +410,7 @@ async def _rebuild(booking_id: str) -> list[dict]:
     await db.ledger_entries.raw("ledger projection rebuild").delete_many({"booking_id": booking_id})
     if rows:
         await db.ledger_entries.insert_many([dict(r) for r in rows])
-    done = {"summary": summary, "other_charges": list(lines.values()), "ledger_rebuilt_at": now_iso()}
+    done = {**also_set, "summary": summary, "other_charges": list(lines.values()), "ledger_rebuilt_at": now_iso()}
     bump = {"$inc": {"money_rev": 1}} if writes else {}
     # 3I: the snapshot lands only if no other bill write moved the rev since this rebuild read the booking
     flt = {"id": booking_id, "money_rev": rev0} if rev0 else {"id": booking_id, "money_rev": {"$in": [None, 0]}}

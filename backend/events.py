@@ -156,6 +156,9 @@ async def surface_snapshot(
     """Values of every money/status surface a booking-context entry can move. Cheap raw aggregates (never read models, which lag)."""
     from datetime import date as _d
 
+    from services import duty
+
+    t0 = duty.start()  # 3I: after-commit work — rests between the money passes so requests on this worker go first
     snap = {}
     if booking_id:
         b = await db.bookings.find_one(
@@ -218,6 +221,7 @@ async def surface_snapshot(
                 "open_balance_paise": sum(d["bal"] for d in dem if d["_id"] in ("Open", "Partially Paid"))
             }
             cm = await _money({"customer_id": b["customer_id"]})
+            t0 = await duty.breathe(t0)
             snap["customer360"] = {
                 "paid_paise": cm["paid_paise"],
                 "outstanding_paise": cm["outstanding"]["total_paise"],
@@ -249,13 +253,15 @@ async def surface_snapshot(
             snap["inventory"] = {"unit": f["flat_number"], "status": f["status"]}
     if project_id:
         pm = await _money({"project_id": project_id})
+        t0 = await duty.breathe(t0)
         snap["projects"] = {
             "collected_paise": pm["collections_total_paise"],
             "outstanding_paise": pm["outstanding"]["total_paise"],
             "overdue_paise": pm["overdue"]["amount_paise"],
             "advance_paise": pm["advance_paise"],
         }
-    hm = await _money({"company_id": company_id})
+    hm = await _money({"company_id": company_id}, lite=True)  # Home reads totals only (no overdue / ageing)
+    t0 = await duty.breathe(t0)
     snap["home"] = {
         "outstanding_paise": hm["outstanding"]["total_paise"],
         "collections_mtd_paise": hm["collections_mtd_paise"],

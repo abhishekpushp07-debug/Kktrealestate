@@ -11,13 +11,15 @@ from services.definitions import (
 )
 
 
-async def money_snapshot(match: dict) -> dict:
-    """Raw money aggregates for a scope (company / project / customer). Never reads read models (they lag)."""
+async def money_snapshot(match: dict, lite: bool = False) -> dict:
+    """Raw money aggregates for a scope (company / project / customer). Never reads read models (they lag).
+    lite: totals only — no overdue / ageing / refunds pass (3I: the Home surface of an audit snapshot)."""
     today = clock.today().isoformat()
     month = today[:7]
     agg = await db.bookings.aggregate(
         [
             {"$match": live_bookings_match(match)},
+            {"$project": {"_id": 0, "agreement_value_paise": 1, "summary": 1}},  # 3I: not the snapshot / history
             {
                 "$group": {
                     "_id": None,
@@ -65,14 +67,17 @@ async def money_snapshot(match: dict) -> dict:
         ]
     ).to_list(1)
     c = col[0] if col else {}
-    od = await db.demands.aggregate(
-        [{"$match": overdue_demands_match(extra=match)}, {"$group": {"_id": None, "n": {"$sum": 1}}}]
-    ).to_list(1)
-    bands, _ = await ageing_for_bookings(match)
-    o = {"n": od[0]["n"] if od else 0, "amt": overdue_of(bands)}
-    rf = await db.refunds.aggregate(
-        [{"$match": {**match, "status": "Paid"}}, {"$group": {"_id": None, "s": {"$sum": "$amount_paise"}}}]
-    ).to_list(1)
+    if lite:
+        od, bands, rf = [], {}, []
+    else:
+        od = await db.demands.aggregate(
+            [{"$match": overdue_demands_match(extra=match)}, {"$group": {"_id": None, "n": {"$sum": 1}}}]
+        ).to_list(1)
+        bands, _ = await ageing_for_bookings(match)
+        rf = await db.refunds.aggregate(
+            [{"$match": {**match, "status": "Paid"}}, {"$group": {"_id": None, "s": {"$sum": "$amount_paise"}}}]
+        ).to_list(1)
+    o = {"n": od[0]["n"] if od else 0, "amt": overdue_of(bands) if bands else 0}
     return {
         "bookings": a.get("n", 0),
         "agreement_paise": a.get("agreed", 0),
