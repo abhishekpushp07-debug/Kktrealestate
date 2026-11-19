@@ -22,7 +22,9 @@ async def ensure_member_nos(project_ids: set) -> None:
         ):
             n = (await db.counters.find_one_and_update(key, {"$inc": {"seq": 1}}, return_document=True))["seq"]
             try:
-                await db.bookings.update_one({"id": b["id"], "member_no": {"$exists": False}}, {"$set": {"member_no": n}})
+                await db.bookings.update_one(
+                    {"id": b["id"], "member_no": {"$exists": False}}, {"$set": {"member_no": n}}
+                )
             except DuplicateKeyError:  # a number given before the counter existed: the next one is free
                 continue
 
