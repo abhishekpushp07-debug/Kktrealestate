@@ -605,7 +605,28 @@ api_router = APIRouter(prefix="/api")
 async def _dues_loop():
     """Daily at 00:30 IST (+ once on startup): raise time-triggered installments."""
     ist = timezone(timedelta(hours=5, minutes=30))
+    first = True
     while True:
+        if first:  # 3I: the startup pass is a catch-up — skip it when tonight's run already finished
+            first = False
+            now = datetime.now(ist)
+            since = now.replace(hour=0, minute=30, second=0, microsecond=0)
+            since -= timedelta(days=1) if since > now else timedelta(0)
+            done = {
+                r["job"]
+                async for r in db.job_runs.find(
+                    {
+                        "job": {"$in": ["DAILY_DUES", "NIGHTLY_INTEGRITY"]},
+                        "status": "OK",
+                        "started_at": {"$gte": since.astimezone(UTC).isoformat()},
+                    },
+                    {"_id": 0, "job": 1},
+                )
+            }
+            if len(done) == 2:
+                logger.info("[dues] tonight's run already finished; next at 00:30 IST")
+                nxt = since + timedelta(days=1)
+                await asyncio.sleep((nxt - now).total_seconds())
         try:
             from routers.admin import reseed_running
 

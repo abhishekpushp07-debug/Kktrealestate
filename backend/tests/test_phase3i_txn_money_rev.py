@@ -19,8 +19,12 @@ async def _run(commit: bool):
         return None
     db = client[os.environ["DB_NAME"]]
     bid, did = f"txn-{uuid.uuid4().hex[:8]}", f"txn-d-{uuid.uuid4().hex[:8]}"
-    await db.bookings.insert_one({"id": bid, "money_rev": 3, "money_snapshot": {"rev": 3, "bills": []}})
-    await db.demands.insert_one({"id": did, "booking_id": bid, "status": "Open", "paid_paise": 0})
+    await db.bookings.insert_one(
+        {"id": bid, "booking_number": f"TXN-{bid}", "money_rev": 3, "money_snapshot": {"rev": 3, "bills": []}}
+    )
+    await db.demands.insert_one(
+        {"id": did, "demand_number": f"TXN-{did}", "booking_id": bid, "status": "Open", "paid_paise": 0}
+    )
     dem = DemandsCollection(db.demands, db)
     try:
         async with await client.start_session() as s:

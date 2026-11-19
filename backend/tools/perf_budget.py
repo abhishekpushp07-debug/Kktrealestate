@@ -115,13 +115,18 @@ def start_backend():
             start_new_session=True,  # 3I: stop() kills the whole group — workers never outlive the run
         )
     proc.kill = lambda: _killpg(proc)
-    for _ in range(120):
+    need = {"done", "follower"} if int(CFG.get("workers") or 1) > 1 else {"done"}
+    seen = set()
+    for _ in range(240):
         try:
-            if httpx.get(f"http://127.0.0.1:{PORT}/api/health", timeout=2).json().get("startup", {}).get("done"):
+            st = httpx.get(f"http://127.0.0.1:{PORT}/api/health", timeout=2).json().get("startup", {})
+            if st.get("done"):
+                seen.add(st.get("phase"))
+            if need <= seen:  # 3I: every worker finished its startup + warm-up, not just the first to answer
                 return proc
         except (httpx.HTTPError, ValueError):
             pass
-        time.sleep(1)
+        time.sleep(0.5)
     proc.kill()
     raise RuntimeError("perf backend did not start: see /tmp/kkt_perf_backend.log")
 
