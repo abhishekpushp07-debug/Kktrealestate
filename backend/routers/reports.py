@@ -1248,7 +1248,7 @@ async def cancellations(
     f, t = _dates(from_date, to_date)
     q = {**_scope(user, project_id), "status": "Cancelled", "cancellation.at": clock.day_range(f, t)}
     rows = []
-    bks = await db.bookings.find(q, {"_id": 0}).to_list(500)
+    bks = await db.bookings.find(q, {"_id": 0, "money_snapshot": 0}).to_list(500)
     refunds: dict[str, dict] = {}
     for r in await db.refunds.find(
         {"booking_id": {"$in": [b["id"] for b in bks]}, "parent_refund_id": {"$exists": False}}, {"_id": 0}

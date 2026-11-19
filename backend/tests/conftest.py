@@ -196,6 +196,7 @@ def _start_private_backend():
         "KKT_ROLE": "test",
         "KKT_SELF_BASE": f"http://127.0.0.1:{TEST_PORT}",
         "BACKUP_ENABLED": "0",
+        "KKT_JOB_SETTLE_S": "0",  # tests expect the scheduler at once
         "DEMO_AUTO_REFRESH": "false",  # the private test backend never rebuilds its snapshot DB at 03:00 IST
         "ACCESS_TOKEN_MINUTES": "60",  # one cached login per account per session must outlive a slow full run
     }  # test servers never mongodump (filled the shared volume once)

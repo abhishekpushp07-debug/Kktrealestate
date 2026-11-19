@@ -252,7 +252,7 @@ async def rebuild(booking_id: str) -> list[dict]:
 
 
 async def _rebuild(booking_id: str) -> list[dict]:
-    b = await db.bookings.find_one({"id": booking_id}, {"_id": 0})
+    b = await db.bookings.find_one({"id": booking_id}, {"_id": 0, "money_snapshot": 0})
     if not b:
         return []
     demands = await db.demands.find({"booking_id": booking_id, "voided": {"$ne": True}}, {"_id": 0}).to_list(None)

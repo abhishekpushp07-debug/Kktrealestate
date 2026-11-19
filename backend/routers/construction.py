@@ -353,7 +353,9 @@ async def _set_current_stage(block_id: str, body: StageSetIn, request: Request, 
     # same booking order; step 2 (charges, ledger rebuild, audit) touches only its own booking, so a few run at a time.
     blk = {"construction_stages": res.get("construction_stages") or stages}
     company = await db.companies.find_one({"id": user["company_id"]}, {"_id": 0})
-    books = await db.bookings.find({"block_id": block_id, "status": "Active"}, {"_id": 0}).to_list(None)
+    books = await db.bookings.find({"block_id": block_id, "status": "Active"}, {"_id": 0, "money_snapshot": 0}).to_list(
+        None
+    )
     steps = await raise_demands_batch(books, ts, blk, company)
     created = [d for _, r in steps if r for d in r[0]]
     sem = asyncio.Semaphore(32)
@@ -506,7 +508,9 @@ async def undo_stage(
     retracted = await retract_for_demands(to_void)
     rs = await retract_for_stage(block_id, last["stage_id"], last["name"])
     retracted = {k: retracted[k] + rs[k] for k in retracted}
-    async for b in db.bookings.find({"block_id": block_id, "status": "Active"}, {"_id": 0}).batch_size(500):
+    async for b in db.bookings.find(
+        {"block_id": block_id, "status": "Active"}, {"_id": 0, "money_snapshot": 0}
+    ).batch_size(500):
         rem = await db.demands.find(
             {"booking_id": b["id"], "voided": {"$ne": True}}, {"_id": 0, "percent": 1, "cumulative_percent": 1}
         ).to_list(None)

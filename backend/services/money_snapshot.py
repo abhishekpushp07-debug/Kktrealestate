@@ -117,7 +117,7 @@ async def bills_for(bookings: list[dict]) -> dict[str, list[dict]]:
                 out.setdefault(d["booking_id"], []).append(bill(d))
         for bid in stale:
             out.setdefault(bid, [])
-        todo = [b for b in stale if b not in _REPAIRING]
+        todo = [b for b in stale if b not in _REPAIRING][:200]  # bulk backfill = startup / nightly, not a read
         _REPAIRING.update(todo)
         if todo:
             asyncio.get_running_loop().create_task(_repair_many(todo))

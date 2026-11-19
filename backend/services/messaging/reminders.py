@@ -309,7 +309,7 @@ async def run_overdue_reminders(as_of: str | None = None, force_window: bool = F
                 "due_date": {"$lt": as_of},
             },
         )
-        bookings = db.bookings.find({"id": {"$in": ids}, "status": "Active"}, {"_id": 0})
+        bookings = db.bookings.find({"id": {"$in": ids}, "status": "Active"}, {"_id": 0, "money_snapshot": 0})
         run = await job_runs.run_isolated(
             "OVERDUE_REMINDERS",
             bookings,

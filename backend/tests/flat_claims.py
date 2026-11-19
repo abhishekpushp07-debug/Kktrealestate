@@ -60,7 +60,7 @@ def own_flats(api: str, headers: dict, n: int, rate: int = 4000) -> list[dict]:
     sgh = next(p for p in call("GET", "/projects")["items"] if p.get("code") == "SGH")
     bt = call("GET", "/master/block-types")["items"][0]
     ft = call("GET", "/master/flat-types", page_size=100)["items"][0]
-    code = f"T{uuid.uuid4().hex[:3].upper()}"
+    code = f"T{uuid.uuid4().hex[:6].upper()}"
     body = {
         "project_id": sgh["id"],
         "block_type_id": bt["id"],

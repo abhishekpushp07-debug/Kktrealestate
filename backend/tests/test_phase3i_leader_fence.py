@@ -41,7 +41,7 @@ asyncio.run(main())
 
 def test_a_stalled_leader_never_runs_beside_the_new_one():
     lock = f"fence-{uuid.uuid4().hex[:8]}"
-    env = {**os.environ, "DB_NAME": TEST_DB, "KKT_LEASE_TTL": "6"}
+    env = {**os.environ, "DB_NAME": TEST_DB, "KKT_LEASE_TTL": "6", "KKT_JOB_SETTLE_S": "0"}
     run = lambda stall, secs: subprocess.Popen(  # noqa: E731
         [sys.executable, "-c", SCRIPT, lock, str(stall), str(secs)], cwd=HERE, env=env
     )

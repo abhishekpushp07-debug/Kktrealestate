@@ -745,7 +745,9 @@ async def member_cards(customer_id: str, user: dict = Depends(require("sales.cus
     )
     addr = co.get("address") or {}
     out = []
-    async for b in db.bookings.find({"id": {"$in": [x["id"] for x in bks]}}, {"_id": 0}).sort("booking_date", 1):
+    async for b in db.bookings.find({"id": {"$in": [x["id"] for x in bks]}}, {"_id": 0, "money_snapshot": 0}).sort(
+        "booking_date", 1
+    ):
         fs = b.get("flat_snapshot") or {}
         slots = await db.parking_slots.find(
             {"id": {"$in": b.get("parking_slot_ids") or []}}, {"_id": 0, "number": 1}

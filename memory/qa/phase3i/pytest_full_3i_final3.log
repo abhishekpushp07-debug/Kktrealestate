@@ -1,0 +1,405 @@
+bringing up nodes...
+bringing up nodes...
+
+........................................................................ [  7%]
+........................................................................ [ 14%]
+........................................................................ [ 22%]
+........................................................................ [ 29%]
+........................................................................ [ 37%]
+...........................................s............................ [ 44%]
+.......................F................................................ [ 51%]
+........................................................................ [ 59%]
+........................................................................ [ 66%]
+....................F................................................... [ 74%]
+........................................................................ [ 81%]
+.................EEE........................................sss......... [ 88%]
+......................ss..........................F..................ss. [ 96%]
+................................F...                                     [100%]
+==================================== ERRORS ====================================
+___ ERROR at setup of test_cancel_deduction_saved_equals_preview[explicit-0] ___
+[gw0] linux -- Python 3.11.18 /root/.venv/bin/python
+
+admin_headers = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzMzlkNmM0ZS1lYTU1LTRmNjMtYjRjZi0xYjk1NzgwODA...iYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzk1MTA4NTg4LCJleHAiOjE3OTUxMTIxODh9.TDoYFEhl1N9k0ckG3e13p717DNoRA4YO9OOMpj8MIqc'}
+
+    @pytest.fixture(scope="module")
+    def world(admin_headers):
+        api = cm.Api(BASE, admin_headers)
+>       flats = own_flats(api.base, api.h, 3, rate=4300)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_phase3m_consistency.py:17: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/flat_claims.py:76: in own_flats
+    blk = call("POST", "/blocks", body)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+method = 'POST', p = '/blocks'
+body = {'project_id': '8e4ef80c-0ce8-4fe6-8c46-7b552afe0d8a', 'block_type_id': 'db8d0090-9fb2-4650-9177-b440721ed0ac', 'name': 'Own-T228', 'code': 'T228', ...}
+params = {}
+
+    def call(method, p, body=None, **params):
+        h = {**headers, "Idempotency-Key": str(uuid.uuid4())}
+        r = requests.request(method, f"{api}{p}", headers=h, json=body, params=params, timeout=60)
+>       assert r.status_code in (200, 201), (method, p, r.status_code, r.text[:300])
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AssertionError: ('POST', '/blocks', 409, '{"detail":"Block code T228 already exists in this project","code":"DUPLICATE_CODE","request_id":"73af1c6fa96c4469","error":{"code":"DUPLICATE_CODE","message":"Block code T228 already exists in this project","details":[],"request_id":"73af1c6fa96c4469"}}')
+
+tests/flat_claims.py:57: AssertionError
+__ ERROR at setup of test_cancel_deduction_saved_equals_preview[blank-policy] __
+[gw0] linux -- Python 3.11.18 /root/.venv/bin/python
+
+admin_headers = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzMzlkNmM0ZS1lYTU1LTRmNjMtYjRjZi0xYjk1NzgwODA...iYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzk1MTA4NTg4LCJleHAiOjE3OTUxMTIxODh9.TDoYFEhl1N9k0ckG3e13p717DNoRA4YO9OOMpj8MIqc'}
+
+    @pytest.fixture(scope="module")
+    def world(admin_headers):
+        api = cm.Api(BASE, admin_headers)
+>       flats = own_flats(api.base, api.h, 3, rate=4300)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_phase3m_consistency.py:17: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/flat_claims.py:76: in own_flats
+    blk = call("POST", "/blocks", body)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+method = 'POST', p = '/blocks'
+body = {'project_id': '8e4ef80c-0ce8-4fe6-8c46-7b552afe0d8a', 'block_type_id': 'db8d0090-9fb2-4650-9177-b440721ed0ac', 'name': 'Own-T228', 'code': 'T228', ...}
+params = {}
+
+    def call(method, p, body=None, **params):
+        h = {**headers, "Idempotency-Key": str(uuid.uuid4())}
+        r = requests.request(method, f"{api}{p}", headers=h, json=body, params=params, timeout=60)
+>       assert r.status_code in (200, 201), (method, p, r.status_code, r.text[:300])
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AssertionError: ('POST', '/blocks', 409, '{"detail":"Block code T228 already exists in this project","code":"DUPLICATE_CODE","request_id":"73af1c6fa96c4469","error":{"code":"DUPLICATE_CODE","message":"Block code T228 already exists in this project","details":[],"request_id":"73af1c6fa96c4469"}}')
+
+tests/flat_claims.py:57: AssertionError
+______ ERROR at setup of test_stage_undo_voids_the_removed_bills_letters _______
+[gw0] linux -- Python 3.11.18 /root/.venv/bin/python
+
+admin_headers = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzMzlkNmM0ZS1lYTU1LTRmNjMtYjRjZi0xYjk1NzgwODA...iYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzk1MTA4NTg4LCJleHAiOjE3OTUxMTIxODh9.TDoYFEhl1N9k0ckG3e13p717DNoRA4YO9OOMpj8MIqc'}
+
+    @pytest.fixture(scope="module")
+    def world(admin_headers):
+        api = cm.Api(BASE, admin_headers)
+>       flats = own_flats(api.base, api.h, 3, rate=4300)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_phase3m_consistency.py:17: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/flat_claims.py:76: in own_flats
+    blk = call("POST", "/blocks", body)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+method = 'POST', p = '/blocks'
+body = {'project_id': '8e4ef80c-0ce8-4fe6-8c46-7b552afe0d8a', 'block_type_id': 'db8d0090-9fb2-4650-9177-b440721ed0ac', 'name': 'Own-T228', 'code': 'T228', ...}
+params = {}
+
+    def call(method, p, body=None, **params):
+        h = {**headers, "Idempotency-Key": str(uuid.uuid4())}
+        r = requests.request(method, f"{api}{p}", headers=h, json=body, params=params, timeout=60)
+>       assert r.status_code in (200, 201), (method, p, r.status_code, r.text[:300])
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AssertionError: ('POST', '/blocks', 409, '{"detail":"Block code T228 already exists in this project","code":"DUPLICATE_CODE","request_id":"73af1c6fa96c4469","error":{"code":"DUPLICATE_CODE","message":"Block code T228 already exists in this project","details":[],"request_id":"73af1c6fa96c4469"}}')
+
+tests/flat_claims.py:57: AssertionError
+=================================== FAILURES ===================================
+_______________________ test_agreement_signed_date_rules _______________________
+[gw1] linux -- Python 3.11.18 /root/.venv/bin/python
+
+admin_headers = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzMzlkNmM0ZS1lYTU1LTRmNjMtYjRjZi0xYjk1NzgwODA...iYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzk1MTA4NTg4LCJleHAiOjE3OTUxMTIxODh9.TDoYFEhl1N9k0ckG3e13p717DNoRA4YO9OOMpj8MIqc'}
+
+    def test_agreement_signed_date_rules(admin_headers):
+        api = _api(admin_headers)
+>       w = World(api)
+            ^^^^^^^^^^
+
+tests/test_phase3e_entry.py:17: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tools/connection_matrix.py:471: in __init__
+    self.flats = own_flats(api.base, api.h, 34, rate=4200)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/flat_claims.py:76: in own_flats
+    blk = call("POST", "/blocks", body)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+method = 'POST', p = '/blocks'
+body = {'project_id': '8e4ef80c-0ce8-4fe6-8c46-7b552afe0d8a', 'block_type_id': 'db8d0090-9fb2-4650-9177-b440721ed0ac', 'name': 'Own-T047', 'code': 'T047', ...}
+params = {}
+
+    def call(method, p, body=None, **params):
+        h = {**headers, "Idempotency-Key": str(uuid.uuid4())}
+        r = requests.request(method, f"{api}{p}", headers=h, json=body, params=params, timeout=60)
+>       assert r.status_code in (200, 201), (method, p, r.status_code, r.text[:300])
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AssertionError: ('POST', '/blocks', 409, '{"detail":"Block code T047 already exists in this project","code":"DUPLICATE_CODE","request_id":"f3d951ac3dad48eb","error":{"code":"DUPLICATE_CODE","message":"Block code T047 already exists in this project","details":[],"request_id":"f3d951ac3dad48eb"}}')
+
+tests/flat_claims.py:57: AssertionError
+________________ test_corrupt_image_does_not_stop_variant_batch ________________
+[gw0] linux -- Python 3.11.18 /root/.venv/bin/python
+
+admin_headers = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzMzlkNmM0ZS1lYTU1LTRmNjMtYjRjZi0xYjk1NzgwODA...iYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzk1MTA4NTg4LCJleHAiOjE3OTUxMTIxODh9.TDoYFEhl1N9k0ckG3e13p717DNoRA4YO9OOMpj8MIqc'}
+
+    def test_corrupt_image_does_not_stop_variant_batch(admin_headers):
+        """Two good PNGs + one PNG-signature file with garbage body: good ones get 3 WebP variants, bad one is 'failed', job run records the error."""
+        ids = []
+        for name, data in (
+            ("a.png", _png()),
+            ("bad.png", b"\x89PNG\r\n\x1a\n" + os.urandom(4000)),
+            ("b.png", _png(300, 200)),
+        ):
+            up = _upload(
+                admin_headers,
+                name,
+                data,
+                kind="construction_photo",
+                entity_type="milestone",
+                entity_id="t-ms",
+                project_id="t-proj",
+            )
+            r = requests.post(f"{BASE}/api/uploads/{up['id']}/complete", headers=admin_headers)
+            assert r.status_code == 201, r.text
+            ids.append(r.json()["id"])
+        deadline = time.time() + 60
+        states = {}
+        while time.time() < deadline:
+            rows = requests.get(
+                f"{BASE}/api/files", params={"entity_type": "milestone", "entity_id": "t-ms"}, headers=admin_headers
+            ).json()["items"]
+            states = {x["id"]: x for x in rows if x["id"] in ids}
+            if all(states[i]["variants_state"] in ("ready", "failed") for i in ids if i in states) and len(states) == 3:
+                break
+            time.sleep(1)
+        assert (
+            states[ids[0]]["variants_state"] == "ready"
+            and states[ids[2]]["variants_state"] == "ready"
+            and states[ids[1]]["variants_state"] == "failed"
+        )
+        v = states[ids[2]]["variants"]
+        assert set(v) == {"thumb", "medium", "large"} and all(
+            u.startswith("/api/files/variants/") and u.endswith(".webp") for u in v.values()
+        )
+        img = requests.get(f"{BASE}{v['thumb']}")
+>       assert img.status_code == 200 and img.headers["Cache-Control"].endswith("immutable") and img.content[:4] == b"RIFF"
+E       assert (504 == 200)
+E        +  where 504 = <Response [504]>.status_code
+
+tests/test_phase_j4_files.py:147: AssertionError
+_____________________ test_photos_lifecycle_restores_cover _____________________
+[gw0] linux -- Python 3.11.18 /root/.venv/bin/python
+
+base_url = 'http://127.0.0.1:8021'
+admin_headers = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzMzlkNmM0ZS1lYTU1LTRmNjMtYjRjZi0xYjk1NzgwODA...iYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzk1MTA4NTg4LCJleHAiOjE3OTUxMTIxODh9.TDoYFEhl1N9k0ckG3e13p717DNoRA4YO9OOMpj8MIqc'}
+
+    def test_photos_lifecycle_restores_cover(base_url, admin_headers):
+        h = admin_headers
+        p = _sgh(base_url, h)
+        base = f"{base_url}/api/projects/{p['id']}/photos"
+        before = requests.get(base, headers=h).json()
+        assert before["photos"], "SGH must carry the Elite tower cover (REQ-184)"
+        added = []
+        for n in range(2):
+            r = requests.post(base, headers=h, files={"file": (f"p{n}.jpg", JPG, "image/jpeg")})
+            assert r.status_code == 201, r.text
+            added.append(r.json()["photos"][-1]["id"])
+        assert r.json()["cover_photo_id"] == before["cover_photo_id"]  # adding never steals the cover
+        ids = [x["id"] for x in r.json()["photos"]]
+        rev = list(reversed(ids))
+        r = requests.put(f"{base}/order", headers=h, json={"ids": rev, "cover_id": added[0]})
+        assert r.status_code == 200 and [x["id"] for x in r.json()["photos"]] == rev
+        assert r.json()["cover_photo_id"] == added[0]
+        pub = requests.get(f"{base_url}{r.json()['cover_image_url']}")
+        assert pub.status_code == 200 and pub.content == JPG
+        g = requests.get(f"{base_url}/api/projects/{p['id']}", headers=h).json()
+>       assert g["cover_photo_id"] == added[0] and all("storage_key" not in x for x in g["photos"])
+E       AssertionError: assert ('192a00401854...85300e08b4925' == '7ea8d9a78f65...ebdd6efa530c6'
+E         
+E         - 7ea8d9a78f654ad6ba2ebdd6efa530c6
+E         + 192a004018544916a0485300e08b4925)
+
+tests/test_project_photos.py:33: AssertionError
+____________ test_kyc_files_linked_on_booking_idempotent_and_gated _____________
+[gw0] linux -- Python 3.11.18 /root/.venv/bin/python
+
+    def test_kyc_files_linked_on_booking_idempotent_and_gated():
+        A = _hdr("admin@kkt.in")
+        pid = next(
+            p
+            for p in requests.get(f"{BASE}/api/projects?page_size=50", headers=A, timeout=30).json()["items"]
+            if p.get("code") == "SGH"
+        )["id"]
+        sold_blocks = {
+            t["block_id"]
+            for t in requests.get(
+                f"{BASE}/api/projects/{pid}/tower-sales", params={"view": "real"}, headers=A, timeout=60
+            ).json()["towers"]
+            if t["sold"] > 0
+        }
+        flats = requests.get(
+            f"{BASE}/api/flats?project_id={pid}&status=Available&page_size=200", headers=A, timeout=30
+        ).json()["items"]
+        flat = claim_flat(flats, lambda f: f.get("bookable") is not False and f["block_id"] in sold_blocks)
+        tag = uuid.uuid4().hex[:6]
+        cid = requests.post(
+            f"{BASE}/api/customers",
+            json={"full_name": f"Z2 Buyer {tag}", "phone": f"9{tag.encode().hex()[:9]}"},
+            headers=A,
+            timeout=30,
+        ).json()["id"]
+        co_id = str(uuid.uuid4())
+        png = _png()
+        pan = _upload(
+            A, png, "pan.png", {"entity_type": "co_applicant", "entity_id": co_id, "kind": "kyc_pan", "customer_id": cid}
+        )
+        aad = _upload(
+            A,
+            png,
+            "aadhaar.png",
+            {"entity_type": "co_applicant", "entity_id": co_id, "kind": "kyc_aadhaar", "customer_id": cid},
+        )
+        assert pan["is_sensitive"] is True and pan["url"] and "storage_key" not in pan
+        # KYC rules at init: size cap, extension, permission, kind needs a co-applicant
+        assert (
+            requests.post(
+                f"{BASE}/api/uploads/init",
+                json={
+                    "filename": "x.mp4",
+                    "size": 10,
+                    "entity_type": "co_applicant",
+                    "entity_id": co_id,
+                    "kind": "kyc_pan",
+                },
+                headers=A,
+                timeout=30,
+            ).status_code
+            == 415
+        )
+        assert (
+            requests.post(
+                f"{BASE}/api/uploads/init",
+                json={
+                    "filename": "x.pdf",
+                    "size": 11 * 1024 * 1024,
+                    "entity_type": "co_applicant",
+                    "entity_id": co_id,
+                    "kind": "kyc_pan",
+                },
+                headers=A,
+                timeout=30,
+            ).status_code
+            == 413
+        )
+        assert (
+            requests.post(
+                f"{BASE}/api/uploads/init", json={"filename": "x.pdf", "size": 10, "kind": "kyc_pan"}, headers=A, timeout=30
+            ).status_code
+            == 422
+        )
+        E = _hdr("employee@kkt.in")
+        assert (
+            requests.post(
+                f"{BASE}/api/uploads/init",
+                json={
+                    "filename": "x.pdf",
+                    "size": 10,
+                    "entity_type": "co_applicant",
+                    "entity_id": co_id,
+                    "kind": "kyc_pan",
+                },
+                headers=E,
+                timeout=30,
+            ).status_code
+            == 403
+        )
+        plans = requests.get(
+            f"{BASE}/api/projects/{pid}/blocks/{flat['block_id']}/payment-plans", headers=A, timeout=30
+        ).json()["items"]
+        body = {
+            "flat_id": flat["id"],
+            "customer_id": cid,
+            "booking_date": "2026-10-28",
+            "agreement_value": max(int(flat.get("price") or 0), 2500000),  # agreed = list: no discount reason needed
+            "cash_agreed": 500000,
+            "account_agreed": max(int(flat.get("price") or 0), 2500000) - 500000,
+            "payment_plan_id": plans[0]["id"] if plans else None,
+            "co_applicants": [{"id": co_id, "name": f"Sita {tag}", "relation": "Daughter"}],
+        }
+        key = str(uuid.uuid4())
+        r1 = requests.post(f"{BASE}/api/bookings", json=body, headers={**A, "Idempotency-Key": key}, timeout=60)
+        assert r1.status_code == 201, r1.text
+        bid = r1.json()["id"]
+        det = requests.get(f"{BASE}/api/bookings/{bid}", headers=A, timeout=30).json()
+        assert det["kyc_completeness"] == {"done": 2, "total": 2, "missing": [], "complete": True}
+        co = det["customer"]["co_applicants"][0]
+        assert co["id"] == co_id and co["kyc"]["kyc_pan"] == pan["id"] and co["kyc"]["kyc_aadhaar"] == aad["id"]
+        c360 = requests.get(f"{BASE}/api/customers/{cid}", headers=A, timeout=30).json()
+        assert c360["co_applicants"][0]["kyc"]["kyc_pan"] == pan["id"] and c360["kyc_completeness"]["complete"] is True
+        files = requests.get(f"{BASE}/api/files", params={"kind": "kyc", "customer_id": cid}, headers=A, timeout=30).json()[
+            "items"
+        ]
+        assert {f["id"] for f in files} == {pan["id"], aad["id"]} and all(f["booking_id"] == bid for f in files)
+        g = requests.get(f"{BASE}/api/graph/booking/{bid}", headers=A, timeout=30).json()
+        assert g["sections"]["kyc_files"]["total"] == 2
+        lst = requests.get(
+            f"{BASE}/api/bookings", params={"status": "Active", "page_size": 100, "project_id": pid}, headers=A, timeout=30
+        ).json()["items"]
+>       assert next(b for b in lst if b["id"] == bid)["kyc_completeness"]["done"] == 2
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       StopIteration
+
+tests/test_phase_z2_kyc.py:177: StopIteration
+=============================== warnings summary ===============================
+../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
+../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
+  /root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12: PendingDeprecationWarning: Please use `import python_multipart` instead.
+    import multipart
+
+../../root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854
+../../root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854
+  /root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854: DeprecationWarning: 'crypt' is deprecated and slated for removal in Python 3.13
+    from crypt import crypt as _crypt
+
+tests/test_startup_s1_s3_idempotent.py:71
+tests/test_startup_s1_s3_idempotent.py:71
+  /app/backend/tests/test_startup_s1_s3_idempotent.py:71: PytestUnknownMarkWarning: Unknown pytest.mark.timeout - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.timeout(900)
+
+tests/test_phase_k_p1.py::test_loadshed_sheds_with_prebuilt_503_and_exempts_probes
+  /root/.venv/lib/python3.11/site-packages/starlette/testclient.py:41: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    [], typing.ContextManager[anyio.abc.BlockingPortal]
+
+tests/test_phase_q.py: 10 warnings
+  /root/.venv/lib/python3.11/site-packages/pypdf/_page.py:1368: DeprecationWarning: Calling `PageObject.replace_contents()` for pages not assigned to a writer is deprecated and will be removed in pypdf 7.0.0. Attach the page to the writer first or use `PdfWriter(clone_from=...)` directly. The existing approach has proved being unreliable.
+    self.replace_contents(ContentStream(new_content_array, self.pdf))
+
+tests/test_kkt_erp.py::TestBlock::test_create_block_and_generation
+tests/test_kkt_erp.py::TestFlatType::test_create_flat_type_auto_area
+tests/test_phase_7.py::TestPortalPhase7::test_portal_booking_payment_plan
+tests/test_phase_7.py::TestPortalPhase7::test_portal_booking_payment_plan
+  /root/.venv/lib/python3.11/site-packages/_pytest/fixtures.py:1313: PytestRemovedIn10Warning: Class-scoped fixture defined as instance method is deprecated.
+  Instance attributes set in this fixture will NOT be visible to test methods,
+  as each test gets a new instance while the fixture runs only once per class.
+  Use @classmethod decorator and set attributes on cls instead.
+  See https://docs.pytest.org/en/stable/deprecations.html#class-scoped-fixture-as-instance-method
+    fixturefunc = resolve_fixture_function(fixturedef, request)
+
+tests/test_phase_5.py::TestPortalData::test_booking_detail_and_subresources
+  /root/.venv/lib/python3.11/site-packages/_pytest/python.py:171: PytestReturnNotNoneWarning: Test functions should return None, but tests/test_phase_5.py::TestPortalData::test_booking_detail_and_subresources returned <class 'str'>.
+  Did you mean to use `assert` instead of `return`?
+  See https://docs.pytest.org/en/stable/how-to/assert.html#return-not-none for more information.
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_phase3e_entry.py::test_agreement_signed_date_rules - Assert...
+FAILED tests/test_phase_j4_files.py::test_corrupt_image_does_not_stop_variant_batch
+FAILED tests/test_project_photos.py::test_photos_lifecycle_restores_cover - A...
+FAILED tests/test_phase_z2_kyc.py::test_kyc_files_linked_on_booking_idempotent_and_gated
+ERROR tests/test_phase3m_consistency.py::test_cancel_deduction_saved_equals_preview[explicit-0]
+ERROR tests/test_phase3m_consistency.py::test_cancel_deduction_saved_equals_preview[blank-policy]
+ERROR tests/test_phase3m_consistency.py::test_stage_undo_voids_the_removed_bills_letters
+4 failed, 957 passed, 8 skipped, 22 warnings, 3 errors in 1681.55s (0:28:01)

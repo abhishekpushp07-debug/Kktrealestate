@@ -62,6 +62,8 @@ async def run_as_leader(name: str, *coros):
     """Runs `coros` (long-lived loops) only while this process holds the lease; cancels them when it may not."""
     tasks: list = []
     renewed = 0.0
+    # 3I: a freshly started server serves its first users before batch catch-up (dues / integrity) begins
+    start_after = time.monotonic() + float(os.environ.get("KKT_JOB_SETTLE_S", "60"))
 
     def stop(why: str):
         nonlocal tasks
@@ -85,11 +87,11 @@ async def run_as_leader(name: str, *coros):
                 log.info("[leader] %s took %s over from %s; waiting %ss", ME, name, took_from, GRACE)
                 await asyncio.sleep(GRACE)
                 continue  # renew again before starting anything
-            if not tasks:
+            if not tasks and time.monotonic() >= start_after:
                 log.info("[leader] %s acquired %s", ME, name)
                 LEADER_OF.set(name)  # inherited by the job tasks created below
                 tasks = [asyncio.create_task(c()) for c in coros]
                 LEADER_OF.set(None)
         else:
             stop("lost")
-        await asyncio.sleep(RENEW)
+        await asyncio.sleep(min(RENEW, max(1.0, start_after - time.monotonic())) if not tasks else RENEW)

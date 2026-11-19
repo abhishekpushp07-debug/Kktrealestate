@@ -1,7 +1,9 @@
-=== replset 15:57:36
+=== replset 16:46:14
 about to fork child process, waiting until server is ready for connections.
-forked process: 7849
+forked process: 1107
 child process started successfully, parent exiting
 { ok: 1 }
-restored 15:58:09
+restored 16:46:47
 setName rs0
+pytest replset exit 143
+REPLSET DONE 16:52:32

@@ -73,7 +73,7 @@ async def schedules_for(booking_q: dict, chunk_size: int = 500):
         chunk.clear()
         return out
 
-    async for bk in db.bookings.find(booking_q, {"_id": 0}).batch_size(500):
+    async for bk in db.bookings.find(booking_q, {"_id": 0, "money_snapshot": 0}).batch_size(500):
         chunk.append(bk)
         if len(chunk) >= chunk_size:
             for pair in await flush():
@@ -451,7 +451,9 @@ async def run_dues_for_all(today: date | None = None, actor: dict | None = None)
 
     run = await job_runs.run_isolated(
         "DAILY_DUES",
-        db.bookings.find({"status": "Active", "payment_plan_snapshot": {"$ne": None}}, {"_id": 0}).batch_size(200),
+        db.bookings.find(
+            {"status": "Active", "payment_plan_snapshot": {"$ne": None}}, {"_id": 0, "money_snapshot": 0}
+        ).batch_size(200),
         one,
         item_id=lambda b: b.get("booking_number") or b.get("id"),
         result_fn=lambda acc: {**counts, "as_of": (today or clock.today()).isoformat()},

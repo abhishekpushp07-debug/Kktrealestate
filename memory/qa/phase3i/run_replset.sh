@@ -2,7 +2,7 @@
 # 3I REQ-379: the full suite once on a single-node replica set (transactions available). Data under /tmp.
 L=/app/memory/qa/phase3i/replset.log
 P=27018
-D=/tmp/kkt_rs0
+D=/app/.eqtmp/kkt_rs0
 echo "=== replset $(date -u +%T)" > $L
 mongosh --port $P --quiet --eval 'db.adminCommand({shutdown:1})' >/dev/null 2>&1; sleep 2
 rm -rf $D; mkdir -p $D
