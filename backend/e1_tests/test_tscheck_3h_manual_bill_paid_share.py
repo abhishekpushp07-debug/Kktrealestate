@@ -1,4 +1,4 @@
-from _h3h import *
+from _h3h import BANK, CHEQUE, NEFT, TODAY, row, sfx, v3  # noqa: F401
 BK="85b4bd88-030f-44af-94e8-e2457f90ab8c"
 def test_manual_bill_on_paid_share(api):
     o0=v3(api,"outstanding")["totals"]["outstanding_paise"]

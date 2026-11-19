@@ -1,5 +1,5 @@
 import re, pytest
-from _h3h import *
+from _h3h import BANK, CHEQUE, NEFT, TODAY, row, sfx, v3  # noqa: F401
 @pytest.mark.parametrize("k,f",[("outstanding","outstanding_paise"),("collections","total_paise")])
 @pytest.mark.parametrize("g",["project","tower","floor","flat","booking"])
 def test_group_subtotals(api,k,f,g):

@@ -5,7 +5,6 @@ import asyncio
 import cProfile
 import logging
 import os
-import pstats
 import sys
 import time
 

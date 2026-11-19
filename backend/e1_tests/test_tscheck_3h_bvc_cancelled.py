@@ -1,4 +1,4 @@
-from _h3h import *
+from _h3h import BANK, CHEQUE, NEFT, TODAY, row, sfx, v3  # noqa: F401
 def test_bvc_default_and_switch(api):
     d=v3(api,"bills-vs-collection"); cs=v3(api,"customer-status")
     assert d["totals"]["demand_paise"]==cs["totals"]["bills_raised"]

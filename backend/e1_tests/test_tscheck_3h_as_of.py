@@ -1,4 +1,4 @@
-from _h3h import *
+from _h3h import BANK, CHEQUE, NEFT, TODAY, row, sfx, v3  # noqa: F401
 def test_as_of(api):
     a=v3(api,"outstanding"); t=v3(api,"outstanding",as_of=TODAY); cs=v3(api,"customer-status",as_of=TODAY)
     assert a["totals"]["outstanding_paise"]==t["totals"]["outstanding_paise"]==cs["totals"]["total_due"]
