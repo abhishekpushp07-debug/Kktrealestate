@@ -63,6 +63,7 @@ async def ops(window: int = 900, user: dict = Depends(require("admin.system_heal
         "pool": {**POOL_STATS, "max_pool_size": POOL["maxPoolSize"]},
         "caches": {"ttlcache": ttlcache.snapshot(), "redis": await __import__("services.cache").cache.health()},
         "report_figures": await db.system_checks.find_one({"name": "report_figures"}, {"_id": 0}),  # 3I REQ-360
+        "member_numbers": await db.system_checks.find_one({"name": "member_numbers"}, {"_id": 0}),  # 3I
         "alerts": alerts.LAST,
         "backup": await _backup_status(),
         "storage": await storage_usage(),

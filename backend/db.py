@@ -34,6 +34,7 @@ client = AsyncIOMotorClient(
     compressors="zlib",
     event_listeners=[__import__("dbtiming").DbTimingListener(), __import__("dbtiming").PoolListener()],
 )
+__import__("services.txn_ctx", fromlist=["install"]).install()  # 3I REQ-379: open transaction's session auto-attached
 _db_raw = client.get_database(
     os.environ["DB_NAME"],
     write_concern=__import__("pymongo").WriteConcern(w="majority", j=True)

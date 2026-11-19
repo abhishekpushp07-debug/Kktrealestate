@@ -21,8 +21,9 @@ async def _run(commit: bool):
     bid, did = f"txn-{uuid.uuid4().hex[:8]}", f"txn-d-{uuid.uuid4().hex[:8]}"
     # a real booking + one of its bills, cloned under new ids so the collection validators accept them
     src = await db.demands.find_one({"voided": False, "status": "Open"}, {"_id": 0})
-    bk = await db.bookings.find_one({"id": src["booking_id"]}, {"_id": 0})
+    bk = await db.bookings.find_one({"id": src["booking_id"]}, {"_id": 0, "member_no": 0})
     bk |= {"id": bid, "booking_number": f"BK-TXN-{bid[4:]}", "money_rev": 3, "money_snapshot": {"rev": 3, "bills": []}}
+    bk["flat_id"] = f"txn-flat-{bid[4:]}"  # one live booking per flat
     await db.bookings.insert_one(bk)
     await db.demands.insert_one(src | {"id": did, "demand_number": f"DM-TXN-{did[6:]}", "booking_id": bid})
     start = bk["status"]

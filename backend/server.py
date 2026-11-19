@@ -24,6 +24,7 @@ from fastapi.responses import JSONResponse
 from pymongo.errors import (
     AutoReconnect,
     ConnectionFailure,
+    DuplicateKeyError,
     ExecutionTimeout,
     NetworkTimeout,
     OperationFailure,
@@ -363,6 +364,10 @@ async def startup_tasks():
             await try_acquire("startup")  # renew lease between steps
         except Exception:
             logging.getLogger(__name__).debug("ignored non-fatal error", exc_info=True)
+    try:  # 3I: every startup — System Health "Member numbers"
+        await __import__("services.member_no", fromlist=["x"]).record_check()
+    except Exception:  # noqa: BLE001
+        logger.exception("member number check failed")
     await _warm_reports()
     STARTUP.update(
         phase="done", done=True, finished_at=__import__("datetime").datetime.now(__import__("datetime").UTC).isoformat()
@@ -574,6 +579,9 @@ async def unhandled_exc_handler(request: Request, exc: Exception):
         exc.code in (112, 251, 246) or exc.has_error_label("TransientTransactionError")
     ):
         return _retryable(rid, 409, "CONFLICT_RETRY", "Write conflict; retry the request", "1")
+    if isinstance(exc, DuplicateKeyError):  # 3I: a business number / key taken a moment ago — never a 500
+        logger.warning("duplicate business key: %s", str(exc)[:200])
+        return _retryable(rid, 409, "DUPLICATE", "This entry was just saved by someone else; refresh and retry", "1")
     logger.exception("Unhandled error")
     return JSONResponse(
         status_code=500,
@@ -650,6 +658,10 @@ async def _dues_loop():
             except Exception as e:  # noqa: BLE001
                 await _jr.item_failed(_run, "report_figures", e)
                 await _jr.finish(_run)
+            try:  # 3I: System Health "Member numbers" (duplicates listed, never renumbered)
+                await __import__("services.member_no", fromlist=["x"]).record_check()
+            except Exception:  # noqa: BLE001
+                logger.exception("member number check failed")
             await _jr.sweep()
             await _jr.notify_stale_if_needed()
             if os.environ.get("BACKUP_ENABLED", "1") == "1":

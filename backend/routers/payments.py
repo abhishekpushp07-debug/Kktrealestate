@@ -15,7 +15,7 @@ from services.ledger import CLEAR_IMMEDIATELY, bucket_paid, line_paid, rebuild, 
 from services.money import inr, present_money, to_paise
 from services.numbering import generate_number
 from services.pdf_builders import receipt_data
-from uow import unit_of_work
+from uow import transactional, unit_of_work
 from utils import (
     ApiError,
     ListParams,
@@ -712,6 +712,7 @@ async def bounce_payment(
 
 
 @router.post("/{payment_id}/reverse")
+@transactional  # 3I REQ-379: one transaction runner (retry on conflict, side effects after commit)
 async def reverse_payment(
     payment_id: str, body: ReasonIn, request: Request, user: dict = Depends(require("finance.payment.reverse"))
 ):

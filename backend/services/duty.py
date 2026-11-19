@@ -7,7 +7,7 @@ import os
 import time
 
 DUTY = float(os.environ.get("KKT_BG_DUTY", "0.5"))
-IDLE_WAIT_S = 1.0  # a busy worker still gets its background work done: never wait longer than this per step
+IDLE_WAIT_S = 0.25  # long enough for a typical request to finish first; a busy worker still progresses
 INFLIGHT = [0]  # requests being served by this process (ObservabilityMiddleware)
 
 

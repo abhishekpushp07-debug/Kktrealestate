@@ -39,14 +39,16 @@ def flush(q: dict | None):
         from services import duty
 
         async with _lock():
-            await duty.idle()
+            if len(_TASKS) <= 2:  # 3I: pace only when the queue is short; a backlog catches up at full speed
+                await duty.idle()
             t0 = duty.start()
             for fn, items in batch:
                 try:
                     await fn(items)
                 except Exception:  # noqa: BLE001 — follow-up work never fails the request that queued it
                     log.exception("after-commit task failed")
-                t0 = await duty.breathe(t0)  # 3I: requests on this worker go first
+                if len(_TASKS) <= 2:
+                    t0 = await duty.breathe(t0)  # 3I: requests on this worker go first
 
     t = asyncio.create_task(run())
     _TASKS.add(t)
@@ -56,5 +58,11 @@ def flush(q: dict | None):
 async def drain(timeout: float = 30.0) -> int:
     """Wait for queued follow-up work (shutdown, /api/health?drain, tests). Returns the number still pending."""
     if _TASKS:
-        await asyncio.wait(list(_TASKS), timeout=timeout)
+        from services import duty
+
+        duty.INFLIGHT[0] -= 1  # 3I: a request waiting for background work must not hold that work back
+        try:
+            await asyncio.wait(list(_TASKS), timeout=timeout)
+        finally:
+            duty.INFLIGHT[0] += 1
     return len(_TASKS)

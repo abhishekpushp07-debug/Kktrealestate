@@ -68,3 +68,13 @@ Found and fixed during the close-out (not in the list of 5):
 - Write slow-down cause is attributed by code reading, not by Server-Timing spans (M-13).
 - Medium has no pre-3G tieout artefact, so "identical to pre-3G" is proven for preview and volume only.
 - Crash-drill coverage limits stay as in report §9 (not re-run in the close-out).
+
+## Standing gate (from 3I, REQ-379) — both database modes before any phase closes
+- Full suite on **standalone** Mongo (preview mode: ordered writes + compensation): 0 failed.
+- Full suite on a **single-node replica set** (live mode: multi-document transactions) with `KKT_TXN_STRICT=1`: 0 failed.
+  Runner: `memory/qa/phase3i/run_replset.sh` (data dir in /tmp; check `df` first; scratch copies dropped after).
+- 3G race drills (20 reps) and the 2-process stale drill in **both** modes: 0 duplicates, 0 s stale, 0 × 500, 0 timeouts.
+- Rules the gate protects: every multi-write flow runs through `uow.transactional` (retry on transient conflict,
+  commit retried on unknown result, follow-up work fires only after commit); the open transaction's session is
+  attached to every collection call by `services/txn_ctx` (strict mode rejects an explicit opt-out); business
+  numbers come from atomic counters; a duplicate business key is a 409, never a 500.

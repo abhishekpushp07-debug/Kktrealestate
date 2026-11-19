@@ -19,7 +19,7 @@ from services.ledger import paid_detail, raise_other_charges, rebuild
 from services.money import pct_of, present_money, to_paise
 from services.numbering import generate_number
 from services.pdf_builders import demand_letter_data
-from uow import guarded_update, unit_of_work
+from uow import guarded_update, transactional, unit_of_work
 from utils import (
     ApiError,
     ListParams,
@@ -271,6 +271,7 @@ def _merge_co_applicants(existing: list[dict], incoming: list) -> tuple[list[dic
 
 
 @router.post("", status_code=201)
+@transactional  # 3I REQ-379: one transaction runner (retry on conflict, side effects after commit)
 async def create_booking(body: BookingIn, request: Request, user: dict = Depends(require("sales.booking.create"))):
     from core.timing import Laps
 
@@ -1068,6 +1069,7 @@ async def _finish_interrupted_cancel(b: dict, user: dict, request: Request):
     return out
 
 
+@transactional  # 3I REQ-379: one transaction runner (retry on conflict, side effects after commit)
 async def _cancel_booking(booking_id: str, body: CancelIn, request: Request, user: dict):
     from services.money_ops import cancellation_preview, create_refund
 
@@ -1237,6 +1239,7 @@ async def _move_flat(b: dict, new_flat: dict, user: dict, ts: str, old_status: s
 
 
 @router.post("/{booking_id}/transfer")
+@transactional  # 3I REQ-379: one transaction runner (retry on conflict, side effects after commit)
 async def transfer_booking(
     booking_id: str, body: TransferIn, request: Request, user: dict = Depends(require("sales.booking.transfer"))
 ):
@@ -1385,6 +1388,7 @@ async def transfer_booking(
 
 
 @router.post("/{booking_id}/swap")
+@transactional  # 3I REQ-379: one transaction runner (retry on conflict, side effects after commit)
 async def swap_bookings(
     booking_id: str, body: SwapIn, request: Request, user: dict = Depends(require("sales.booking.transfer"))
 ):
@@ -1482,6 +1486,7 @@ async def swap_bookings(
 
 
 @router.post("/{booking_id}/complete")
+@transactional  # 3I REQ-379: one transaction runner (retry on conflict, side effects after commit)
 async def complete_booking(
     booking_id: str, body: CompleteIn, request: Request, user: dict = Depends(require("sales.booking.edit"))
 ):

@@ -1,5 +1,5 @@
 from db import db
-from uow import unit_of_work
+from uow import transactional, unit_of_work
 from utils import ApiError, base_doc
 
 AREA_CODES = {"CARPET": "carpet_sqft", "BUILTUP": "builtup_sqft", "SUPER_BUILTUP": "super_builtup_sqft"}
@@ -189,6 +189,7 @@ async def resolve_positions(block: dict) -> dict[int, list[dict]]:
     return out
 
 
+@transactional  # 3I REQ-379: one transaction runner (retry on conflict, side effects after commit)
 async def generate_flats(
     block: dict, floors: list[int] | None, user: dict | None, apply_defaults: bool = False
 ) -> list[dict]:
