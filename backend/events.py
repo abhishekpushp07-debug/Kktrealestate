@@ -315,12 +315,20 @@ async def snapshot_subscriber(evt: dict):
         # "before" = the most recent snapshot in the same context (booking, else flat/project), captured when the previous entry completed
         prev_q = {"company_id": company_id, "snapshot": {"$exists": True}, "id": {"$nin": audit_ids}}
         if ctx["booking_id"]:
-            prev_q["snapshot_ctx.booking_id"] = ctx["booking_id"]
+            key = "booking_id"
         elif ctx["flat_id"]:
-            prev_q["snapshot_ctx.flat_id"] = ctx["flat_id"]
+            key = "flat_id"
         else:
-            prev_q["snapshot_ctx.project_id"] = ctx["project_id"]
-        prev = await db.audit_logs.find(prev_q, {"_id": 0, "snapshot": 1}).sort("created_at", -1).limit(1).to_list(1)
+            key = "project_id"
+        prev_q[f"snapshot_ctx.{key}"] = ctx[key]
+        # 3I: hinted — the planner may otherwise walk every company audit row via (company_id, created_at)
+        prev = (
+            await db.audit_logs.find(prev_q, {"_id": 0, "snapshot": 1})
+            .sort("created_at", -1)
+            .hint([(f"snapshot_ctx.{key}", 1), ("created_at", -1)])
+            .limit(1)
+            .to_list(1)
+        )
         await db.audit_logs.update_many(
             {"id": {"$in": audit_ids}},
             {

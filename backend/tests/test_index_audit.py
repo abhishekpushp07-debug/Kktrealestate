@@ -135,3 +135,31 @@ def test_query_uses_index(name, coll, q, sort):
     assert "IXSCAN" in stages or "EOF" in stages, f"{name}: {stages}"
     if sort and "SORT" in stages and "IXSCAN" not in stages:
         pytest.fail(f"{name}: in-memory sort without index")
+
+
+def _index_names(plan) -> set[str]:
+    out = set()
+
+    def walk(n):
+        if isinstance(n, dict):
+            if n.get("stage") == "IXSCAN":
+                out.add(n.get("indexName"))
+            for v in n.values():
+                walk(v)
+        elif isinstance(n, list):
+            for v in n:
+                walk(v)
+
+    walk(plan)
+    return out
+
+
+@pytest.mark.parametrize("ctx", ["flat_id", "project_id"])
+def test_snapshot_before_lookup_uses_its_context_index(ctx):
+    """3I: the after-commit "before" lookup for a flat / project context must not walk every company audit row."""
+    q = {"company_id": "c", "snapshot": {"$exists": True}, "id": {"$nin": ["a"]}, f"snapshot_ctx.{ctx}": "x"}
+    hint = [(f"snapshot_ctx.{ctx}", 1), ("created_at", -1)]  # events.py hints it (the planner may pick company_id)
+    cur = db.audit_logs.find(q).sort("created_at", -1).hint(hint).limit(1)
+    plan = _LOOP.run_until_complete(cur.explain())["queryPlanner"]["winningPlan"]
+    assert "SORT" not in _stages(plan)
+    assert any(f"snapshot_ctx.{ctx}" in (n or "") for n in _index_names(plan)), plan

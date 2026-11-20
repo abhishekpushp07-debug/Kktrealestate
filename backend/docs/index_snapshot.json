@@ -166,6 +166,30 @@
    ]
   ]
  },
+ "audit_logs.snapshot_ctx.flat_id_1_created_at_-1": {
+  "key": [
+   [
+    "snapshot_ctx.flat_id",
+    1
+   ],
+   [
+    "created_at",
+    -1
+   ]
+  ]
+ },
+ "audit_logs.snapshot_ctx.project_id_1_created_at_-1": {
+  "key": [
+   [
+    "snapshot_ctx.project_id",
+    1
+   ],
+   [
+    "created_at",
+    -1
+   ]
+  ]
+ },
  "backups.expires_at_1": {
   "expireAfterSeconds": 86400,
   "key": [

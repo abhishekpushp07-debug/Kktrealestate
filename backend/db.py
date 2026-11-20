@@ -325,6 +325,9 @@ async def _indexes_business_compound():
     await _ci(db.payments, [("company_id", ASCENDING), ("status", ASCENDING), ("posted_at", ASCENDING)])
     await _ci(db.payments, [("company_id", ASCENDING), ("status", ASCENDING), ("reversal.at", ASCENDING)])
     await _ci(db.audit_logs, [("snapshot_ctx.booking_id", ASCENDING), ("created_at", DESCENDING)])
+    # 3I: flat / project context "before" lookup scanned every company audit row (2.2 s on preview) without these
+    await _ci(db.audit_logs, [("snapshot_ctx.flat_id", ASCENDING), ("created_at", DESCENDING)])
+    await _ci(db.audit_logs, [("snapshot_ctx.project_id", ASCENDING), ("created_at", DESCENDING)])
     await _ci(db.refunds, [("booking_id", ASCENDING), ("status", ASCENDING)])
     await _ci(db.refunds, [("company_id", ASCENDING), ("paid_date", ASCENDING)])
     await _ci(db.demands, [("company_id", ASCENDING), ("status", ASCENDING), ("due_date", ASCENDING)])
