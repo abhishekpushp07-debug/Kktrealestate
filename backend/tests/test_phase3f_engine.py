@@ -202,6 +202,7 @@ F3 = {
 
 
 @pytest.mark.parametrize("key", list(F3))
+@pytest.mark.load_sensitive  # two live reports compared: no other worker may write between the reads
 def test_f3_equals_existing_report(admin, key):
     new = requests.get(f"{BASE}/api/reports/v3/{key}", headers=admin, timeout=60).json()
     dflt = new.get("defaults") or {}

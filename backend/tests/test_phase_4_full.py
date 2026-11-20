@@ -113,6 +113,7 @@ def test_reports_rbac(client, accounts, employee):
 
 
 # ---------- Totals reconciliation ----------
+@pytest.mark.load_sensitive  # report total vs payments list read separately: no other worker may write between the reads
 def test_collections_totals_match_payments(client, admin):
     rep = client.get(
         "/api/reports/collections", params={"from_date": "2020-01-01", "to_date": "2030-12-31"}, headers=admin
