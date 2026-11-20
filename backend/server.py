@@ -376,8 +376,10 @@ async def startup_tasks():
 
 
 async def _money_snapshots():
-    """3I REQ-355: build any missing per-booking money snapshot once (a new database / first deploy); then a count."""
-    if await db.bookings.count_documents({"money_snapshot": {"$exists": False}}, limit=1):
+    """3I REQ-355/360: build any missing per-booking money snapshot once (a new database / first deploy), and give
+    System Health its "Report figures" line at once when no nightly check has run on this database yet."""
+    missing = await db.bookings.count_documents({"money_snapshot": {"$exists": False}}, limit=1)
+    if missing or not await db.system_checks.find_one({"name": "report_figures"}, {"_id": 1}):
         from services.money_snapshot import in_step_check
 
         await in_step_check()
