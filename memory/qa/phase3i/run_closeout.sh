@@ -106,7 +106,7 @@ if ! (done_ r_races && done_ r_races_redis && done_ r_stale && done_ r_stale_red
   drill r_engagement engagement --label final_rs --reps 10
   drill r_engagement_redis engagement --label final_rs --reps 10 --redis redis://127.0.0.1:6390/0
   python -m tools.db_audit_drills teardown >> $Q/drills_final.log 2>&1
-  export MONGO_URL=$MONGO_URL_SAVED; unset KKT_TXN_STRICT
+  if [ -n "$MONGO_URL_SAVED" ]; then export MONGO_URL=$MONGO_URL_SAVED; else unset MONGO_URL; fi; unset KKT_TXN_STRICT
   mongosh --port $P --quiet --eval 'db.adminCommand({shutdown:1})' > /dev/null 2>&1; sleep 2; rm -rf $D
 fi
 redis_down 6390

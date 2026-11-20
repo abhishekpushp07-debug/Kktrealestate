@@ -1,0 +1,8 @@
+  RSS COMMAND         COMMAND
+1576804 mongod        mongod --replSet rs0 --port 27018 --dbpath /tmp/kkt_rs0 --bind_ip 127.0.0.1 --wiredTigerCacheSizeGB 1 --fork --logpath
+1479588 mongod        /usr/bin/mongod --bind_ip_all
+192236 python         /root/.venv/bin/python -m uvicorn server:app --host 127.0.0.1 --port 8031 --log-level warning --timeout-keep-alive 120
+148356 python         /root/.venv/bin/python -c from multiprocessing.spawn import spawn_main; spawn_main(tracker_fd=5, pipe_handle=10) --mul
+124812 uvicorn        /opt/plugins-venv/bin/python /opt/plugins-venv/bin/uvicorn plugins.tools.agent.server:app --host 0.0.0.0 --port 8010 -
+120208 MainThread     node /usr/bin/mongodb-mcp-server --transport http --httpHost=0.0.0.0 --httpPort=8020 --readOnly --dangerousHostBinding
+87512 python          /root/.venv/bin/python -u -c import sys;exec(eval(sys.stdin.readline()))
