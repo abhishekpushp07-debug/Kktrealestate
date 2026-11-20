@@ -21,14 +21,28 @@ def init_storage(force: bool = False):
     return _state["key"]
 
 
+REQUEST_BUDGET_S = float(os.environ.get("REQUEST_TIMEOUT_S", "60"))
+SMALL_PUT = 16 * 1024 * 1024
+
+
 def _put(path: str, data: bytes, content_type: str) -> dict:
-    """Timeout scales with payload (200 MB under load needs > 120 s); transient 5xx / timeouts retried 3× with backoff."""
+    """Timeout scales with payload (200 MB under load needs > 120 s); transient 5xx / timeouts retried 3× with backoff.
+    3I: a request-sized payload (≤ 16 MB) shares one deadline inside the request budget, so a hung storage connection
+    is retried within the request instead of the request being cut at 60 s with no retry."""
     import time
 
     key = init_storage()
-    timeout = 120 + len(data) // (1024 * 1024)
+    per = 120 + len(data) // (1024 * 1024)
+    end = time.monotonic() + REQUEST_BUDGET_S - 8 if len(data) <= SMALL_PUT else None
     last = None
     for attempt in range(3):
+        if end is not None:
+            left = end - time.monotonic()
+            if left < 3:
+                break
+            timeout = (5, min(per, left / (3 - attempt)))
+        else:
+            timeout = per
         try:
             resp = requests.put(
                 f"{STORAGE_URL}/objects/{path}",
@@ -52,7 +66,9 @@ def _put(path: str, data: bytes, content_type: str) -> dict:
             if isinstance(e, requests.HTTPError) and e.response is not None and e.response.status_code < 500:
                 raise
             last = e
-            time.sleep(1.5 * (attempt + 1))
+            logger.warning("storage put transient (attempt %d): %s", attempt + 1, e)
+            if attempt < 2:
+                time.sleep(1.5 * (attempt + 1))
     raise last
 
 
