@@ -20,6 +20,7 @@ rs_up() {
   rm -rf $D; mkdir -p $D
   mongod --replSet rs0 --port $P --dbpath $D --bind_ip 127.0.0.1 --wiredTigerCacheSizeGB 1 --fork --logpath $D/mongod.log >> $L 2>&1
   mongosh --port $P --quiet --eval 'rs.initiate({_id:"rs0",members:[{_id:0,host:"127.0.0.1:'$P'"}]})' >> $L 2>&1
+  local i  # (was global: clobbered the chunk loop index -> wrong file slice after every RS (re)start)
   for i in $(seq 1 30); do mongosh --port $P --quiet --eval 'db.hello().isWritablePrimary' 2>/dev/null | grep -q true && break; sleep 1; done
   mongodump --uri=mongodb://localhost:27017 --db=test_database --archive --quiet | \
     mongorestore --uri="mongodb://127.0.0.1:$P/?replicaSet=rs0" --archive --quiet >> $L 2>&1
