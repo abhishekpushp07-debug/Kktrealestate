@@ -40,6 +40,8 @@ def trigger_date(ins: dict, booking: dict, block: dict) -> date | None:
     """Date on which the installment becomes due to be raised; None = not yet triggered."""
     bd = date.fromisoformat(booking["booking_date"])
     t = ins["trigger_type"]
+    if ins.get("migrated_pending"):  # 3I: stage done before migration but never billed — pending, never auto-raised
+        return None
     if t == "ON_BOOKING":
         return bd
     if t == "DAYS_AFTER_BOOKING":

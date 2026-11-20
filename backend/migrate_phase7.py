@@ -308,7 +308,9 @@ async def _snapshot_bookings_and_verify_ledgers(cid: str, plan_by_template: dict
         report["bookings_checked"] += 1
         before = await _snapshot_totals(bk["id"])
         tid = None
-        blk = await db.blocks.find_one({"id": bk["block_id"]}, {"_id": 0, "milestone_template_id": 1, "project_id": 1})
+        blk = await db.blocks.find_one(
+            {"id": bk["block_id"]}, {"_id": 0, "milestone_template_id": 1, "project_id": 1, "construction_stages": 1}
+        )
         if blk:
             tid = blk.get("milestone_template_id") or (
                 (await db.projects.find_one({"id": blk["project_id"]}, {"_id": 0, "milestone_template_id": 1})) or {}
@@ -372,6 +374,26 @@ async def _snapshot_bookings_and_verify_ledgers(cid: str, plan_by_template: dict
                         await db.demands.update_one(
                             {"id": d["id"]}, {"$addToSet": {"absorbed_installment_seqs": i["seq"]}}
                         )
+            # 3I owner rule "bills are the truth": a construction-linked instalment whose stage was already complete
+            # but has no bill on this booking migrates as pending, never as triggered (no invented money)
+            billed = set()
+            async for d in db.demands.find(
+                {"booking_id": bk["id"]}, {"_id": 0, "installment_seq": 1, "absorbed_installment_seqs": 1}
+            ):
+                billed.add(d.get("installment_seq"))
+                billed.update(d.get("absorbed_installment_seqs") or [])
+            done = {
+                s.get("stage_id")
+                for s in (blk or {}).get("construction_stages") or []
+                if s.get("status") == "Completed"
+            }
+            for i in snap["installments"]:
+                if (
+                    i["trigger_type"] in ("ON_STAGE", "ON_POSSESSION")
+                    and i["seq"] not in billed
+                    and (i["trigger_type"] == "ON_POSSESSION" or i.get("trigger_stage_id") in done)
+                ):
+                    i["migrated_pending"] = True
             await db.bookings.update_one(
                 {"id": bk["id"]},
                 {

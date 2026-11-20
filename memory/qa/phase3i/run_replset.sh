@@ -17,7 +17,7 @@ import asyncio,os; from motor.motor_asyncio import AsyncIOMotorClient
 async def m():
     h=await AsyncIOMotorClient(os.environ['MONGO_URL']).admin.command('hello'); print('setName', h.get('setName'))
 asyncio.run(m())" >> $L 2>&1
-KKT_TXN_STRICT=1 MONGO_URL="mongodb://127.0.0.1:$P/?replicaSet=rs0" KKT_TEST_PORT=8031 timeout 3600 python -m pytest tests -q -p no:cacheprovider --tb=line -rfE > /app/memory/qa/phase3i/pytest_replset.log 2>&1
+KKT_TXN_STRICT=1 MONGO_URL="mongodb://127.0.0.1:$P/?replicaSet=rs0" KKT_TEST_PORT=8031 timeout 3600 python -m pytest tests -v -p no:cacheprovider --tb=line -rfE > /app/memory/qa/phase3i/pytest_replset.log 2>&1
 echo "pytest replset exit $?" >> $L
 pkill -f "port 80[34]1" ; sleep 2  # the suite's own backend must not outlive the run
 mongosh --port $P --quiet --eval 'db.adminCommand({shutdown:1})' >/dev/null 2>&1
