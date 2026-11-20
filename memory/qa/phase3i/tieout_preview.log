@@ -1,48 +1,48 @@
-PASS collections FY total == Σ cleared receipts                   report=37954608600 raw=37954608600 
+PASS collections FY total == Σ cleared receipts                   report=37444037500 raw=37444037500 
 PASS cheques-in-hand count == Pending payments                    report=2 raw=2 
-PASS cheques-in-hand amount == Σ Pending                          report=5234500 raw=5234500 
-PASS cheque register rows == instrument payments                  report=148 raw=148 raw by status {'Bounced': 2, 'Cleared': 144, 'Pending': 2}
+PASS cheques-in-hand amount == Σ Pending                          report=23215200 raw=23215200 
+PASS cheque register rows == instrument payments                  report=147 raw=147 raw by status {'Bounced': 2, 'Cleared': 143, 'Pending': 2}
 PASS inventory report by_status == flats                          report={'Available': 102, 'Hold': 3, 'Booked':  raw={'Available': 102, 'Blocked': 1, 'Booked 
 PASS home units/available tiles == flats                          report=(186, 102) raw=(186, 102) 
 PASS legacy dashboard inventory == flats                          report={'Available': 102, 'Hold': 3, 'Booked':  raw={'Available': 102, 'Blocked': 1, 'Booked 
-PASS outstanding total == Σ booking summary dues                  report=4499277700 raw=4499277700 
-PASS home overdue tile == Σ bookings overdue (definitions.ageing_bands) report=2115065000 raw=2115065000 
-PASS report overdue == Σ bookings overdue                         report=2115065000 raw=2115065000 
-PASS dashboard overdue == report overdue                          report=2115065000 raw=2115065000 
+PASS outstanding total == Σ booking summary dues                  report=4671717200 raw=4671717200 
+PASS home overdue tile == Σ bookings overdue (definitions.ageing_bands) report=2273329800 raw=2273329800 
+PASS report overdue == Σ bookings overdue                         report=2273329800 raw=2273329800 
+PASS dashboard overdue == report overdue                          report=2273329800 raw=2273329800 
 PASS Outstanding by customer: one row per customer id             report=80 raw=80 
-PASS Outstanding by customer Σ net balance == by booking Σ net balance report=4425655100 raw=4425655100 
-PASS Outstanding & Ageing band Not due == Σ bookings band Not due (definitions.ageing_bands) report=2384212700 raw=2384212700 
-PASS Outstanding & Ageing band 0-30 == Σ bookings band 0-30 (definitions.ageing_bands) report=498982700 raw=498982700 
-PASS Outstanding & Ageing band 31-60 == Σ bookings band 31-60 (definitions.ageing_bands) report=292437500 raw=292437500 
-PASS Outstanding & Ageing band 61-90 == Σ bookings band 61-90 (definitions.ageing_bands) report=540304500 raw=540304500 
-PASS Outstanding & Ageing band 90+ == Σ bookings band 90+ (definitions.ageing_bands) report=783340300 raw=783340300 
+PASS Outstanding by customer Σ net balance == by booking Σ net balance report=4598019150 raw=4598019150 
+PASS Outstanding & Ageing band Not due == Σ bookings band Not due (definitions.ageing_bands) report=2398387400 raw=2398387400 
+PASS Outstanding & Ageing band 0-30 == Σ bookings band 0-30 (definitions.ageing_bands) report=484930000 raw=484930000 
+PASS Outstanding & Ageing band 31-60 == Σ bookings band 31-60 (definitions.ageing_bands) report=264763100 raw=264763100 
+PASS Outstanding & Ageing band 61-90 == Σ bookings band 61-90 (definitions.ageing_bands) report=544141700 raw=544141700 
+PASS Outstanding & Ageing band 90+ == Σ bookings band 90+ (definitions.ageing_bands) report=979495000 raw=979495000 
 PASS booking card overdue days == definitions.overdue_days (every live booking) report=80 raw=80 
 PASS other-charge parts with bill_day <= due_on                   report=723 raw=723 
 PASS GST-with-stage part bill_day == the day of the instalment bill it was billed with report=599 raw=599 
 PASS other-charge part due_on == its bill's due, else bill_day + days-to-pay report=723 raw=723 
-PASS ageing bands sum == report total outstanding                 report=4499277700 raw=4499277700 
-PASS report bands == Σ booking bands                              report={'Not due': 2384212700, '0-30': 49898270 raw={'Not due': 2384212700, '0-30': 49898270 
-PASS home outstanding tile == Σ booking dues                      report=4499277700 raw=4499277700 
-PASS home outstanding tile == outstanding report due              report=4499277700 raw=4499277700 
-PASS ONE NUMBER: Home outstanding == Outstanding report total     report=4499277700 raw=4499277700 
-PASS ONE NUMBER: Outstanding report total == Σ booking.summary.outstanding_paise report=4499277700 raw=4499277700 
-PASS Home advance held == Σ booking.summary.advance_paise         report=73622600 raw=73622600 
+PASS ageing bands sum == report total outstanding                 report=4671717200 raw=4671717200 
+PASS report bands == Σ booking bands                              report={'Not due': 2398387400, '0-30': 48493000 raw={'Not due': 2398387400, '0-30': 48493000 
+PASS home outstanding tile == Σ booking dues                      report=4671717200 raw=4671717200 
+PASS home outstanding tile == outstanding report due              report=4671717200 raw=4671717200 
+PASS ONE NUMBER: Home outstanding == Outstanding report total     report=4671717200 raw=4671717200 
+PASS ONE NUMBER: Outstanding report total == Σ booking.summary.outstanding_paise report=4671717200 raw=4671717200 
+PASS Home advance held == Σ booking.summary.advance_paise         report=73698050 raw=73698050 
 PASS refunds API Paid total == Σ paid refunds                     report=42289200 raw=42289200 
 PASS cancellations report refund paid == Σ paid refunds           report=42289200 raw=42289200 
 PASS ledger REFUND contra rows == Σ paid refunds (all buckets)    report=42289200 raw=42289200 
 PASS bounce charges on bookings == bounce-charge audit rows       report=2 raw=2 
 PASS transferred bookings' flats point back to booking            report=3 raw=3 
 PASS cancelled bookings carry no open demands                     report=0 raw=0 
-PASS demand-vs-collection (default: live bookings) + Cancelled bookings line == Σ non-void demands report=38258908400 raw=38258908400 
-PASS legacy dashboard collections.month == Σ cleared this month   report=1747141200 raw=1747141200 month=2026-11
+PASS demand-vs-collection (default: live bookings) + Cancelled bookings line == Σ non-void demands report=37937925900 raw=37937925900 
+PASS legacy dashboard collections.month == Σ cleared this month   report=1684609000 raw=1684609000 month=2026-11
 PASS cancellations rows == Cancelled bookings                     report=2 raw=2 
 PASS sales-leads total == leads                                   report=123 raw=123 
 PASS Σ cleared cash receipts == booking.summary.cash_paid (all active) report=0 raw=0 count of bookings that differ
 PASS Σ Udhar − Σ Jama == outstanding − advance (every booking)    report=0 raw=0 two-sided ledger law
-PASS manual bills counted in Outstanding (order = plan % + Σ manual) report=0 raw=0 1 with manual bills
-PASS Σ customer-card Due == Σ live booking outstanding            report=4499277700 raw=4499277700 
-PASS Σ customer-card Advance == Σ live booking advance            report=73622600 raw=73622600 
-PASS Σ customer-card Overdue == ageing report overdue (definitions.ageing_for_bookings, incl. other charges) report=2115065000 raw=2115065000 
+PASS manual bills counted in Outstanding (order = plan % + Σ manual) report=0 raw=0 0 with manual bills
+PASS Σ customer-card Due == Σ live booking outstanding            report=4671717200 raw=4671717200 
+PASS Σ customer-card Advance == Σ live booking advance            report=73698050 raw=73698050 
+PASS Σ customer-card Overdue == ageing report overdue (definitions.ageing_for_bookings, incl. other charges) report=2273329800 raw=2273329800 
 PASS customer segments partition All (overdue + on track + all clear + advance-only + no booking) report=82 raw=82 
 PASS Advance chip == customers holding an advance (raw bookings)  report=5 raw=5 
 PASS KYC pending chip == active customers not Verified (raw)      report=2 raw=2 
@@ -50,59 +50,59 @@ PASS customer-card 'agreement pending' == customers with an unsigned live bookin
 PASS GGV banner 'booked or sold' == tower chart == raw flats      report=(12, 12) raw=(12, 12) 
 PASS SGH banner 'booked or sold' == tower chart == raw flats      report=(68, 68) raw=(68, 68) 
 PASS YE banner 'booked or sold' == tower chart == raw flats       report=(0, 0) raw=(0, 0) 
-PASS Σ project-card Collected == Σ live booking Jama − waived     report=37862732600 raw=37862732600 
-PASS Σ project-card Outstanding == Σ live booking outstanding     report=4499277700 raw=4499277700 
+PASS Σ project-card Collected == Σ live booking Jama − waived     report=37352161500 raw=37352161500 
+PASS Σ project-card Outstanding == Σ live booking outstanding     report=4671717200 raw=4671717200 
 PASS booking-card Due == booking outstanding, one plan segment per instalment report=0 raw=0 79 active bookings
 PASS plan-timeline row states == booking-card plan segments       report=0 raw=0 25 bookings
 PASS /bookings segment counts sum == list total                   report=82 raw=82 
 PASS /projects segment counts sum == list total                   report=3 raw=3 
-PASS Home month Cash·Account·Other == Σ allocation parts          report={'Cash': 953610600, 'Account': 707411200 raw={'Cash': 953610600, 'Account': 707411200 
-PASS Home month total == Cash + Account + Other                   report=1747141200 raw=1747141200 
-PASS trends current month split == Σ allocation parts             report={'Cash': 953610600, 'Account': 707411200 raw={'Cash': 953610600, 'Account': 707411200 
-PASS collections-v2 (this month, by bucket) == Σ allocation parts report={'Cash': 953610600, 'Account': 707411200 raw={'Cash': 953610600, 'Account': 707411200 
-PASS collections FY cash/account/other == Σ allocation parts      report={'Cash': 14395467400, 'Account': 1980155 raw={'Cash': 14395467400, 'Account': 1980155 
-PASS carried: opening + billed in period − received − waived in period == closing report=4425655100 raw=4425655100 
-PASS bridge: received by payment date == Collections net received (receipt basis) report=20446865100 raw=20446865100 
-PASS bridge: by payment date − not live − dated in, cleared after + dated before, cleared in + refunds == carried received report=20446865100 raw=20446865100 
-PASS bridge from 2025-04-01: by clearance == carried received     report=37862732600 raw=37862732600 
-PASS bridge from 2026-11-03: by clearance == carried received     report=1708528700 raw=1708528700 
-PASS carried: closing == Outstanding report net balance (today)   report=4425655100 raw=4425655100 
-PASS formula: Bills vs Collection cash + account billed == total billed report=38024979500 raw=38024979500 
-PASS bridge: Bills vs Collection (live) + other charges billed == Outstanding bill raised report=42291512700 raw=42291512700 
+PASS Home month Cash·Account·Other == Σ allocation parts          report={'Cash': 891800400, 'Account': 698505600 raw={'Cash': 891800400, 'Account': 698505600 
+PASS Home month total == Cash + Account + Other                   report=1684609000 raw=1684609000 
+PASS trends current month split == Σ allocation parts             report={'Cash': 891800400, 'Account': 698505600 raw={'Cash': 891800400, 'Account': 698505600 
+PASS collections-v2 (this month, by bucket) == Σ allocation parts report={'Cash': 891800400, 'Account': 698505600 raw={'Cash': 891800400, 'Account': 698505600 
+PASS collections FY cash/account/other == Σ allocation parts      report={'Cash': 14201430100, 'Account': 1965616 raw={'Cash': 14201430100, 'Account': 1965616 
+PASS carried: opening + billed in period − received − waived in period == closing report=4598019150 raw=4598019150 
+PASS bridge: received by payment date == Collections net received (receipt basis) report=20136406500 raw=20136406500 
+PASS bridge: by payment date − not live − dated in, cleared after + dated before, cleared in + refunds == carried received report=20136406500 raw=20136406500 
+PASS bridge from 2025-04-01: by clearance == carried received     report=37352161500 raw=37352161500 
+PASS bridge from 2026-11-04: by clearance == carried received     report=1549155900 raw=1549155900 
+PASS carried: closing == Outstanding report net balance (today)   report=4598019150 raw=4598019150 
+PASS formula: Bills vs Collection cash + account billed == total billed report=37703997000 raw=37703997000 
+PASS bridge: Bills vs Collection (live) + other charges billed == Outstanding bill raised report=41954881100 raw=41954881100 
 PASS formula: Advances cash + account == total advance            report=73622600 raw=73622600 
-PASS formula: Advances total == Outstanding report advance held   report=73622600 raw=73622600 
-PASS formula: Cheques cleared + bounced + pending == register amount report=5334380800 raw=5334380800 
-PASS formula: Bank-wise sum of banks == total                     report=14612782400 raw=14612782400 
-PASS formula: Bank-wise cleared + reversed == received            report=14612782400 raw=14612782400 
-PASS identity: Bank-wise + Cash == Collections (this FY)          report=20446865100 raw=20446865100 
-PASS Home due ageing == Outstanding report ageing (per band)      report={'Not due': 2384212700, '0-30': 49898270 raw={'Not due': 2384212700, '0-30': 49898270 
-PASS Home due ageing total == report Outstanding                  report=4499277700 raw=4499277700 
+FAIL formula: Advances total == Outstanding report advance held   report=73622600 raw=73698050 
+PASS formula: Cheques cleared + bounced + pending == register amount report=5381151800 raw=5381151800 
+PASS formula: Bank-wise sum of banks == total                     report=14001471500 raw=14001471500 
+PASS formula: Bank-wise cleared + reversed == received            report=14001471500 raw=14001471500 
+PASS identity: Bank-wise + Cash == Collections (this FY)          report=20136406500 raw=20136406500 
+PASS Home due ageing == Outstanding report ageing (per band)      report={'Not due': 2398387400, '0-30': 48493000 raw={'Not due': 2398387400, '0-30': 48493000 
+PASS Home due ageing total == report Outstanding                  report=4671717200 raw=4671717200 
 PASS Home ageing (today) loads                                    report=True raw=True 
-PASS Home ageing (today) /reports/outstanding-v2 ageing[bucket=Not due].amount_paise report=2384212700 raw=2384212700 {}
-PASS Home ageing (today) /reports/outstanding-v2 ageing[bucket=0-30].amount_paise report=498982700 raw=498982700 {}
-PASS Home ageing (today) /reports/outstanding-v2 ageing[bucket=31-60].amount_paise report=292437500 raw=292437500 {}
-PASS Home ageing (today) /reports/outstanding-v2 ageing[bucket=61-90].amount_paise report=540304500 raw=540304500 {}
-PASS Home ageing (today) /reports/outstanding-v2 ageing[bucket=90+].amount_paise report=783340300 raw=783340300 {}
-PASS Home ageing (today) /reports/outstanding-v2 totals.outstanding_paise report=4499277700 raw=4499277700 {}
+PASS Home ageing (today) /reports/outstanding-v2 ageing[bucket=Not due].amount_paise report=2398387400 raw=2398387400 {}
+PASS Home ageing (today) /reports/outstanding-v2 ageing[bucket=0-30].amount_paise report=484930000 raw=484930000 {}
+PASS Home ageing (today) /reports/outstanding-v2 ageing[bucket=31-60].amount_paise report=264763100 raw=264763100 {}
+PASS Home ageing (today) /reports/outstanding-v2 ageing[bucket=61-90].amount_paise report=544141700 raw=544141700 {}
+PASS Home ageing (today) /reports/outstanding-v2 ageing[bucket=90+].amount_paise report=979495000 raw=979495000 {}
+PASS Home ageing (today) /reports/outstanding-v2 totals.outstanding_paise report=4671717200 raw=4671717200 {}
 PASS Home money_today (today) loads                               report=True raw=True 
-PASS Home money_today (today) /reports/collections-v2 totals.cash_paise report=27562800 raw=27562800 {'from_date': '2026-11-19', 'to_date': '2026-11-19'}
-PASS Home money_today (today) /reports/collections-v2 totals.account_paise report=15187600 raw=15187600 {'from_date': '2026-11-19', 'to_date': '2026-11-19'}
-PASS Home money_today (today) /reports/collections-v2 totals.other_paise report=7703500 raw=7703500 {'from_date': '2026-11-19', 'to_date': '2026-11-19'}
-PASS Home money_today (today) /reports/collections-v2 totals.total_paise report=50453900 raw=50453900 {'from_date': '2026-11-19', 'to_date': '2026-11-19'}
-PASS Home money_today (today) /payments/summary Pending.amount_paise report=5234500 raw=5234500 {'status': 'Pending'}
+PASS Home money_today (today) /reports/collections-v2 totals.cash_paise report=28822800 raw=28822800 {'from_date': '2026-11-20', 'to_date': '2026-11-20'}
+PASS Home money_today (today) /reports/collections-v2 totals.account_paise report=0 raw=0 {'from_date': '2026-11-20', 'to_date': '2026-11-20'}
+PASS Home money_today (today) /reports/collections-v2 totals.other_paise report=4000000 raw=4000000 {'from_date': '2026-11-20', 'to_date': '2026-11-20'}
+PASS Home money_today (today) /reports/collections-v2 totals.total_paise report=32822800 raw=32822800 {'from_date': '2026-11-20', 'to_date': '2026-11-20'}
+PASS Home money_today (today) /payments/summary Pending.amount_paise report=23215200 raw=23215200 {'status': 'Pending'}
 PASS Home due_vs_received (today) loads                           report=True raw=True 
-PASS Home due_vs_received (today) /demands/register totals.total_paise report=8000000 raw=8000000 {'basis': 'due', 'date_from': '2026-11-19', 'date_to': '2026
-PASS Home due_vs_received (today) /reports/collections-v2 totals.total_paise report=50453900 raw=50453900 {'from_date': '2026-11-19', 'to_date': '2026-11-19'}
+PASS Home due_vs_received (today) /demands/register totals.total_paise report=0 raw=0 {'basis': 'due', 'date_from': '2026-11-20', 'date_to': '2026
+PASS Home due_vs_received (today) /reports/collections-v2 totals.total_paise report=32822800 raw=32822800 {'from_date': '2026-11-20', 'to_date': '2026-11-20'}
 PASS Home call_today (today) loads                                report=True raw=True 
 PASS Home call_today (today) /leads total                         report=1 raw=1 {'due_today': True}
-PASS Home call_today (today) /site-visits total                   report=1 raw=1 {'date_from': '2026-11-19', 'date_to': '2026-11-19', 'status
+PASS Home call_today (today) /site-visits total                   report=1 raw=1 {'date_from': '2026-11-20', 'date_to': '2026-11-20', 'status
 PASS Home inflow_30 (today) loads                                 report=True raw=True 
-PASS Home inflow_30 (today) /demands/register totals.balance_paise report=2123035000 raw=2123035000 {'basis': 'due', 'date_from': '2026-11-20', 'date_to': '2026
-PASS Home inflow_30 (today) /payments/summary Pending.amount_paise report=5234500 raw=5234500 {'status': 'Pending'}
+PASS Home inflow_30 (today) /demands/register totals.balance_paise report=2135548000 raw=2135548000 {'basis': 'due', 'date_from': '2026-11-21', 'date_to': '2026
+PASS Home inflow_30 (today) /payments/summary Pending.amount_paise report=23215200 raw=23215200 {'status': 'Pending'}
 PASS Home next_milestone (today) loads                            report=True raw=True 
 PASS Home next_milestone (today) /blocks/5d2087ec-b20a-4abb-ae11-3a1bf447f158/stages/d60cd0cf-dcdc-4e09-a375-977838cbb1a4/preview total_paise report=0 raw=0 {}
 PASS Home next_milestone (today) /blocks/cabe48b7-d5fe-40ed-ae75-0ab01d693877/stages/ab5fb388-ca9f-46b0-b260-060d213c1b34/preview total_paise report=1507668800 raw=1507668800 {}
-PASS Home next_milestone (today) /blocks/21dca443-0913-4d8f-923f-c23959081b49/stages/ab5fb388-ca9f-46b0-b260-060d213c1b34/preview total_paise report=2822793600 raw=2822793600 {}
+PASS Home next_milestone (today) /blocks/21dca443-0913-4d8f-923f-c23959081b49/stages/ab5fb388-ca9f-46b0-b260-060d213c1b34/preview total_paise report=2789975400 raw=2789975400 {}
 PASS Home next_milestone (today) /blocks/0d220380-bdd3-4202-9769-7a5db753b75a/stages/892b47c6-35c7-42e2-bbca-5734bd291f76/preview total_paise report=0 raw=0 {}
 PASS Home inventory (today) loads                                 report=True raw=True 
 PASS Home inventory (today) /flats total                          report=48 raw=48 {'block_id': '8c8d8d49-1575-45d7-86b0-70f09cc71917', 'status
@@ -138,40 +138,40 @@ PASS Home inventory (today) /flats total                          report=0 raw=0
 PASS Home flat_status (today) loads                               report=True raw=True 
 PASS Home construction (today) loads                              report=True raw=True 
 PASS Home pipeline (today) loads                                  report=True raw=True 
-PASS Home pipeline (today) /leads total                           report=2 raw=2 {'created_from': '2026-11-19', 'created_to': '2026-11-19'}
-PASS Home pipeline (today) /site-visits total                     report=0 raw=0 {'date_from': '2026-11-19', 'date_to': '2026-11-19', 'status
-PASS Home pipeline (today) /bookings total                        report=2 raw=2 {'date_from': '2026-11-19', 'date_to': '2026-11-19', 'status
-PASS Home pipeline (today) /leads total                           report=0 raw=0 {'created_from': '2026-11-19', 'created_to': '2026-11-19', '
+PASS Home pipeline (today) /leads total                           report=2 raw=2 {'created_from': '2026-11-20', 'created_to': '2026-11-20'}
+PASS Home pipeline (today) /site-visits total                     report=0 raw=0 {'date_from': '2026-11-20', 'date_to': '2026-11-20', 'status
+PASS Home pipeline (today) /bookings total                        report=2 raw=2 {'date_from': '2026-11-20', 'date_to': '2026-11-20', 'status
+PASS Home pipeline (today) /leads total                           report=0 raw=0 {'created_from': '2026-11-20', 'created_to': '2026-11-20', '
 PASS Home attention (today) loads                                 report=True raw=True 
 PASS Home attention (today) /flats total                          report=1 raw=1 {'hold_expiring': True}
 PASS Home attention (today) /payments/summary Bounced.count       report=0 raw=0 {'status': 'Bounced', 'unreplaced': True}
-PASS Home attention (today) /demands/register totals.count        report=5 raw=5 {'stale_days': 30}
+PASS Home attention (today) /demands/register totals.count        report=2 raw=2 {'stale_days': 30}
 PASS Home ageing (month) loads                                    report=True raw=True 
-PASS Home ageing (month) /reports/outstanding-v2 ageing[bucket=Not due].amount_paise report=2384212700 raw=2384212700 {}
-PASS Home ageing (month) /reports/outstanding-v2 ageing[bucket=0-30].amount_paise report=498982700 raw=498982700 {}
-PASS Home ageing (month) /reports/outstanding-v2 ageing[bucket=31-60].amount_paise report=292437500 raw=292437500 {}
-PASS Home ageing (month) /reports/outstanding-v2 ageing[bucket=61-90].amount_paise report=540304500 raw=540304500 {}
-PASS Home ageing (month) /reports/outstanding-v2 ageing[bucket=90+].amount_paise report=783340300 raw=783340300 {}
-PASS Home ageing (month) /reports/outstanding-v2 totals.outstanding_paise report=4499277700 raw=4499277700 {}
+PASS Home ageing (month) /reports/outstanding-v2 ageing[bucket=Not due].amount_paise report=2398387400 raw=2398387400 {}
+PASS Home ageing (month) /reports/outstanding-v2 ageing[bucket=0-30].amount_paise report=484930000 raw=484930000 {}
+PASS Home ageing (month) /reports/outstanding-v2 ageing[bucket=31-60].amount_paise report=264763100 raw=264763100 {}
+PASS Home ageing (month) /reports/outstanding-v2 ageing[bucket=61-90].amount_paise report=544141700 raw=544141700 {}
+PASS Home ageing (month) /reports/outstanding-v2 ageing[bucket=90+].amount_paise report=979495000 raw=979495000 {}
+PASS Home ageing (month) /reports/outstanding-v2 totals.outstanding_paise report=4671717200 raw=4671717200 {}
 PASS Home money_today (month) loads                               report=True raw=True 
-PASS Home money_today (month) /reports/collections-v2 totals.cash_paise report=27562800 raw=27562800 {'from_date': '2026-11-19', 'to_date': '2026-11-19'}
-PASS Home money_today (month) /reports/collections-v2 totals.account_paise report=15187600 raw=15187600 {'from_date': '2026-11-19', 'to_date': '2026-11-19'}
-PASS Home money_today (month) /reports/collections-v2 totals.other_paise report=7703500 raw=7703500 {'from_date': '2026-11-19', 'to_date': '2026-11-19'}
-PASS Home money_today (month) /reports/collections-v2 totals.total_paise report=50453900 raw=50453900 {'from_date': '2026-11-19', 'to_date': '2026-11-19'}
-PASS Home money_today (month) /payments/summary Pending.amount_paise report=5234500 raw=5234500 {'status': 'Pending'}
+PASS Home money_today (month) /reports/collections-v2 totals.cash_paise report=28822800 raw=28822800 {'from_date': '2026-11-20', 'to_date': '2026-11-20'}
+PASS Home money_today (month) /reports/collections-v2 totals.account_paise report=0 raw=0 {'from_date': '2026-11-20', 'to_date': '2026-11-20'}
+PASS Home money_today (month) /reports/collections-v2 totals.other_paise report=4000000 raw=4000000 {'from_date': '2026-11-20', 'to_date': '2026-11-20'}
+PASS Home money_today (month) /reports/collections-v2 totals.total_paise report=32822800 raw=32822800 {'from_date': '2026-11-20', 'to_date': '2026-11-20'}
+PASS Home money_today (month) /payments/summary Pending.amount_paise report=23215200 raw=23215200 {'status': 'Pending'}
 PASS Home due_vs_received (month) loads                           report=True raw=True 
-PASS Home due_vs_received (month) /demands/register totals.total_paise report=3490076000 raw=3490076000 {'basis': 'due', 'date_from': '2026-11-01', 'date_to': '2026
-PASS Home due_vs_received (month) /reports/collections-v2 totals.total_paise report=1747141200 raw=1747141200 {'from_date': '2026-11-01', 'to_date': '2026-11-30'}
+PASS Home due_vs_received (month) /demands/register totals.total_paise report=3612022000 raw=3612022000 {'basis': 'due', 'date_from': '2026-11-01', 'date_to': '2026
+PASS Home due_vs_received (month) /reports/collections-v2 totals.total_paise report=1684609000 raw=1684609000 {'from_date': '2026-11-01', 'to_date': '2026-11-30'}
 PASS Home call_today (month) loads                                report=True raw=True 
 PASS Home call_today (month) /leads total                         report=1 raw=1 {'due_today': True}
-PASS Home call_today (month) /site-visits total                   report=1 raw=1 {'date_from': '2026-11-19', 'date_to': '2026-11-19', 'status
+PASS Home call_today (month) /site-visits total                   report=1 raw=1 {'date_from': '2026-11-20', 'date_to': '2026-11-20', 'status
 PASS Home inflow_30 (month) loads                                 report=True raw=True 
-PASS Home inflow_30 (month) /demands/register totals.balance_paise report=2123035000 raw=2123035000 {'basis': 'due', 'date_from': '2026-11-20', 'date_to': '2026
-PASS Home inflow_30 (month) /payments/summary Pending.amount_paise report=5234500 raw=5234500 {'status': 'Pending'}
+PASS Home inflow_30 (month) /demands/register totals.balance_paise report=2135548000 raw=2135548000 {'basis': 'due', 'date_from': '2026-11-21', 'date_to': '2026
+PASS Home inflow_30 (month) /payments/summary Pending.amount_paise report=23215200 raw=23215200 {'status': 'Pending'}
 PASS Home next_milestone (month) loads                            report=True raw=True 
 PASS Home next_milestone (month) /blocks/5d2087ec-b20a-4abb-ae11-3a1bf447f158/stages/d60cd0cf-dcdc-4e09-a375-977838cbb1a4/preview total_paise report=0 raw=0 {}
 PASS Home next_milestone (month) /blocks/cabe48b7-d5fe-40ed-ae75-0ab01d693877/stages/ab5fb388-ca9f-46b0-b260-060d213c1b34/preview total_paise report=1507668800 raw=1507668800 {}
-PASS Home next_milestone (month) /blocks/21dca443-0913-4d8f-923f-c23959081b49/stages/ab5fb388-ca9f-46b0-b260-060d213c1b34/preview total_paise report=2822793600 raw=2822793600 {}
+PASS Home next_milestone (month) /blocks/21dca443-0913-4d8f-923f-c23959081b49/stages/ab5fb388-ca9f-46b0-b260-060d213c1b34/preview total_paise report=2789975400 raw=2789975400 {}
 PASS Home next_milestone (month) /blocks/0d220380-bdd3-4202-9769-7a5db753b75a/stages/892b47c6-35c7-42e2-bbca-5734bd291f76/preview total_paise report=0 raw=0 {}
 PASS Home inventory (month) loads                                 report=True raw=True 
 PASS Home inventory (month) /flats total                          report=48 raw=48 {'block_id': '8c8d8d49-1575-45d7-86b0-70f09cc71917', 'status
@@ -214,33 +214,33 @@ PASS Home pipeline (month) /leads total                           report=1 raw=1
 PASS Home attention (month) loads                                 report=True raw=True 
 PASS Home attention (month) /flats total                          report=1 raw=1 {'hold_expiring': True}
 PASS Home attention (month) /payments/summary Bounced.count       report=0 raw=0 {'status': 'Bounced', 'unreplaced': True}
-PASS Home attention (month) /demands/register totals.count        report=5 raw=5 {'stale_days': 30}
+PASS Home attention (month) /demands/register totals.count        report=2 raw=2 {'stale_days': 30}
 PASS Home ageing (fy) loads                                       report=True raw=True 
-PASS Home ageing (fy) /reports/outstanding-v2 ageing[bucket=Not due].amount_paise report=2384212700 raw=2384212700 {}
-PASS Home ageing (fy) /reports/outstanding-v2 ageing[bucket=0-30].amount_paise report=498982700 raw=498982700 {}
-PASS Home ageing (fy) /reports/outstanding-v2 ageing[bucket=31-60].amount_paise report=292437500 raw=292437500 {}
-PASS Home ageing (fy) /reports/outstanding-v2 ageing[bucket=61-90].amount_paise report=540304500 raw=540304500 {}
-PASS Home ageing (fy) /reports/outstanding-v2 ageing[bucket=90+].amount_paise report=783340300 raw=783340300 {}
-PASS Home ageing (fy) /reports/outstanding-v2 totals.outstanding_paise report=4499277700 raw=4499277700 {}
+PASS Home ageing (fy) /reports/outstanding-v2 ageing[bucket=Not due].amount_paise report=2398387400 raw=2398387400 {}
+PASS Home ageing (fy) /reports/outstanding-v2 ageing[bucket=0-30].amount_paise report=484930000 raw=484930000 {}
+PASS Home ageing (fy) /reports/outstanding-v2 ageing[bucket=31-60].amount_paise report=264763100 raw=264763100 {}
+PASS Home ageing (fy) /reports/outstanding-v2 ageing[bucket=61-90].amount_paise report=544141700 raw=544141700 {}
+PASS Home ageing (fy) /reports/outstanding-v2 ageing[bucket=90+].amount_paise report=979495000 raw=979495000 {}
+PASS Home ageing (fy) /reports/outstanding-v2 totals.outstanding_paise report=4671717200 raw=4671717200 {}
 PASS Home money_today (fy) loads                                  report=True raw=True 
-PASS Home money_today (fy) /reports/collections-v2 totals.cash_paise report=27562800 raw=27562800 {'from_date': '2026-11-19', 'to_date': '2026-11-19'}
-PASS Home money_today (fy) /reports/collections-v2 totals.account_paise report=15187600 raw=15187600 {'from_date': '2026-11-19', 'to_date': '2026-11-19'}
-PASS Home money_today (fy) /reports/collections-v2 totals.other_paise report=7703500 raw=7703500 {'from_date': '2026-11-19', 'to_date': '2026-11-19'}
-PASS Home money_today (fy) /reports/collections-v2 totals.total_paise report=50453900 raw=50453900 {'from_date': '2026-11-19', 'to_date': '2026-11-19'}
-PASS Home money_today (fy) /payments/summary Pending.amount_paise report=5234500 raw=5234500 {'status': 'Pending'}
+PASS Home money_today (fy) /reports/collections-v2 totals.cash_paise report=28822800 raw=28822800 {'from_date': '2026-11-20', 'to_date': '2026-11-20'}
+PASS Home money_today (fy) /reports/collections-v2 totals.account_paise report=0 raw=0 {'from_date': '2026-11-20', 'to_date': '2026-11-20'}
+PASS Home money_today (fy) /reports/collections-v2 totals.other_paise report=4000000 raw=4000000 {'from_date': '2026-11-20', 'to_date': '2026-11-20'}
+PASS Home money_today (fy) /reports/collections-v2 totals.total_paise report=32822800 raw=32822800 {'from_date': '2026-11-20', 'to_date': '2026-11-20'}
+PASS Home money_today (fy) /payments/summary Pending.amount_paise report=23215200 raw=23215200 {'status': 'Pending'}
 PASS Home due_vs_received (fy) loads                              report=True raw=True 
-PASS Home due_vs_received (fy) /demands/register totals.total_paise report=22080987400 raw=22080987400 {'basis': 'due', 'date_from': '2026-04-01', 'date_to': '2027
-PASS Home due_vs_received (fy) /reports/collections-v2 totals.total_paise report=20446865100 raw=20446865100 {'from_date': '2026-04-01', 'to_date': '2027-03-31'}
+PASS Home due_vs_received (fy) /demands/register totals.total_paise report=21760004900 raw=21760004900 {'basis': 'due', 'date_from': '2026-04-01', 'date_to': '2027
+PASS Home due_vs_received (fy) /reports/collections-v2 totals.total_paise report=20136406500 raw=20136406500 {'from_date': '2026-04-01', 'to_date': '2027-03-31'}
 PASS Home call_today (fy) loads                                   report=True raw=True 
 PASS Home call_today (fy) /leads total                            report=1 raw=1 {'due_today': True}
-PASS Home call_today (fy) /site-visits total                      report=1 raw=1 {'date_from': '2026-11-19', 'date_to': '2026-11-19', 'status
+PASS Home call_today (fy) /site-visits total                      report=1 raw=1 {'date_from': '2026-11-20', 'date_to': '2026-11-20', 'status
 PASS Home inflow_30 (fy) loads                                    report=True raw=True 
-PASS Home inflow_30 (fy) /demands/register totals.balance_paise   report=2123035000 raw=2123035000 {'basis': 'due', 'date_from': '2026-11-20', 'date_to': '2026
-PASS Home inflow_30 (fy) /payments/summary Pending.amount_paise   report=5234500 raw=5234500 {'status': 'Pending'}
+PASS Home inflow_30 (fy) /demands/register totals.balance_paise   report=2135548000 raw=2135548000 {'basis': 'due', 'date_from': '2026-11-21', 'date_to': '2026
+PASS Home inflow_30 (fy) /payments/summary Pending.amount_paise   report=23215200 raw=23215200 {'status': 'Pending'}
 PASS Home next_milestone (fy) loads                               report=True raw=True 
 PASS Home next_milestone (fy) /blocks/5d2087ec-b20a-4abb-ae11-3a1bf447f158/stages/d60cd0cf-dcdc-4e09-a375-977838cbb1a4/preview total_paise report=0 raw=0 {}
 PASS Home next_milestone (fy) /blocks/cabe48b7-d5fe-40ed-ae75-0ab01d693877/stages/ab5fb388-ca9f-46b0-b260-060d213c1b34/preview total_paise report=1507668800 raw=1507668800 {}
-PASS Home next_milestone (fy) /blocks/21dca443-0913-4d8f-923f-c23959081b49/stages/ab5fb388-ca9f-46b0-b260-060d213c1b34/preview total_paise report=2822793600 raw=2822793600 {}
+PASS Home next_milestone (fy) /blocks/21dca443-0913-4d8f-923f-c23959081b49/stages/ab5fb388-ca9f-46b0-b260-060d213c1b34/preview total_paise report=2789975400 raw=2789975400 {}
 PASS Home next_milestone (fy) /blocks/0d220380-bdd3-4202-9769-7a5db753b75a/stages/892b47c6-35c7-42e2-bbca-5734bd291f76/preview total_paise report=0 raw=0 {}
 PASS Home inventory (fy) loads                                    report=True raw=True 
 PASS Home inventory (fy) /flats total                             report=48 raw=48 {'block_id': '8c8d8d49-1575-45d7-86b0-70f09cc71917', 'status
@@ -283,9 +283,9 @@ PASS Home pipeline (fy) /leads total                              report=5 raw=5
 PASS Home attention (fy) loads                                    report=True raw=True 
 PASS Home attention (fy) /flats total                             report=1 raw=1 {'hold_expiring': True}
 PASS Home attention (fy) /payments/summary Bounced.count          report=0 raw=0 {'status': 'Bounced', 'unreplaced': True}
-PASS Home attention (fy) /demands/register totals.count           report=5 raw=5 {'stale_days': 30}
-PASS Home Overdue by age total == report Outstanding (ONE number) report=4499277700 raw=4499277700 
-PASS Home Money today == Σ today's allocation parts               report=50453900 raw=50453900 
+PASS Home attention (fy) /demands/register totals.count           report=2 raw=2 {'stale_days': 30}
+PASS Home Overdue by age total == report Outstanding (ONE number) report=4671717200 raw=4671717200 
+PASS Home Money today == Σ today's allocation parts               report=32822800 raw=32822800 
 PASS report [collections-v2] net Jama (receipt basis, all time) == Σ cleared receipts report= raw= tools/tieout_reports.py
 PASS report [collections-v2] net Jama == Σ ledger Jama rows (receipts + reversals) report= raw= tools/tieout_reports.py
 PASS report [collections-v2] FY total (cleared basis) == raw payments by cleared date report= raw= tools/tieout_reports.py
@@ -506,4 +506,4 @@ PASS report [bills-vs-collection] default bill raised == Customer status bills r
 PASS report [bills-vs-collection] default view has no cancelled bookings report= raw= tools/tieout_reports.py
 PASS report [customer-status] Customer status bridge line == Bills vs Collection report= raw= tools/tieout_reports.py
 PASS Phase I report tie-outs all PASS                             report=True raw=True 219 report ties
-0 failed
+1 failed

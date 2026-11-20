@@ -1,4 +1,4 @@
-# Phase I reports — tie-out status · DB `test_database` · 2026-11-20T03:04:10+05:30
+# Phase I reports — tie-out status · DB `test_database` · 2026-11-20T18:31:39+05:30
 
 ## collections-v2 — DONE
 - **PASS** net Jama (receipt basis, all time) == Σ cleared receipts · report=`37444037500` raw=`37444037500`
@@ -132,7 +132,7 @@
 - **PASS** requests / open / resolved == existing Service requests & SLA · report=`(14, 8, 6)` raw=`(14, 8, 6)`
 
 ## activity — DONE
-- **PASS** audit actions == audit_logs (live log) · report=`195334` raw=`195334`
+- **PASS** audit actions == audit_logs (live log) · report=`197244` raw=`197244`
 
 ## data-quality — DONE
 - **PASS** open demands on cancelled bookings == 0 (integrity) · report=`0` raw=`0`
@@ -313,7 +313,7 @@
 - **PASS** leads == leads master (live) · report=`123` raw=`123`
 
 ## follow-ups — DONE
-- **PASS** overdue == existing Sales & leads follow-ups overdue (all dates) · report=`0` raw=`0`
+- **PASS** overdue == existing Sales & leads follow-ups overdue (all dates) · report=`1` raw=`1`
 
 ## visit-register — DONE
 - **PASS** completed / no-show / cancelled (this FY) == existing Site visit conversion · report=`(24, 1, 1)` raw=`(24, 1, 1)`
@@ -335,6 +335,6 @@
 
 ## team-pipeline — DONE
 - **PASS** Σ open == Lead ageing open leads · report=`34` raw=`34`
-- **PASS** Σ follow-ups overdue == Follow-ups overdue · report=`0` raw=`0`
+- **PASS** Σ follow-ups overdue == Follow-ups overdue · report=`1` raw=`1`
 
 **219/219 PASS**

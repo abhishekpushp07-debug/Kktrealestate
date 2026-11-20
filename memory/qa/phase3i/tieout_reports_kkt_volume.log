@@ -20,7 +20,7 @@ PASS [outstanding-v2] net == outstanding − advance == Σ Udhar − Σ Jama (re
 PASS [outstanding-v2] per booking: report net == ledger net == summary net; report outstanding == summary outstanding report=[] raw=[]
 PASS [outstanding-v2] outstanding == Home outstanding tile                                   report=117646512400 raw=117646512400
 PASS [outstanding-v2] bands Σ == outstanding                                                 report=117646512400 raw=117646512400
-PASS [outstanding-v2] report bands == Σ definitions.ageing_bands                             report={'Not due': 7063799600, '0-30' raw={'Not due': 7063799600, '0-30'
+PASS [outstanding-v2] report bands == Σ definitions.ageing_bands                             report={'Not due': 7055033600, '0-30' raw={'Not due': 7055033600, '0-30'
 PASS [outstanding-v2] Σ by customer == total (outstanding_paise)                             report=117646512400 raw=117646512400
 PASS [outstanding-v2] Σ by customer == total (net_balance_paise)                             report=7806642400 raw=7806642400
 PASS [outstanding-v2] Σ by project == total (outstanding_paise)                              report=117646512400 raw=117646512400
@@ -72,14 +72,14 @@ PASS [site-visits] Σ by project == total (scheduled)                           
 PASS [site-visits] Σ by month == total (scheduled)                                        report=74 raw=74
 PASS [sales-team] sold value == Σ live agreement values                                  report=692218900000 raw=692218900000
 PASS [sales-team] collections == Σ cleared receipts of live bookings                     report=427837735000 raw=427837735000
-PASS [sales-team] overdue == outstanding report overdue                                  report=110582712800 raw=110582712800
+PASS [sales-team] overdue == outstanding report overdue                                  report=110591478800 raw=110591478800
 PASS [construction-vs-plan] stage rows == Σ stages of active towers                                report=46 raw=46
 PASS [construction-vs-plan] stage demands == Σ ON_STAGE/ON_POSSESSION demands                      report=11982060000 raw=11982060000
 PASS [construction-vs-plan] subtotals == Σ their stage rows (demanded)                             report=11982060000 raw=11982060000
 PASS [construction-vs-plan] no tower name with leading/trailing space                              report=[] raw=[]
 PASS [construction-vs-plan] GET /payments/demands honours block_id                                 report=[] raw=[]
 PASS [service-sla] tickets == service_requests                                            report=200 raw=200
-PASS [activity] audit actions == audit_logs (live log)                                 report=60045 raw=60045
+PASS [activity] audit actions == audit_logs (live log)                                 report=60743 raw=60743
 PASS [data-quality] open demands on cancelled bookings == 0 (integrity)                    report=0 raw=0
 PASS [data-quality] towers without stage plan excludes inactive towers                     report=0 raw=0
 PASS [data-quality] payment plans not summing 100 == 0                                     report=0 raw=0
@@ -102,7 +102,7 @@ PASS [customer-ageing] Σ total due == Outstanding & ageing report total        
 PASS [customer-status] formula bridge: total due == Overdue & ageing total due                report=117646512400 raw=117646512400
 PASS [advance-holders] Σ advance == Σ booking advance (definitions)                           report=109839870000 raw=109839870000
 PASS [call-list] Σ due == ageing Σ total due                                            report=117646512400 raw=117646512400
-PASS [call-list] Σ overdue == ageing Σ overdue                                          report=110582712800 raw=110582712800
+PASS [call-list] Σ overdue == ageing Σ overdue                                          report=110591478800 raw=110591478800
 PASS [call-list] sorted oldest first                                                    report=True raw=True
 PASS [kyc-pending] agreement pending == live bookings without signed agreement            report=0 raw=0
 PASS [payment-behaviour] customers == customers with live bookings                              report=1490 raw=1490
@@ -146,7 +146,7 @@ PASS [sales-team] Σ sold (all dates) == existing Sales team report             
 PASS [sales-team] Σ bookings (all dates) == existing Sales team report                   report=1499 raw=1499
 PASS [realised-rate] Σ agreement value == Plan & stage position                             report=692218900000 raw=692218900000
 PASS [realised-rate] Σ list − Σ agreement == Σ discount                                     report=77125000 raw=77125000
-PASS [booking-health] Σ overdue == Customer status overdue                                   report=110582712800 raw=110582712800
+PASS [booking-health] Σ overdue == Customer status overdue                                   report=110591478800 raw=110591478800
 PASS [booking-health] Σ total due == Customer status total due                               report=117646512400 raw=117646512400
 PASS [booking-health] healthy + watch + at risk == live bookings                             report=1499 raw=1499
 PASS [project-statement] SGH Σ bill raised == existing Project statement                        report=22590862100 raw=22590862100
@@ -181,7 +181,7 @@ PASS [stage-bills] Σ bills raised == Customer status                           
 PASS [stage-bills] Σ received == Customer status Account + Cash                           report=427780700000 raw=427780700000
 PASS [stage-bills] Σ instalment dues == Customer status                                   report=91956640000 raw=91956640000
 PASS [sales-velocity] Σ unsold == Inventory status available + hold                          report=669 raw=669
-PASS [sales-velocity] Σ booked in the last 12 months == booking register same window         report=569 raw=569
+PASS [sales-velocity] Σ booked in the last 12 months == booking register same window         report=567 raw=567
 PASS [lead-funnel] New (this FY) == existing Sales & leads funnel                         report=2 raw=2
 PASS [lead-funnel] Contacted (this FY) == existing Sales & leads funnel                   report=2 raw=2
 PASS [lead-funnel] Site Visit Scheduled (this FY) == existing Sales & leads funnel        report=1 raw=1
@@ -198,9 +198,9 @@ PASS [source-performance] Campaign leads / converted == existing Sales & leads  
 PASS [lead-register] leads == leads master (live)                                           report=1498 raw=1498
 PASS [follow-ups] overdue == existing Sales & leads follow-ups overdue (all dates)       report=3 raw=3
 PASS [visit-register] completed / no-show / cancelled (this FY) == existing Site visit conversion report=(2, 1, 0) raw=(2, 1, 0)
-PASS [visit-register] visits (this FY) == existing scheduled                                 report=9 raw=9
+PASS [visit-register] visits (this FY) == existing scheduled                                 report=15 raw=15
 PASS [visit-register] booked after visit (this FY) == existing converted                     report=0 raw=0
-PASS [visit-conversion] scheduled / completed / booked == existing Site visit conversion       report=(9, 2, 0) raw=(9, 2, 0)
+PASS [visit-conversion] scheduled / completed / booked == existing Site visit conversion       report=(15, 2, 0) raw=(15, 2, 0)
 PASS [lost-leads] lost == leads master status Lost                                       report=1 raw=1
 PASS [response-time] responded + not yet == leads this FY (Lead funnel)                     report=1498 raw=1498
 PASS [lead-ageing] open leads == leads master open stages                                 report=7 raw=7

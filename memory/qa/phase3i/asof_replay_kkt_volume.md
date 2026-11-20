@@ -1,4 +1,4 @@
-# As-of replay proof — `kkt_volume` (today 2026-11-19)
+# As-of replay proof — `kkt_volume` (today 2026-11-20)
 
 | As of | Bookings | Outstanding (report) | Customer status | Booking mismatches |
 |---|---:|---:|---:|---:|
@@ -12,7 +12,7 @@
 | 2026-08-31 | 1416 | 77005000 | 77005000 | 0 |
 | 2026-09-30 | 1464 | 64605000 | 64605000 | 0 |
 | 2026-10-31 | 1499 | 64605000 | 64605000 | 0 |
-| 2026-11-02 | 1499 | 64605000 | 64605000 | 0 |
-| 2026-11-18 | 1499 | 117625132400 | 117625132400 | 0 |
+| 2026-11-03 | 1499 | 64605000 | 64605000 | 0 |
+| 2026-11-19 | 1499 | 117646512400 | 117646512400 | 0 |
 
 **PASS** — 0 mismatches (booking net balance vs replay; report total vs Customer status).

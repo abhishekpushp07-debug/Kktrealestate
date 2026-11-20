@@ -2,7 +2,7 @@ kkt_medium tieout exit 0
 kkt_medium tieout_reports exit 0
 kkt_medium asof_replay exit 0
 kkt_medium exports exit 0
-kkt_volume tieout exit 0
+kkt_volume tieout exit 1
 kkt_volume tieout_reports exit 0
 kkt_volume asof_replay exit 0
 kkt_volume exports exit 0

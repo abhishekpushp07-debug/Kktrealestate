@@ -14,7 +14,7 @@
 | customer-directory | 200 · 93 KB | 200 · 344 KB | 0 |
 | service-sla | 200 · 5 KB | 200 · 66 KB | 0 |
 | cancelled-customers | 200 · 5 KB | 200 · 66 KB | 0 |
-| collections | 200 · 483 KB | 200 · 1697 KB | 0 |
+| collections | 200 · 483 KB | 200 · 1696 KB | 0 |
 | day-book | 200 · 16 KB | 200 · 100 KB | 0 |
 | bank-receipts | 200 · 5 KB | 200 · 66 KB | 0 |
 | cheques | 200 · 201 KB | 200 · 645 KB | 0 |
@@ -48,7 +48,7 @@
 | lead-register | 200 · 70 KB | 200 · 294 KB | 0 |
 | source-performance | 200 · 5 KB | 200 · 66 KB | 0 |
 | follow-ups | 200 · 5 KB | 200 · 66 KB | 0 |
-| visit-register | 200 · 5 KB | 200 · 66 KB | 0 |
+| visit-register | 200 · 6 KB | 200 · 66 KB | 0 |
 | visit-conversion | 200 · 5 KB | 200 · 65 KB | 0 |
 | lost-leads | 200 · 5 KB | 200 · 65 KB | 0 |
 | response-time | 200 · 54 KB | 200 · 259 KB | 0 |

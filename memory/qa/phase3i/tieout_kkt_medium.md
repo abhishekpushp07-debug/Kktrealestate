@@ -1,4 +1,4 @@
-# Report tie-outs · DB `kkt_medium` · 2026-11-19
+# Report tie-outs · DB `kkt_medium` · 2026-11-20
 
 | Tie-out | Report value | Raw value | Result | Note |
 |---|---|---|---|---|
@@ -69,7 +69,7 @@
 | bridge: received by payment date == Collections net received (receipt basis) | `21090266600` | `21090266600` | **PASS** |  |
 | bridge: by payment date − not live − dated in, cleared after + dated before, cleared in + refunds == carried received | `21096966600` | `21096966600` | **PASS** |  |
 | bridge from 2025-04-01: by clearance == carried received | `38883646000` | `38883646000` | **PASS** |  |
-| bridge from 2026-11-03: by clearance == carried received | `2128598400` | `2128598400` | **PASS** |  |
+| bridge from 2026-11-04: by clearance == carried received | `1888265500` | `1888265500` | **PASS** |  |
 | carried: closing == Outstanding report net balance (today) | `7809962100` | `7809962100` | **PASS** |  |
 | formula: Bills vs Collection cash + account billed == total billed | `42008569500` | `42008569500` | **PASS** |  |
 | bridge: Bills vs Collection (live) + other charges billed == Outstanding bill raised | `46696733100` | `46696733100` | **PASS** |  |
@@ -89,19 +89,19 @@
 | Home ageing (today) /reports/outstanding-v2 ageing[bucket=90+].amount_paise | `4084669700` | `4084669700` | **PASS** | {} |
 | Home ageing (today) /reports/outstanding-v2 totals.outstanding_paise | `8186875500` | `8186875500` | **PASS** | {} |
 | Home money_today (today) loads | `True` | `True` | **PASS** |  |
-| Home money_today (today) /reports/collections-v2 totals.cash_paise | `0` | `0` | **PASS** | {'from_date': '2026-11-19', 'to_date': '2026-11-19'} |
-| Home money_today (today) /reports/collections-v2 totals.account_paise | `0` | `0` | **PASS** | {'from_date': '2026-11-19', 'to_date': '2026-11-19'} |
-| Home money_today (today) /reports/collections-v2 totals.other_paise | `0` | `0` | **PASS** | {'from_date': '2026-11-19', 'to_date': '2026-11-19'} |
-| Home money_today (today) /reports/collections-v2 totals.total_paise | `0` | `0` | **PASS** | {'from_date': '2026-11-19', 'to_date': '2026-11-19'} |
+| Home money_today (today) /reports/collections-v2 totals.cash_paise | `0` | `0` | **PASS** | {'from_date': '2026-11-20', 'to_date': '2026-11-20'} |
+| Home money_today (today) /reports/collections-v2 totals.account_paise | `0` | `0` | **PASS** | {'from_date': '2026-11-20', 'to_date': '2026-11-20'} |
+| Home money_today (today) /reports/collections-v2 totals.other_paise | `0` | `0` | **PASS** | {'from_date': '2026-11-20', 'to_date': '2026-11-20'} |
+| Home money_today (today) /reports/collections-v2 totals.total_paise | `0` | `0` | **PASS** | {'from_date': '2026-11-20', 'to_date': '2026-11-20'} |
 | Home money_today (today) /payments/summary Pending.amount_paise | `65800000` | `65800000` | **PASS** | {'status': 'Pending'} |
 | Home due_vs_received (today) loads | `True` | `True` | **PASS** |  |
-| Home due_vs_received (today) /demands/register totals.total_paise | `0` | `0` | **PASS** | {'basis': 'due', 'date_from': '2026-11-19', 'date_to': '2026 |
-| Home due_vs_received (today) /reports/collections-v2 totals.total_paise | `0` | `0` | **PASS** | {'from_date': '2026-11-19', 'to_date': '2026-11-19'} |
+| Home due_vs_received (today) /demands/register totals.total_paise | `0` | `0` | **PASS** | {'basis': 'due', 'date_from': '2026-11-20', 'date_to': '2026 |
+| Home due_vs_received (today) /reports/collections-v2 totals.total_paise | `0` | `0` | **PASS** | {'from_date': '2026-11-20', 'to_date': '2026-11-20'} |
 | Home call_today (today) loads | `True` | `True` | **PASS** |  |
 | Home call_today (today) /leads total | `1` | `1` | **PASS** | {'due_today': True} |
-| Home call_today (today) /site-visits total | `0` | `0` | **PASS** | {'date_from': '2026-11-19', 'date_to': '2026-11-19', 'status |
+| Home call_today (today) /site-visits total | `0` | `0` | **PASS** | {'date_from': '2026-11-20', 'date_to': '2026-11-20', 'status |
 | Home inflow_30 (today) loads | `True` | `True` | **PASS** |  |
-| Home inflow_30 (today) /demands/register totals.balance_paise | `1733351000` | `1733351000` | **PASS** | {'basis': 'due', 'date_from': '2026-11-20', 'date_to': '2026 |
+| Home inflow_30 (today) /demands/register totals.balance_paise | `1733351000` | `1733351000` | **PASS** | {'basis': 'due', 'date_from': '2026-11-21', 'date_to': '2026 |
 | Home inflow_30 (today) /payments/summary Pending.amount_paise | `65800000` | `65800000` | **PASS** | {'status': 'Pending'} |
 | Home next_milestone (today) loads | `True` | `True` | **PASS** |  |
 | Home next_milestone (today) /blocks/8c8d8d49-1575-45d7-86b0-70f09cc71917/stages/892b47c6-35c7-42e2-bbca-5734bd291f76/preview total_paise | `0` | `0` | **PASS** | {} |
@@ -178,14 +178,14 @@
 | Home flat_status (today) loads | `True` | `True` | **PASS** |  |
 | Home construction (today) loads | `True` | `True` | **PASS** |  |
 | Home pipeline (today) loads | `True` | `True` | **PASS** |  |
-| Home pipeline (today) /leads total | `0` | `0` | **PASS** | {'created_from': '2026-11-19', 'created_to': '2026-11-19'} |
-| Home pipeline (today) /site-visits total | `0` | `0` | **PASS** | {'date_from': '2026-11-19', 'date_to': '2026-11-19', 'status |
-| Home pipeline (today) /bookings total | `0` | `0` | **PASS** | {'date_from': '2026-11-19', 'date_to': '2026-11-19', 'status |
-| Home pipeline (today) /leads total | `0` | `0` | **PASS** | {'created_from': '2026-11-19', 'created_to': '2026-11-19', ' |
+| Home pipeline (today) /leads total | `0` | `0` | **PASS** | {'created_from': '2026-11-20', 'created_to': '2026-11-20'} |
+| Home pipeline (today) /site-visits total | `0` | `0` | **PASS** | {'date_from': '2026-11-20', 'date_to': '2026-11-20', 'status |
+| Home pipeline (today) /bookings total | `0` | `0` | **PASS** | {'date_from': '2026-11-20', 'date_to': '2026-11-20', 'status |
+| Home pipeline (today) /leads total | `0` | `0` | **PASS** | {'created_from': '2026-11-20', 'created_to': '2026-11-20', ' |
 | Home attention (today) loads | `True` | `True` | **PASS** |  |
-| Home attention (today) /flats total | `1` | `1` | **PASS** | {'hold_expiring': True} |
+| Home attention (today) /flats total | `2` | `2` | **PASS** | {'hold_expiring': True} |
 | Home attention (today) /payments/summary Bounced.count | `0` | `0` | **PASS** | {'status': 'Bounced', 'unreplaced': True} |
-| Home attention (today) /demands/register totals.count | `9` | `9` | **PASS** | {'stale_days': 30} |
+| Home attention (today) /demands/register totals.count | `4` | `4` | **PASS** | {'stale_days': 30} |
 | Home ageing (month) loads | `True` | `True` | **PASS** |  |
 | Home ageing (month) /reports/outstanding-v2 ageing[bucket=Not due].amount_paise | `2211972600` | `2211972600` | **PASS** | {} |
 | Home ageing (month) /reports/outstanding-v2 ageing[bucket=0-30].amount_paise | `969075100` | `969075100` | **PASS** | {} |
@@ -194,19 +194,19 @@
 | Home ageing (month) /reports/outstanding-v2 ageing[bucket=90+].amount_paise | `4084669700` | `4084669700` | **PASS** | {} |
 | Home ageing (month) /reports/outstanding-v2 totals.outstanding_paise | `8186875500` | `8186875500` | **PASS** | {} |
 | Home money_today (month) loads | `True` | `True` | **PASS** |  |
-| Home money_today (month) /reports/collections-v2 totals.cash_paise | `0` | `0` | **PASS** | {'from_date': '2026-11-19', 'to_date': '2026-11-19'} |
-| Home money_today (month) /reports/collections-v2 totals.account_paise | `0` | `0` | **PASS** | {'from_date': '2026-11-19', 'to_date': '2026-11-19'} |
-| Home money_today (month) /reports/collections-v2 totals.other_paise | `0` | `0` | **PASS** | {'from_date': '2026-11-19', 'to_date': '2026-11-19'} |
-| Home money_today (month) /reports/collections-v2 totals.total_paise | `0` | `0` | **PASS** | {'from_date': '2026-11-19', 'to_date': '2026-11-19'} |
+| Home money_today (month) /reports/collections-v2 totals.cash_paise | `0` | `0` | **PASS** | {'from_date': '2026-11-20', 'to_date': '2026-11-20'} |
+| Home money_today (month) /reports/collections-v2 totals.account_paise | `0` | `0` | **PASS** | {'from_date': '2026-11-20', 'to_date': '2026-11-20'} |
+| Home money_today (month) /reports/collections-v2 totals.other_paise | `0` | `0` | **PASS** | {'from_date': '2026-11-20', 'to_date': '2026-11-20'} |
+| Home money_today (month) /reports/collections-v2 totals.total_paise | `0` | `0` | **PASS** | {'from_date': '2026-11-20', 'to_date': '2026-11-20'} |
 | Home money_today (month) /payments/summary Pending.amount_paise | `65800000` | `65800000` | **PASS** | {'status': 'Pending'} |
 | Home due_vs_received (month) loads | `True` | `True` | **PASS** |  |
 | Home due_vs_received (month) /demands/register totals.total_paise | `3552256000` | `3552256000` | **PASS** | {'basis': 'due', 'date_from': '2026-11-01', 'date_to': '2026 |
 | Home due_vs_received (month) /reports/collections-v2 totals.total_paise | `2190672000` | `2190672000` | **PASS** | {'from_date': '2026-11-01', 'to_date': '2026-11-30'} |
 | Home call_today (month) loads | `True` | `True` | **PASS** |  |
 | Home call_today (month) /leads total | `1` | `1` | **PASS** | {'due_today': True} |
-| Home call_today (month) /site-visits total | `0` | `0` | **PASS** | {'date_from': '2026-11-19', 'date_to': '2026-11-19', 'status |
+| Home call_today (month) /site-visits total | `0` | `0` | **PASS** | {'date_from': '2026-11-20', 'date_to': '2026-11-20', 'status |
 | Home inflow_30 (month) loads | `True` | `True` | **PASS** |  |
-| Home inflow_30 (month) /demands/register totals.balance_paise | `1733351000` | `1733351000` | **PASS** | {'basis': 'due', 'date_from': '2026-11-20', 'date_to': '2026 |
+| Home inflow_30 (month) /demands/register totals.balance_paise | `1733351000` | `1733351000` | **PASS** | {'basis': 'due', 'date_from': '2026-11-21', 'date_to': '2026 |
 | Home inflow_30 (month) /payments/summary Pending.amount_paise | `65800000` | `65800000` | **PASS** | {'status': 'Pending'} |
 | Home next_milestone (month) loads | `True` | `True` | **PASS** |  |
 | Home next_milestone (month) /blocks/8c8d8d49-1575-45d7-86b0-70f09cc71917/stages/892b47c6-35c7-42e2-bbca-5734bd291f76/preview total_paise | `0` | `0` | **PASS** | {} |
@@ -288,9 +288,9 @@
 | Home pipeline (month) /bookings total | `2` | `2` | **PASS** | {'date_from': '2026-11-01', 'date_to': '2026-11-30', 'status |
 | Home pipeline (month) /leads total | `1` | `1` | **PASS** | {'created_from': '2026-11-01', 'created_to': '2026-11-30', ' |
 | Home attention (month) loads | `True` | `True` | **PASS** |  |
-| Home attention (month) /flats total | `1` | `1` | **PASS** | {'hold_expiring': True} |
+| Home attention (month) /flats total | `2` | `2` | **PASS** | {'hold_expiring': True} |
 | Home attention (month) /payments/summary Bounced.count | `0` | `0` | **PASS** | {'status': 'Bounced', 'unreplaced': True} |
-| Home attention (month) /demands/register totals.count | `9` | `9` | **PASS** | {'stale_days': 30} |
+| Home attention (month) /demands/register totals.count | `4` | `4` | **PASS** | {'stale_days': 30} |
 | Home ageing (fy) loads | `True` | `True` | **PASS** |  |
 | Home ageing (fy) /reports/outstanding-v2 ageing[bucket=Not due].amount_paise | `2211972600` | `2211972600` | **PASS** | {} |
 | Home ageing (fy) /reports/outstanding-v2 ageing[bucket=0-30].amount_paise | `969075100` | `969075100` | **PASS** | {} |
@@ -299,19 +299,19 @@
 | Home ageing (fy) /reports/outstanding-v2 ageing[bucket=90+].amount_paise | `4084669700` | `4084669700` | **PASS** | {} |
 | Home ageing (fy) /reports/outstanding-v2 totals.outstanding_paise | `8186875500` | `8186875500` | **PASS** | {} |
 | Home money_today (fy) loads | `True` | `True` | **PASS** |  |
-| Home money_today (fy) /reports/collections-v2 totals.cash_paise | `0` | `0` | **PASS** | {'from_date': '2026-11-19', 'to_date': '2026-11-19'} |
-| Home money_today (fy) /reports/collections-v2 totals.account_paise | `0` | `0` | **PASS** | {'from_date': '2026-11-19', 'to_date': '2026-11-19'} |
-| Home money_today (fy) /reports/collections-v2 totals.other_paise | `0` | `0` | **PASS** | {'from_date': '2026-11-19', 'to_date': '2026-11-19'} |
-| Home money_today (fy) /reports/collections-v2 totals.total_paise | `0` | `0` | **PASS** | {'from_date': '2026-11-19', 'to_date': '2026-11-19'} |
+| Home money_today (fy) /reports/collections-v2 totals.cash_paise | `0` | `0` | **PASS** | {'from_date': '2026-11-20', 'to_date': '2026-11-20'} |
+| Home money_today (fy) /reports/collections-v2 totals.account_paise | `0` | `0` | **PASS** | {'from_date': '2026-11-20', 'to_date': '2026-11-20'} |
+| Home money_today (fy) /reports/collections-v2 totals.other_paise | `0` | `0` | **PASS** | {'from_date': '2026-11-20', 'to_date': '2026-11-20'} |
+| Home money_today (fy) /reports/collections-v2 totals.total_paise | `0` | `0` | **PASS** | {'from_date': '2026-11-20', 'to_date': '2026-11-20'} |
 | Home money_today (fy) /payments/summary Pending.amount_paise | `65800000` | `65800000` | **PASS** | {'status': 'Pending'} |
 | Home due_vs_received (fy) loads | `True` | `True` | **PASS** |  |
 | Home due_vs_received (fy) /demands/register totals.total_paise | `23656952400` | `23656952400` | **PASS** | {'basis': 'due', 'date_from': '2026-04-01', 'date_to': '2027 |
 | Home due_vs_received (fy) /reports/collections-v2 totals.total_paise | `21096966600` | `21096966600` | **PASS** | {'from_date': '2026-04-01', 'to_date': '2027-03-31'} |
 | Home call_today (fy) loads | `True` | `True` | **PASS** |  |
 | Home call_today (fy) /leads total | `1` | `1` | **PASS** | {'due_today': True} |
-| Home call_today (fy) /site-visits total | `0` | `0` | **PASS** | {'date_from': '2026-11-19', 'date_to': '2026-11-19', 'status |
+| Home call_today (fy) /site-visits total | `0` | `0` | **PASS** | {'date_from': '2026-11-20', 'date_to': '2026-11-20', 'status |
 | Home inflow_30 (fy) loads | `True` | `True` | **PASS** |  |
-| Home inflow_30 (fy) /demands/register totals.balance_paise | `1733351000` | `1733351000` | **PASS** | {'basis': 'due', 'date_from': '2026-11-20', 'date_to': '2026 |
+| Home inflow_30 (fy) /demands/register totals.balance_paise | `1733351000` | `1733351000` | **PASS** | {'basis': 'due', 'date_from': '2026-11-21', 'date_to': '2026 |
 | Home inflow_30 (fy) /payments/summary Pending.amount_paise | `65800000` | `65800000` | **PASS** | {'status': 'Pending'} |
 | Home next_milestone (fy) loads | `True` | `True` | **PASS** |  |
 | Home next_milestone (fy) /blocks/8c8d8d49-1575-45d7-86b0-70f09cc71917/stages/892b47c6-35c7-42e2-bbca-5734bd291f76/preview total_paise | `0` | `0` | **PASS** | {} |
@@ -393,9 +393,9 @@
 | Home pipeline (fy) /bookings total | `39` | `39` | **PASS** | {'date_from': '2026-04-01', 'date_to': '2027-03-31', 'status |
 | Home pipeline (fy) /leads total | `5` | `5` | **PASS** | {'created_from': '2026-04-01', 'created_to': '2027-03-31', ' |
 | Home attention (fy) loads | `True` | `True` | **PASS** |  |
-| Home attention (fy) /flats total | `1` | `1` | **PASS** | {'hold_expiring': True} |
+| Home attention (fy) /flats total | `2` | `2` | **PASS** | {'hold_expiring': True} |
 | Home attention (fy) /payments/summary Bounced.count | `0` | `0` | **PASS** | {'status': 'Bounced', 'unreplaced': True} |
-| Home attention (fy) /demands/register totals.count | `9` | `9` | **PASS** | {'stale_days': 30} |
+| Home attention (fy) /demands/register totals.count | `4` | `4` | **PASS** | {'stale_days': 30} |
 | Home Overdue by age total == report Outstanding (ONE number) | `8186875500` | `8186875500` | **PASS** |  |
 | Home Money today == Σ today's allocation parts | `0` | `0` | **PASS** |  |
 | report [collections-v2] net Jama (receipt basis, all time) == Σ cleared receipts | `` | `` | **PASS** | tools/tieout_reports.py |

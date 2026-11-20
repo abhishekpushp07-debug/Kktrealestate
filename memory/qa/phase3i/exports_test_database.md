@@ -4,9 +4,9 @@
 
 | Report | Excel | PDF | PDF pages wrapped cells |
 |---|---|---|---:|
-| customer-status | 200 · 10 KB | 200 · 82 KB | 0 |
+| customer-status | 200 · 10 KB | 200 · 81 KB | 0 |
 | customer-statement | 200 · 5 KB | 200 · 65 KB | 0 |
-| customer-ageing | 200 · 7 KB | 200 · 72 KB | 0 |
+| customer-ageing | 200 · 8 KB | 200 · 72 KB | 0 |
 | advance-holders | 200 · 5 KB | 200 · 66 KB | 0 |
 | call-list | 200 · 7 KB | 200 · 71 KB | 0 |
 | kyc-pending | 200 · 8 KB | 200 · 73 KB | 0 |
@@ -14,8 +14,8 @@
 | customer-directory | 200 · 9 KB | 200 · 76 KB | 0 |
 | service-sla | 200 · 5 KB | 200 · 66 KB | 0 |
 | cancelled-customers | 200 · 5 KB | 200 · 66 KB | 0 |
-| collections | 200 · 53 KB | 200 · 235 KB | 0 |
-| day-book | 200 · 14 KB | 200 · 99 KB | 0 |
+| collections | 200 · 53 KB | 200 · 234 KB | 0 |
+| day-book | 200 · 14 KB | 200 · 96 KB | 0 |
 | bank-receipts | 200 · 5 KB | 200 · 66 KB | 0 |
 | cheques | 200 · 13 KB | 200 · 89 KB | 0 |
 | bills-vs-collection | 200 · 7 KB | 200 · 70 KB | 0 |

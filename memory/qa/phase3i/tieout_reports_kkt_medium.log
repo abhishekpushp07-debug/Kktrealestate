@@ -79,7 +79,7 @@ PASS [construction-vs-plan] subtotals == Σ their stage rows (demanded)         
 PASS [construction-vs-plan] no tower name with leading/trailing space                              report=[] raw=[]
 PASS [construction-vs-plan] GET /payments/demands honours block_id                                 report=[] raw=[]
 PASS [service-sla] tickets == service_requests                                            report=14 raw=14
-PASS [activity] audit actions == audit_logs (live log)                                 report=170118 raw=170118
+PASS [activity] audit actions == audit_logs (live log)                                 report=170406 raw=170406
 PASS [data-quality] open demands on cancelled bookings == 0 (integrity)                    report=0 raw=0
 PASS [data-quality] towers without stage plan excludes inactive towers                     report=0 raw=0
 PASS [data-quality] payment plans not summing 100 == 0                                     report=0 raw=0
@@ -166,7 +166,7 @@ PASS [price-list] Σ list price of available flats == existing Inventory availab
 PASS [price-list] unsold == available + hold in Inventory status                         report=476 raw=476
 PASS [hold-register] active holds == flats on Hold in the flats master                      report=3 raw=3
 PASS [hold-register] holds == existing Hold register active holds                           report=3 raw=3
-PASS [hold-register] lapsing within 48 h == existing Hold register expiring                 report=1 raw=1
+PASS [hold-register] lapsing within 48 h == existing Hold register expiring                 report=2 raw=2
 PASS [inventory-status] Available flats for Sales (display layer) == shown-as available in Inventory control report=473 raw=473
 PASS [inventory-status] Hold flats for Sales (display layer) == shown-as hold in Inventory control report=3 raw=3
 PASS [inventory-status] Sold flats for Sales (display layer) == shown-as sold in Inventory control report=138 raw=138
@@ -182,7 +182,7 @@ PASS [stage-bills] Σ bills raised == Customer status                           
 PASS [stage-bills] Σ received == Customer status Account + Cash                           report=35126443300 raw=35126443300
 PASS [stage-bills] Σ instalment dues == Customer status                                   report=7256539600 raw=7256539600
 PASS [sales-velocity] Σ unsold == Inventory status available + hold                          report=476 raw=476
-PASS [sales-velocity] Σ booked in the last 12 months == booking register same window         report=69 raw=69
+PASS [sales-velocity] Σ booked in the last 12 months == booking register same window         report=68 raw=68
 PASS [lead-funnel] New (this FY) == existing Sales & leads funnel                         report=7 raw=7
 PASS [lead-funnel] Contacted (this FY) == existing Sales & leads funnel                   report=6 raw=6
 PASS [lead-funnel] Site Visit Scheduled (this FY) == existing Sales & leads funnel        report=6 raw=6

@@ -1,4 +1,4 @@
-tieout exit 0
+tieout exit 1
 tieout_reports exit 0
 asof_replay exit 0
 exports exit 0

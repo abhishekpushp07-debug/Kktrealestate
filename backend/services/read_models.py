@@ -451,7 +451,15 @@ async def get_dashboard(company_id: str, scope: list[str] | None) -> dict:
     snap = await db.dashboard_snapshots.find_one(
         {"company_id": company_id, "scope_hash": scope_hash(scope)}, {"_id": 0}
     )
-    return snap or await compute_dashboard(company_id, scope)
+    if snap and (snap.get("computed_at") or "") >= clock.day_start_utc():
+        return snap
+    # 3I: a new business day moves overdue / today figures — summaries computed on an earlier day are refreshed first
+    pf = {} if not scope or "*" in scope else {"project_id": {"$in": scope}}
+    old = await db.project_summaries.find(
+        {"company_id": company_id, **pf, "computed_at": {"$lt": clock.day_start_utc()}}, {"_id": 0, "project_id": 1}
+    ).to_list(None)
+    await asyncio.gather(*(refresh_project(p["project_id"]) for p in old))
+    return await compute_dashboard(company_id, scope)
 
 
 async def recompute_all() -> dict:

@@ -40,7 +40,7 @@
 | price-list | 200 · 18 KB | 200 · 106 KB | 0 |
 | hold-register | 200 · 5 KB | 200 · 66 KB | 0 |
 | landowner | 200 · 5 KB | 200 · 65 KB | 0 |
-| parking | 200 · 9 KB | 200 · 81 KB | 0 |
+| parking | 200 · 9 KB | 200 · 80 KB | 0 |
 | construction-vs-plan | 200 · 8 KB | 200 · 75 KB | 0 |
 | stage-bills | 200 · 6 KB | 200 · 67 KB | 0 |
 | sales-velocity | 200 · 6 KB | 200 · 67 KB | 0 |
