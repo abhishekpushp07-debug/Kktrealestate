@@ -11,7 +11,7 @@ M=/app/memory/qa/phase3i/chunks2_manifest_${HEAD#*:}.txt
 mapfile -t FILES < $M
 N=7
 HEAVY=" tests/test_phase_j4_files.py tests/test_phase_k_ops.py tests/test_phase_l.py tests/test_phase_z1_backup.py tests/test_reseed_counters.py tests/test_demo_refresh.py tests/test_refresh_frozen_clock.py tests/test_refresh_keeps_setup.py tests/test_memory_scale.py "
-P=27018; D=/app/.eqtmp/kkt_rs0
+P=27018; D=/tmp/kkt_rs0  # overlay (80 GB); /app is a 9.8 GB volume shared with the preview mongod — never put scratch DBs there
 rs_up() {
   mongosh --port $P --quiet --eval 'db.hello().isWritablePrimary' 2>/dev/null | grep -q true && \
     mongosh --port $P --quiet --eval 'db.getSiblingDB("test_database").users.countDocuments({})' 2>/dev/null | grep -qv '^0$' && return 0
@@ -48,9 +48,10 @@ run() {  # run <out> <xdist-n> <files…>
 for ((i = 0; i < ${#FILES[@]}; i += N)); do
   c=$((i / N)); out=$Q/c$c.log
   head -1 $out 2>/dev/null | grep -qE "^COMMIT [0-9a-f]+:${HEAD#*:} files: " && head -1 $out | grep -qF " files: ${FILES[*]:i:N}" && \
-    tail -1 $out | grep -qE "(passed|failed|error).* in [0-9.]+s" && continue
+    tail -1 $out | grep -qE "(passed|failed|error|skipped).* in [0-9.]+s" && continue
   echo "COMMIT $HEAD files: ${FILES[*]:i:N}" > $out
-  echo "chunk $c start $(date -u +%T) $HEAD" >> $L
+  echo "chunk $c start $(date -u +%T) $HEAD · /app free $(df -m /app | awk 'NR==2{print $4}') MB" >> $L
+  [ $(df -m /app | awk 'NR==2{print $4}') -lt 1500 ] && { echo "ABORT: /app volume < 1.5 GB free" >> $L; exit 1; }
   [ "$MODE" = rs ] && rs_up
   light=(); heavy=()
   for f in "${FILES[@]:i:N}"; do [[ "$HEAVY" == *" $f "* ]] && heavy+=("$f") || light+=("$f"); done
