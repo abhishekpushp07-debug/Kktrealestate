@@ -106,6 +106,7 @@ def test_generated_letter_shows_on_booking_page_and_customer_360_on_both_servers
         assert doc_id in [g["id"] for g in panels["generated_documents"]["items"]]
 
 
+@pytest.mark.load_sensitive  # unread counts read on two servers: no other worker may notify between the reads
 def test_notification_bell_counts_on_both_servers(admin_headers, mongo, second_server):
     me = _get(BASE, "/auth/me", admin_headers)
     before = [x["unread"] for x in _both(second_server, "/notifications/unread-count", admin_headers)]
