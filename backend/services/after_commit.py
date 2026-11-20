@@ -10,7 +10,7 @@ from contextvars import ContextVar
 
 PENDING: ContextVar[dict | None] = ContextVar("kkt_after_commit", default=None)
 _TASKS: set[asyncio.Task] = set()
-_LOCK: list[asyncio.Lock] = []
+_LOCK: dict[str, asyncio.Lock] = {}
 log = logging.getLogger("kkt.after_commit")
 
 
@@ -24,26 +24,33 @@ async def defer(key, fn, item=None):
     q[key] = (fn, items)
 
 
-def _lock() -> asyncio.Lock:
-    if not _LOCK:
-        _LOCK.append(asyncio.Lock())
-    return _LOCK[0]
+def _lock(lane: str) -> asyncio.Lock:
+    return _LOCK.setdefault(lane, asyncio.Lock())
+
+
+def _lane(key) -> str:  # 3I: audit surface snapshots are heavy; letters / notifications never queue behind them
+    return "snapshot" if isinstance(key, tuple) and key and key[0] == "snapshot" else "user"
 
 
 def flush(q: dict | None):
     if not q:
         return
-    batch = list(q.values())
+    for lane in ("user", "snapshot"):
+        batch = [v for k, v in q.items() if _lane(k) == lane]
+        if batch:
+            _spawn(lane, batch)
 
+
+def _spawn(lane: str, batch: list):
     async def run():
         from services import duty
 
-        async with _lock():
-            await duty.idle()  # 3I: in-flight requests on this worker finish first (≤ 0.25 s); no rest between steps —
-            for fn, items in batch:  # letters / notifications are user-facing and must not queue up behind pacing
+        async with _lock(lane):
+            await duty.idle()  # 3I: in-flight requests on this worker finish first (≤ 0.25 s)
+            for fn, items in batch:
                 try:
                     await fn(items)
-                except Exception:  # noqa: BLE001 — follow-up work never fails the request that queued it
+                except Exception:
                     log.exception("after-commit task failed")
 
     t = asyncio.create_task(run())
