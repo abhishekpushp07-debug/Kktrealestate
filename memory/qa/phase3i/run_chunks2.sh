@@ -1,7 +1,7 @@
 #!/bin/bash
 # 3I close-out v2: full suite in small resumable chunks, memory-bounded. MODE=sa | rs (replica set, KKT_TXN_STRICT=1).
 # Per chunk: cgroup memory peak sampled every 1 s (mem.log + top processes at peak), scratch RS capped
-# (--wiredTigerCacheSizeGB 1), HEAVY files run with -n 1, kkt_test + /tmp pytest dirs dropped between chunks.
+# (--wiredTigerCacheSizeGB 1), HEAVY files (200 MB upload, backup, load test, reseed/refresh) run alone with -n 1, kkt_test + /tmp pytest dirs dropped between chunks.
 # A chunk whose log ends with pytest's summary line on the same commit is skipped on relaunch.
 MODE=$1; Q=/app/memory/qa/phase3i/chunks2_$MODE; mkdir -p $Q; L=$Q/driver.log; ML=$Q/mem.log
 cd /app/backend
@@ -10,12 +10,13 @@ M=/app/memory/qa/phase3i/chunks2_manifest_${HEAD#*:}.txt
 [ -s $M ] || ls tests/test_*.py | sort > $M
 mapfile -t FILES < $M
 N=7
-HEAVY=" tests/test_phase_l.py tests/test_phase_z1_backup.py tests/test_reseed_counters.py tests/test_demo_refresh.py tests/test_refresh_frozen_clock.py tests/test_refresh_keeps_setup.py tests/test_memory_scale.py "
+HEAVY=" tests/test_phase_j4_files.py tests/test_phase_k_ops.py tests/test_phase_l.py tests/test_phase_z1_backup.py tests/test_reseed_counters.py tests/test_demo_refresh.py tests/test_refresh_frozen_clock.py tests/test_refresh_keeps_setup.py tests/test_memory_scale.py "
 P=27018; D=/app/.eqtmp/kkt_rs0
 rs_up() {
   mongosh --port $P --quiet --eval 'db.hello().isWritablePrimary' 2>/dev/null | grep -q true && \
     mongosh --port $P --quiet --eval 'db.getSiblingDB("test_database").users.countDocuments({})' 2>/dev/null | grep -qv '^0$' && return 0
   mongosh --port $P --quiet --eval 'db.adminCommand({shutdown:1})' >/dev/null 2>&1; sleep 2
+  [ -f $D/mongod.log ] && tail -400 $D/mongod.log > $Q/mongod_prev_$(date -u +%H%M%S).log  # why the last one stopped
   rm -rf $D; mkdir -p $D
   mongod --replSet rs0 --port $P --dbpath $D --bind_ip 127.0.0.1 --wiredTigerCacheSizeGB 1 --fork --logpath $D/mongod.log >> $L 2>&1
   mongosh --port $P --quiet --eval 'rs.initiate({_id:"rs0",members:[{_id:0,host:"127.0.0.1:'$P'"}]})' >> $L 2>&1
