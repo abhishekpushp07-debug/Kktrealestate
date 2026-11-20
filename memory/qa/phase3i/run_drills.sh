@@ -6,6 +6,7 @@ L=$Q/drills_$TAG.log
 cd /app/backend
 pkill -f "port 810[12]" ; sleep 1
 echo "=== drills $TAG $(date -u +%T)" > $L
+export LD_LIBRARY_PATH=/app/.eqtmp/bin${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}  # redis libs kept under /app (pod restarts drop system libs)
 REDIS=$(command -v redis-server || echo /app/.eqtmp/bin/redis-server)
 CLI=$(command -v redis-cli || echo /app/.eqtmp/bin/redis-cli)
 $REDIS --port 6390 --save "" --appendonly no --daemonize yes >> $L 2>&1

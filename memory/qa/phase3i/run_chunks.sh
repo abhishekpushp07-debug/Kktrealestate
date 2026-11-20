@@ -3,7 +3,9 @@
 # A chunk whose log ends with pytest's summary line is done and skipped on the next launch.
 MODE=$1; Q=/app/memory/qa/phase3i/chunks_$MODE; mkdir -p $Q; L=$Q/driver.log
 cd /app/backend
-mapfile -t FILES < <(ls tests/test_*.py | sort)
+M=/app/memory/qa/phase3i/chunks_manifest_$(git -C /app rev-parse --short HEAD).txt  # 3I: one file list per commit — a restart must not reshuffle chunks
+[ -s $M ] || ls tests/test_*.py | sort > $M
+mapfile -t FILES < $M
 N=14
 rs_up() {
   P=27018; D=/tmp/kkt_rs0
@@ -21,7 +23,7 @@ rs_up() {
 for ((i = 0; i < ${#FILES[@]}; i += N)); do
   c=$((i / N)); out=$Q/c$c.log
   HEAD=$(git -C /app rev-parse --short HEAD)
-  head -1 $out 2>/dev/null | grep -q "^COMMIT $HEAD" && tail -1 $out | grep -qE "(passed|failed|error).* in [0-9.]+s" && continue
+  head -1 $out 2>/dev/null | grep -qxF "COMMIT $HEAD files: ${FILES[*]:i:N}" && tail -1 $out | grep -qE "(passed|failed|error).* in [0-9.]+s" && continue
   echo "COMMIT $HEAD files: ${FILES[*]:i:N}" > $out
   echo "chunk $c start $(date -u +%T) $(git -C /app rev-parse --short HEAD)" >> $L
   if [ "$MODE" = rs ]; then

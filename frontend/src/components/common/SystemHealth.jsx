@@ -176,6 +176,20 @@ function ReportFigures({ r }) {
   );
 }
 
+function MemberNumbers({ m }) {
+  if (!m) return null;
+  return (
+    <div className="mt-1 text-sm text-txt-muted" data-testid="ops-member-numbers">
+      Member numbers: {m.duplicates ? `${m.duplicates} duplicates` : "no duplicates"}
+      {(m.rows || []).map((r) => (
+        <p key={`${r.project}-${r.member_no}`} data-testid="ops-member-numbers-row">
+          {r.project} · № {r.member_no} · {r.bookings.join(", ")}
+        </p>
+      ))}
+    </div>
+  );
+}
+
 function OpsSummary({ d, groups }) {
   return (
     <>
@@ -416,6 +430,7 @@ export function SystemHealthCard() {
           <UniquenessRules rules={d.uniqueness} />
           <FastCache r={d.caches?.redis} />
           <ReportFigures r={d.report_figures} />
+          <MemberNumbers m={d.member_numbers} />
           <div className="mt-5 grid gap-4 md:grid-cols-2 [&>*]:min-w-0">
             <OpsJobs d={d} jobs={jobs} />
             <div data-testid="ops-slow">
