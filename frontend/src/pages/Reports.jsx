@@ -443,7 +443,8 @@ function formulaText(key, d, bucket) {
     );
   if (key === "advances")
     return (
-      `Cash advance ${rs(t.cash_advance_paise)} + account advance ${rs(t.account_advance_paise)} = ${rs(t.total_advance_paise)} advance held` +
+      `Cash advance ${rs(t.cash_advance_paise)} + account advance ${rs(t.account_advance_paise)} + other charges advance` +
+      ` ${rs(t.other_advance_paise || 0)} = ${rs(t.total_advance_paise)} advance held` +
       ` (same as the Outstanding report)`
     );
   if (key === "cheques" && d.by_status) {

@@ -1,6 +1,7 @@
 """Phase 3E Part 5 (REQ-243…256): waiver request → approve / reject → cancel; money only on approval; ledger law,
 cancellation refund on received money only, never a receipt."""
 
+import pytest
 import requests
 
 from tests.conftest import BASE, TEST_PASSWORD
@@ -146,3 +147,54 @@ def test_other_charge_waiver_targets_its_line_and_ledger_law_holds(admin_headers
         == s["total_udhar_paise"] - s["total_jama_paise"]
     )
     assert s["other_waived_paise"] == 10000
+
+
+@pytest.mark.load_sensitive  # company-wide totals: nothing else may post between the two reads
+def test_account_waiver_on_paid_gst_is_whole_rupees_and_advances_equal_outstanding(admin_headers):
+    """3I close-out (owner decision A): an Account waiver whose agreement GST is already paid holds the GST credit as
+    an other-charge advance; the Advances report counts it, so its total == Outstanding "advance held"."""
+    api = Api(BASE, admin_headers)
+    w = World(api)
+    f = w.flat()
+    b = api.post(
+        "/bookings",
+        {
+            "flat_id": f["id"],
+            "customer_id": w.customer()["id"],
+            "booking_date": w.today,
+            "agreement_value": f["price"],
+            "cash_agreed": 0,
+            "account_agreed": f["price"],
+            "agreement_gst_percent": 5,
+            "remarks": "connection matrix",
+        },
+    )
+    c = {"bid": b["id"]}
+    due = api.get(f"/bookings/{c['bid']}")["summary"]["outstanding_paise"]
+    if due:
+        w.pay(c, due / 100, mode="NEFT_RTGS", category="Account", allocation="auto", instrument={"number": "UTRQA3E"})
+    api.post(
+        "/demands/manual", {"booking_id": c["bid"], "name": "QA 3E bill", "account_amount": 20000, "due_date": w.today}
+    )
+    ok = api.post(
+        "/waivers",
+        {
+            "booking_id": c["bid"],
+            "target": {"kind": "share", "share": "Account"},
+            "amount": 15000,
+            "reason": "QA paid GST",
+        },
+    )
+    note = ok["gst_note"]
+    assert ok["status"] == "Approved" and note["gst_paise"] > 0 and note["gst_paise"] % 100 == 0
+    assert note.get("held_as_advance_paise", 0) > 0
+    s = api.get(f"/bookings/{c['bid']}")["summary"]
+    assert s["other_charges_due_paise"] < 0
+    adv = api.get("/reports/advances")
+    mine = next(r for r in adv["rows"] if r["booking_number"] == b["booking_number"])
+    assert mine["other_advance_paise"] == -s["other_charges_due_paise"]
+    assert adv["totals"]["total_advance_paise"] == api.get("/reports/outstanding-v2")["totals"]["advance_paise"]
+    api.post(f"/waivers/{ok['id']}/cancel", {"reason": "QA cleanup"})
+    api.post(
+        f"/bookings/{c['bid']}/cancel", {"reason": "QA cleanup", "version": api.get(f"/bookings/{c['bid']}")["version"]}
+    )

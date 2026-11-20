@@ -796,7 +796,11 @@ async def advances(
     q = {
         **_scope(user, project_id),
         "status": {"$in": ["Active", "Completed"]},
-        "$or": [{"summary.cash_due_paise": {"$lt": 0}}, {"summary.account_due_paise": {"$lt": 0}}],
+        "$or": [
+            {"summary.cash_due_paise": {"$lt": 0}},
+            {"summary.account_due_paise": {"$lt": 0}},
+            {"summary.other_charges_due_paise": {"$lt": 0}},  # one advance number (= Outstanding advance held)
+        ],
     }
     rows = []
     for b in await db.bookings.find(
@@ -818,21 +822,25 @@ async def advances(
                 "unit": f"{b['project_code']} {b['flat_snapshot']['flat_number']}",
                 "cash_advance_paise": max(-s.get("cash_due_paise", 0), 0),
                 "account_advance_paise": max(-s.get("account_due_paise", 0), 0),
+                "other_advance_paise": max(-s.get("other_charges_due_paise", 0), 0),
                 "since": s.get("last_payment_at"),
             }
         )
-        rows[-1]["total_advance_paise"] = rows[-1]["cash_advance_paise"] + rows[-1]["account_advance_paise"]
+        r = rows[-1]
+        r["total_advance_paise"] = r["cash_advance_paise"] + r["account_advance_paise"] + r["other_advance_paise"]
     cols = [
         ("booking_number", "Booking", "str"),
         ("customer_name", "Customer", "str", 1.5),
         ("unit", "Unit", "str"),
         ("cash_advance_paise", "Cash advance", "money"),
         ("account_advance_paise", "Account advance", "money"),
+        ("other_advance_paise", "Other charges advance", "money"),
         ("total_advance_paise", "Total advance", "money"),
         ("since", "Since", "date"),
     ]
     totals = {
-        k: sum(r[k] for r in rows) for k in ("cash_advance_paise", "account_advance_paise", "total_advance_paise")
+        k: sum(r[k] for r in rows)
+        for k in ("cash_advance_paise", "account_advance_paise", "other_advance_paise", "total_advance_paise")
     }
     return await respond(request, format, {}, "Advance Report", await _company(user), cols, rows, totals, "advances")
 

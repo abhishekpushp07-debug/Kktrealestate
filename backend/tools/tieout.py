@@ -607,10 +607,20 @@ def main(base):
         g("/reports/outstanding-v2")["totals"]["bill_raised_paise"],
     )
     tie(
-        "formula: Advances cash + account == total advance",
-        adv["totals"]["cash_advance_paise"] + adv["totals"]["account_advance_paise"],
+        "formula: Advances cash + account + other charges == total advance",
+        adv["totals"]["cash_advance_paise"]
+        + adv["totals"]["account_advance_paise"]
+        + adv["totals"].get("other_advance_paise", 0),
         adv["totals"]["total_advance_paise"],
     )
+    paise_cn = [  # owner rule 8: every credit note (waiver credit and its GST) is whole rupees
+        w["waiver_number"]
+        for w in db.waivers.find(
+            {"company_id": cid, "status": "Approved"}, {"waiver_number": 1, "amount_paise": 1, "gst_note": 1}
+        )
+        if (w.get("amount_paise") or 0) % 100 or ((w.get("gst_note") or {}).get("gst_paise") or 0) % 100
+    ]
+    tie("credit notes: every amount and GST credit in whole rupees", paise_cn, [])
     tie(
         "formula: Advances total == Outstanding report advance held",
         adv["totals"]["total_advance_paise"],

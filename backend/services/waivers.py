@@ -8,6 +8,7 @@ from datetime import date
 from db import db
 from services import clock
 from services.breakdown import AGR_GST_CODE
+from services.money import rupees_whole
 from services.numbering import financial_year, generate_number
 from utils import ApiError, new_id, now_iso
 
@@ -35,9 +36,10 @@ def entries_for(b: dict, target: dict, amount: int) -> tuple[list[dict], dict]:
         return [{"bucket": "Cash", "amount_paise": amount}], {"gst_paise": 0, "text": "Cash share — no GST"}
     if target["kind"] == "share":
         rate = gst_rate(b)
-        g = round(amount * rate / 100)
-        out = [{"bucket": "Account", "amount_paise": amount}]
         gst_line = next((x for x in b.get("other_charges") or [] if x.get("code") == AGR_GST_CODE), None)
+        # whole rupees (owner rule 8), never more than the GST line itself (the last credit absorbs the remainder)
+        g = min(rupees_whole(round(amount * rate / 100)), (gst_line or {}).get("total_paise") or 0)
+        out = [{"bucket": "Account", "amount_paise": amount}]
         note = {"gst_paise": 0, "rate": rate, "text": "No GST on agreement"}
         if g and gst_line:
             open_g = max(gst_line.get("demanded_paise", 0) - gst_line.get("paid_paise", 0), 0)
@@ -53,7 +55,7 @@ def entries_for(b: dict, target: dict, amount: int) -> tuple[list[dict], dict]:
         return out, note
     line = next(x for x in b["other_charges"] if x["line_id"] == target["line_id"])
     p = line.get("gst_percent") or 0
-    g = round(amount * p / (100 + p)) if p else 0
+    g = rupees_whole(round(amount * p / (100 + p))) if p else 0  # whole rupees (owner rule 8)
     return [{"bucket": "Other", "line_id": line["line_id"], "amount_paise": amount}], {
         "gst_paise": g,
         "rate": p,
