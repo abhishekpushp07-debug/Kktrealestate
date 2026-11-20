@@ -18,7 +18,8 @@ DROP = {
     "computed_at",
     "business_hour",
     "data_age_s",
-}  # hours_left moves with the clock
+    "greeting_date",
+}  # hours_left / greeting_date move with the clock
 
 
 def matrix(spec: dict, projects: list[str]) -> list[dict]:
