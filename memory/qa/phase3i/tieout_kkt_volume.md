@@ -10,9 +10,9 @@
 | home units/available tiles == flats | `(2170, 665)` | `(2170, 665)` | **PASS** |  |
 | legacy dashboard inventory == flats | `{'Available': 665, 'Hold': 4, 'Booked': 1498, 'Sold': 1, 'Blocked': 2}` | `{'Booked': 1498, 'Available': 665, 'Hold': 4, 'Blocked': 2, 'Sold': 1}` | **PASS** |  |
 | outstanding total == Σ booking summary dues | `117646512400` | `117646512400` | **PASS** |  |
-| home overdue tile == Σ bookings overdue (definitions.ageing_bands) | `110582712800` | `110591478800` | **FAIL** |  |
+| home overdue tile == Σ bookings overdue (definitions.ageing_bands) | `110591478800` | `110591478800` | **PASS** |  |
 | report overdue == Σ bookings overdue | `110591478800` | `110591478800` | **PASS** |  |
-| dashboard overdue == report overdue | `110582712800` | `110591478800` | **FAIL** |  |
+| dashboard overdue == report overdue | `110591478800` | `110591478800` | **PASS** |  |
 | Outstanding by customer: one row per customer id | `1490` | `1490` | **PASS** |  |
 | Outstanding by customer Σ net balance == by booking Σ net balance | `7806642400` | `7806642400` | **PASS** |  |
 | Outstanding & Ageing band Not due == Σ bookings band Not due (definitions.ageing_bands) | `7055033600` | `7055033600` | **PASS** |  |
@@ -76,7 +76,8 @@
 | carried: closing == Outstanding report net balance (today) | `7806642400` | `7806642400` | **PASS** |  |
 | formula: Bills vs Collection cash + account billed == total billed | `409897470000` | `409897470000` | **PASS** |  |
 | bridge: Bills vs Collection (live) + other charges billed == Outstanding bill raised | `435644377400` | `435644377400` | **PASS** |  |
-| formula: Advances cash + account == total advance | `109839870000` | `109839870000` | **PASS** |  |
+| formula: Advances cash + account + other charges == total advance | `109839870000` | `109839870000` | **PASS** |  |
+| credit notes: every amount and GST credit in whole rupees | `[]` | `[]` | **PASS** |  |
 | formula: Advances total == Outstanding report advance held | `109839870000` | `109839870000` | **PASS** |  |
 | formula: Cheques cleared + bounced + pending == register amount | `103632100000` | `103632100000` | **PASS** |  |
 | formula: Bank-wise sum of banks == total | `191064500000` | `191064500000` | **PASS** |  |

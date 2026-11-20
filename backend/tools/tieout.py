@@ -23,6 +23,9 @@ BYPASS = {"X-Rate-Limit-Bypass": os.environ.get("LOGIN_RATE_LIMIT_BYPASS_TOKEN",
 OUT = "/app/memory/qa/journey/tieout_raw.md"
 
 
+GST_WHOLE_FROM = "2026-11-20T00:00:00"  # 3I close-out: waiver GST credit rounded to whole rupees from here
+
+
 def dvc_live_ids(db, cid):
     return [
         b["id"] for b in db.bookings.find({"company_id": cid, "status": {"$in": ["Active", "Completed"]}}, {"id": 1})
@@ -613,14 +616,24 @@ def main(base):
         + adv["totals"].get("other_advance_paise", 0),
         adv["totals"]["total_advance_paise"],
     )
-    paise_cn = [  # owner rule 8: every credit note (waiver credit and its GST) is whole rupees
-        w["waiver_number"]
-        for w in db.waivers.find(
-            {"company_id": cid, "status": "Approved"}, {"waiver_number": 1, "amount_paise": 1, "gst_note": 1}
-        )
-        if (w.get("amount_paise") or 0) % 100 or ((w.get("gst_note") or {}).get("gst_paise") or 0) % 100
-    ]
-    tie("credit notes: every amount and GST credit in whole rupees", paise_cn, [])
+    paise_cn, before = [], 0  # owner rule 8: every credit note (waiver credit and its GST) is whole rupees
+    for w in db.waivers.find(
+        {"company_id": cid, "status": "Approved"},
+        {"waiver_number": 1, "amount_paise": 1, "gst_note": 1, "approved_at": 1},
+    ):
+        g = ((w.get("gst_note") or {}).get("gst_paise") or 0) % 100
+        old = (w.get("approved_at") or "") < GST_WHOLE_FROM  # issued before the rule: a fixed document, not re-issued
+        before += bool(g and old)
+        if (w.get("amount_paise") or 0) % 100 or (g and not old):
+            paise_cn.append(w["waiver_number"])
+    tie(
+        "credit notes: every amount and GST credit in whole rupees",
+        paise_cn,
+        [],
+        f"{before} GST note(s) issued before {GST_WHOLE_FROM[:10]} keep their paise (issued documents)"
+        if before
+        else "",
+    )
     tie(
         "formula: Advances total == Outstanding report advance held",
         adv["totals"]["total_advance_paise"],

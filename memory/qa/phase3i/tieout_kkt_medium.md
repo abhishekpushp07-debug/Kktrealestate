@@ -73,7 +73,8 @@
 | carried: closing == Outstanding report net balance (today) | `7809962100` | `7809962100` | **PASS** |  |
 | formula: Bills vs Collection cash + account billed == total billed | `42008569500` | `42008569500` | **PASS** |  |
 | bridge: Bills vs Collection (live) + other charges billed == Outstanding bill raised | `46696733100` | `46696733100` | **PASS** |  |
-| formula: Advances cash + account == total advance | `376913400` | `376913400` | **PASS** |  |
+| formula: Advances cash + account + other charges == total advance | `376913400` | `376913400` | **PASS** |  |
+| credit notes: every amount and GST credit in whole rupees | `['WV-2627-0006']` | `[]` | **FAIL** |  |
 | formula: Advances total == Outstanding report advance held | `376913400` | `376913400` | **PASS** |  |
 | formula: Cheques cleared + bounced + pending == register amount | `5406142800` | `5406142800` | **PASS** |  |
 | formula: Bank-wise sum of banks == total | `15066583900` | `15066583900` | **PASS** |  |

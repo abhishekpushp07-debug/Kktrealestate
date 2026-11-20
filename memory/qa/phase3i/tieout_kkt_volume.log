@@ -6,9 +6,9 @@ PASS inventory report by_status == flats                          report={'Avail
 PASS home units/available tiles == flats                          report=(2170, 665) raw=(2170, 665) 
 PASS legacy dashboard inventory == flats                          report={'Available': 665, 'Hold': 4, 'Booked':  raw={'Booked': 1498, 'Available': 665, 'Hold 
 PASS outstanding total == Σ booking summary dues                  report=117646512400 raw=117646512400 
-FAIL home overdue tile == Σ bookings overdue (definitions.ageing_bands) report=110582712800 raw=110591478800 
+PASS home overdue tile == Σ bookings overdue (definitions.ageing_bands) report=110591478800 raw=110591478800 
 PASS report overdue == Σ bookings overdue                         report=110591478800 raw=110591478800 
-FAIL dashboard overdue == report overdue                          report=110582712800 raw=110591478800 
+PASS dashboard overdue == report overdue                          report=110591478800 raw=110591478800 
 PASS Outstanding by customer: one row per customer id             report=1490 raw=1490 
 PASS Outstanding by customer Σ net balance == by booking Σ net balance report=7806642400 raw=7806642400 
 PASS Outstanding & Ageing band Not due == Σ bookings band Not due (definitions.ageing_bands) report=7055033600 raw=7055033600 
@@ -72,7 +72,8 @@ PASS bridge from 2026-11-04: by clearance == carried received     report=7015370
 PASS carried: closing == Outstanding report net balance (today)   report=7806642400 raw=7806642400 
 PASS formula: Bills vs Collection cash + account billed == total billed report=409897470000 raw=409897470000 
 PASS bridge: Bills vs Collection (live) + other charges billed == Outstanding bill raised report=435644377400 raw=435644377400 
-PASS formula: Advances cash + account == total advance            report=109839870000 raw=109839870000 
+PASS formula: Advances cash + account + other charges == total advance report=109839870000 raw=109839870000 
+PASS credit notes: every amount and GST credit in whole rupees    report=[] raw=[] 
 PASS formula: Advances total == Outstanding report advance held   report=109839870000 raw=109839870000 
 PASS formula: Cheques cleared + bounced + pending == register amount report=103632100000 raw=103632100000 
 PASS formula: Bank-wise sum of banks == total                     report=191064500000 raw=191064500000 
@@ -957,4 +958,4 @@ PASS report [bills-vs-collection] default bill raised == Customer status bills r
 PASS report [bills-vs-collection] default view has no cancelled bookings report= raw= tools/tieout_reports.py
 PASS report [customer-status] Customer status bridge line == Bills vs Collection report= raw= tools/tieout_reports.py
 PASS Phase I report tie-outs all PASS                             report=True raw=True 217 report ties
-2 failed
+0 failed

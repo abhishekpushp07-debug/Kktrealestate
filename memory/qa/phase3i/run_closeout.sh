@@ -4,7 +4,7 @@
 # Usage: setsid nohup bash run_closeout.sh > /dev/null 2>&1 < /dev/null &
 cd /app/backend
 Q=/app/memory/qa/phase3i; T=/app/.eqtmp; S=$Q/closing_final.state; L=$Q/closeout.log
-touch $S
+touch $S; mkdir -p /tmp/eq
 B=/usr/bin; [ -x $B/redis-server ] || B=/app/.eqtmp/bin
 export LD_LIBRARY_PATH=/app/.eqtmp/bin${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
 log() { echo "$(date -u +%FT%T) $* · df=$(df --output=avail -h / | tail -1 | tr -d ' ') · $(git -C /app rev-parse --short HEAD)" >> $L; }

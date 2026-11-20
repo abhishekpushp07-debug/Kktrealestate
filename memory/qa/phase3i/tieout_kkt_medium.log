@@ -69,7 +69,8 @@ PASS bridge from 2026-11-04: by clearance == carried received     report=1888265
 PASS carried: closing == Outstanding report net balance (today)   report=7809962100 raw=7809962100 
 PASS formula: Bills vs Collection cash + account billed == total billed report=42008569500 raw=42008569500 
 PASS bridge: Bills vs Collection (live) + other charges billed == Outstanding bill raised report=46696733100 raw=46696733100 
-PASS formula: Advances cash + account == total advance            report=376913400 raw=376913400 
+PASS formula: Advances cash + account + other charges == total advance report=376913400 raw=376913400 
+FAIL credit notes: every amount and GST credit in whole rupees    report=['WV-2627-0006'] raw=[] 
 PASS formula: Advances total == Outstanding report advance held   report=376913400 raw=376913400 
 PASS formula: Cheques cleared + bounced + pending == register amount report=5406142800 raw=5406142800 
 PASS formula: Bank-wise sum of banks == total                     report=15066583900 raw=15066583900 
@@ -614,4 +615,4 @@ PASS report [bills-vs-collection] default bill raised == Customer status bills r
 PASS report [bills-vs-collection] default view has no cancelled bookings report= raw= tools/tieout_reports.py
 PASS report [customer-status] Customer status bridge line == Bills vs Collection report= raw= tools/tieout_reports.py
 PASS Phase I report tie-outs all PASS                             report=True raw=True 219 report ties
-0 failed
+1 failed
