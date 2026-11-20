@@ -1,0 +1,40 @@
+{
+ "phase": "3F",
+ "passed": 13,
+ "failed": 2,
+ "retest_needed": true,
+ "bugs": [
+  {"severity": "medium", "title": "Collections (This FY) does not equal Bank-wise receipts + Cash (₹15,000 gap)",
+   "evidence": "GET /api/reports/v3/collections -> total_paise 20434866600 (₹20,43,48,666, 1,071 receipts); /bank-receipts -> total_paise 14604783900 (cleared ₹14,60,07,839 + pending ₹40,000, 881); /collections?bank=Cash -> 5831582700 (190). 881+190=1071 counts tie but ₹14,60,47,839 + ₹5,83,15,827 = ₹20,43,63,666 ≠ ₹20,43,48,666. Likely bank-wise includes the ₹40,000 pending cheque while a ₹25,000 Cash-mode 'Other' receipt (KKT/2627/39774, bank not 'Cash') is handled differently. Same gap visible on screen (finance-collections-bank-tie)."},
+  {"severity": "medium", "title": "Bills vs Collection 'Bill raised' ≠ Customer status / Outstanding bills raised",
+   "evidence": "GET /api/reports/v3/bills-vs-collection totals.demand_paise 38062956400 (₹38,06,29,564) vs /customer-status totals.bills_raised 38016979500 (₹38,01,69,795) — ₹4,59,769 apart; probably BvC includes bills of the 2 cancelled bookings or excludes something Customer status counts."}
+ ],
+ "notes": [
+  "Outstanding & ageing / Collections group-by offers only Project, Tower, Customer, Sales — no Floor or Flat levels (Customer status has project/tower/floor/flat/customer). Criterion asks Project → Tower → Floor → Flat → Customer. Project→Tower subtotals sum to the grand total exactly (outstanding and customer-status).",
+  "Booking register shows 82 rows (79 Active + 1 Completed + 2 Cancelled) vs 80 live bookings; non-cancelled = 80 = Customer status count. This is acceptable as a master list but the headline reads '82 bookings'.",
+  "Sales stacking-plan API rows still carry a raw customer_id UUID on 38 Sold flats (not shown on screen, no names, no money). Low risk, but consider stripping it in the display layer.",
+  "Sales hub shows only the 6 inventory tiles; lead reports return 403 for Sales (no lead tiles).",
+  "Collections list opens newest first (18 Nov 2026 rows on top), default This FY 01 Apr–18 Nov 2026.",
+  "Old link /reports/collections-v2 redirects to /reports/v3/collections.",
+  "Saved view residue: one 'QA view <ts>' preset pinned on admin's Home (created by outstanding-group-views-pin). Delete it from the Saved views menu if you don't want it there.",
+  "The localhost:3000 frontend calls the preview backend URL, so login from localhost returned 404. All browser checks ran against the preview URL."
+ ],
+ "action_items": [],
+ "checks": [
+  {"criterion": "JRN-106 hub 5 segments × 10", "name": "test_tscheck_3f_hub.py", "lane": "backend", "status": "passed", "evidence": "GET /api/reports/v3 admin: 5 segments ×10 live tiles, one_click=customer-status, control_room present; sales: 6 inventory tiles only"},
+  {"criterion": "JRN-106 hub 5 segments × 10", "name": "reports-hub-5x10", "lane": "browser", "status": "passed", "evidence": "segments customers/finance/bookings/project-inventory/leads each 10 tiles; no 'soon'/engine words; Collections '₹20.43 Cr | total · 1,071 receipts · this FY'; /reports/collections-v2 -> /reports/v3/collections"},
+  {"criterion": "JRN-110 Customer status one click", "name": "test_tscheck_3f_customer_status.py", "lane": "backend", "status": "passed", "evidence": "10 columns in order; agreement = cash+account; account+cash dues+other = total_due 4497664300 = customer-ageing total; as_of=2026-03-31 changes totals"},
+  {"criterion": "JRN-110 Customer status one click", "name": "customer-status-one-click", "lane": "browser", "status": "passed", "evidence": "hub one-click opens sheet; headers match; formula '... = total due ₹4,49,76,643 (as in Overdue & ageing)'; customer-status.xlsx downloaded; as of 31 Mar 2026 -> total due ₹2,64,49,164"},
+  {"criterion": "JRN-107 filters all/many/few + cascade + dates", "name": "outstanding-filters-cascade", "lane": "browser", "status": "passed", "evidence": "project multi-select has search/Select all; SGH -> towers A/B/C only; Tower A chosen then project switched to GGV -> 'Tower A' dropped (12 bookings · GGV); Clear all restores grand formula"},
+  {"criterion": "JRN-108/109 drill, columns, export, saved views, share", "name": "outstanding-group-views-pin", "lane": "browser", "status": "passed", "evidence": "group by tower renders group table; column chooser lists 15 cols; saved 'QA view' POST /reports/presets 200, reopened restores project=SGH&group=tower; share URL reopens; pinned shows on Home (home-pin-<id>)"},
+  {"criterion": "JRN-108/109 drill, columns, export, saved views, share", "name": "test_tscheck_3f_exports.py", "lane": "backend", "status": "passed", "evidence": "collections export.xlsx?mode=Cash TOTAL row numeric 58340827 = screen total; outstanding export.pdf 200 %PDF"},
+  {"criterion": "JRN-112/113 Finance & Bookings totals connected", "name": "test_tscheck_3f_finance_bookings.py", "lane": "backend", "status": "failed", "evidence": "2 of 4 failed (and failed again on rerun): bank+cash 20436366600 != collections 20434866600; BvC demand 38062956400 != bills_raised 38016979500. Passed: booking-health total/overdue = customer-status; at-risk 100% rows say 'other'; register non-cancelled = 80"},
+  {"criterion": "JRN-112/113 Finance & Bookings totals connected", "name": "finance-collections-bank-tie", "lane": "browser", "status": "failed", "evidence": "BANK+CASH 204363666 vs COLLECTIONS 204348666; HEALTH 'overdue ₹2,11,17,481 of total due ₹4,49,76,643' matches Customer status"},
+  {"criterion": "JRN-114 Stacking plan & inventory incl. Sales view", "name": "test_tscheck_3f_inventory_sales.py", "lane": "backend", "status": "passed", "evidence": "stacking=inventory=186; sales statuses ⊆ {Available,Hold,Sold}; no names; project-statement 403, collections 403 for sales"},
+  {"criterion": "JRN-114 Stacking plan & inventory incl. Sales view", "name": "stacking-plan-admin-sales", "lane": "browser", "status": "passed", "evidence": "186 cells; legend Available|Hold|Blocked|Booked|Sold; Available filled blue, Hold transparent outline, Booked slate, Sold graphite, Blocked hatched; V1..V12 natural order; sales sees only available/hold/sold, no money; project statement denied"},
+  {"criterion": "JRN-115 Leads reports", "name": "test_tscheck_3f_leads.py", "lane": "backend", "status": "passed", "evidence": "funnel FY 64 = register FY 64; Website 13=13; converted ties; follow-ups 1 = home followups_due 1; median 72h avg 125.4h; lost reasons present"},
+  {"criterion": "JRN-115 Leads reports", "name": "leads-reports-tie", "lane": "browser", "status": "passed", "evidence": "funnel Website '13 leads' = register '13 leads · Website'; RT median 72.0 h avg 125.4 h; lost shows Budget mismatch; follow-ups '1 lead'"},
+  {"criterion": "Phone + Night/Day", "name": "reports-phone-night-day", "lane": "browser", "status": "passed", "evidence": "390px Night & Day on customer-status/outstanding/stacking-plan/lead-register: cards, no table, scrollWidth 390, filters behind 'Filters' toggle"},
+  {"criterion": "JRN-107 filters all/many/few + cascade + dates", "name": "test_tscheck_3f_hub.py (period/value covered via API probes)", "lane": "backend", "status": "passed", "evidence": "collections defaults this_fy 2026-04-01..2026-11-18; mode=Cash narrows to 191; mode=Cash,UPI 308; lead source filter narrows"}
+ ]
+}

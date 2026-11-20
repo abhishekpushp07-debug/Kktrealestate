@@ -1,0 +1,18 @@
+(trapped) error reading bcrypt version
+Traceback (most recent call last):
+  File "/root/.venv/lib/python3.11/site-packages/passlib/handlers/bcrypt.py", line 620, in _load_backend_mixin
+    version = _bcrypt.__about__.__version__
+              ^^^^^^^^^^^^^^^^^
+AttributeError: module 'bcrypt' has no attribute '__about__'
+index audit_logs.id skipped: An existing index has the same name as the requested index. When index names are not specified, they are auto generated 
+[startup] indexes ensured in 0.11s
+UoW mode: multi-document-transaction
+KKT backend serving after 0.13s (uow=multi-document-transaction); background startup tasks running
+[leader] agent-env-7e19496f-5cca-4a63-b4cd-232b17fee803:4725 took scheduler over from agent-env-7e19496f-5cca-4a63-b4cd-232b17fee803:229; waiting 25.0s
+Object storage initialized
+{"request_id": "117d3036de2743a5", "method": "GET", "path": "/api/health", "status": 200, "duration_ms": 3.7, "user_id": null}
+{"request_id": "dc7e0034a4ec46c5", "method": "POST", "path": "/api/auth/login", "status": 200, "duration_ms": 247.0, "user_id": null}
+[startup] system_roles ok in 0.44s
+{"request_id": "58302a5bee7e45bf", "method": "POST", "path": "/api/admin/hard-purge", "status": 200, "duration_ms": 275.7, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+[startup] owner_bootstrap ok in 0.00s
+[startup] seed_phase7 ok in 0.00s

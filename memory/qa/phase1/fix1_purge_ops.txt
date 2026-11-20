@@ -1,0 +1,4 @@
+purge dry-run counts {'dry_run': True, 'numbers': {'bookings': [], 'receipts': [], 'customers': [], 'bills': 0}, 'names': {'projects': [], 'towers': [], 'payment_plans': [], 'payment_plan_templates': [], 'tower_templates': [], 'floor_plan_templates': [], 'flat_types': [], 'stage_plan_templates': [], 'construction_stage_plans': [], 'construction_stages': []}, 'at': '2026-11-16T01:49:53.950710+00:00'}
+ops last_backup None
+ops.backup.last_backup None age_h None stale None
+System Health last_backup test_database-20261116T014158Z.archive.gz age_h 0.1 stale False

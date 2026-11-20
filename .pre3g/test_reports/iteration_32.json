@@ -1,0 +1,29 @@
+{
+  "summary": "Frontend-only retest of the 3 findings from iteration_31, on the preview production build (bundle built 04:58 UTC, which has the fixes), logged in as admin@kkt.in. All 3 fixes pass. (1) weekStart: checked with node and in the browser. 2026-11-22 (Sun) gives 2026-11-16 and 2026-11-23 (Mon) gives 2026-11-23. Other days also give the right Monday: 17/21 Nov give 16 Nov, 29 Nov gives 23 Nov, 2027-01-03 gives 2026-12-28. In the UI the week view opens on 16–22 Nov. Next goes to 23–29 Nov, Prev twice goes to 09–15 Nov and Today returns to 16–22 Nov. The day view goes 16 → 17 (Next), then 15 (Prev twice), and Today returns to 16. Switching back to Week shows 16–22 Nov. (2) Slot picker (Book visit dialog, Ganesh Green Villas): it starts on 16–22 Nov with 52 slots. The first Previous-week click moves to 09–15 Nov (0 slots) and stays there for 2.8 s with no bounce back. Prev again goes to 02–08 Nov, and Next moves forward 09 → 16 → 23 Nov. For the auto-skip, a page.route mock made the 16 Nov week return empty. The picker auto-skipped once to 23–29 Nov (56 slots), and a manual Prev back to the empty 16 Nov week stayed there. No third fetch, so no re-skip. (3) Master cards: hold-reasons show 'INTEREST ·' (code once, no repeat). allocation-categories show 'BANK · Not bookable' and 'BUILDER · Bookable'. plc-types ('FLOOR_RISE · per sqft'), charge-types, payment-modes and amenities read well. No card on 7 masters shows 'X · X'. (4) Regression: 13 Masters hub links + the 'Rarely used lists → Admin · Advanced' link + 15 Advanced links = 29/29, each opens its own page. No visits were created.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "MasterPage card subtitle (line 280)", "issue": "When summary() returns '' (hold-reasons, room-types, area-types and other kinds with no description), the subtitle still ends with a dangling separator: 'INTEREST ·', 'LIVING ·'. The ' · ' is hard-coded after r.code. Render the separator only when the summary is not empty.", "selector": "[data-testid^=master-card-]", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Masters list (structured master)", "issues": ["The top-bar breadcrumb shows 'masters › m › Detail' on allocation-categories but 'masters › m › hold-reasons' on hold-reasons. These are inconsistent, and the 'm' segment is meaningless.", "The in-page breadcrumb still reads 'Settings › Catalogues › <Master>' (not new).", "'Used in N active hold(s)' still wraps onto 3 lines in the card footer (not new)."]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "MasterPage.jsx line 280: show the ' · ' after r.code only when summary(cfg.kind, r) is not empty.",
+    "Optional: SlotPicker never resets 'jumped' when the project changes, so a second project whose first week is empty will not auto-skip. Reset jumped/from on projectId change if that is wanted.",
+    "Optional: hold-reasons has a leftover 'tscheck custom reason' (TSCHECK_CUSTOM) row in the preview DB, which looks like test residue from an earlier run."
+  ],
+  "critical_code_review_comments": [
+    "SlotPicker auto-skip only moves forward 1 week. If the first two weeks are both empty, the user still lands on an empty week (acceptable, just noting).",
+    "Prev is not disabled for weeks fully in the past (09–15 Nov shows all dashes). A small UX improvement would be to disable it."
+  ],
+  "updated_files": ["/app/test_reports/iteration_32.json"],
+  "success_rate": {"backend": "not tested (frontend only)", "frontend": "100% of the requested retests (one new low-priority cosmetic issue: dangling separator)"},
+  "seed_data_creation": "None. No visits were created. The availability API was mocked in the browser only, for the auto-skip check.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Today on preview is Mon 2026-11-16. The fixes are in build chunks 5327/6421/7073. To test the slot picker auto-skip, mock /api/site-visits/availability with date_from=2026-11-16 using page.route, because real data has slots this week. The hub has 13 masters-link-* + masters-advanced-link, and Advanced has 15 advanced-link-* (after admin-advanced-toggle)."
+}

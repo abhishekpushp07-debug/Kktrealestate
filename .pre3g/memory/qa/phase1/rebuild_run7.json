@@ -1,0 +1,54 @@
+{
+ "bookings": {
+  "Active": 78,
+  "Completed": 0,
+  "Cancelled": 2
+ },
+ "payments": {
+  "Cleared": [
+   990,
+   32377107500
+  ],
+  "Pending": [
+   1,
+   4000000
+  ],
+  "Bounced": [
+   2,
+   39032000
+  ],
+  "Reversed": [
+   1,
+   1500000
+  ]
+ },
+ "demands": [
+  554,
+  36967456500
+ ],
+ "outstanding": 8728505900,
+ "advance": 101298600,
+ "refunds": [
+  [
+   "Forfeited",
+   0
+  ],
+  [
+   "Paid",
+   13938600
+  ],
+  [
+   "Paid",
+   27877200
+  ]
+ ],
+ "flats": {
+  "Available": 56,
+  "Hold": 3,
+  "Blocked": 1,
+  "Booked": 78,
+  "Sold": 0
+ },
+ "leads": 120,
+ "visits": 87
+}

@@ -1,0 +1,88 @@
+COMMIT ceeac3b files: tests/test_story_behaviours.py tests/test_story_headline.py tests/test_story_logic.py tests/test_structure_builder.py tests/test_surfaces_gate.py tests/test_theme_contrast.py tests/test_transfer_money_law.py tests/test_ttlcache_race.py tests/test_whole_rupee.py
+============================= test session starts ==============================
+platform linux -- Python 3.11.18, pytest-9.1.1, pluggy-1.7.0 -- /root/.venv/bin/python
+rootdir: /app/backend
+configfile: pytest.ini
+plugins: locust-2.47.0, platformdirs-4.13.5, asyncio-1.4.0, anyio-4.15.1, xdist-3.8.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+created: 2/2 workers
+2 workers [37 items]
+
+scheduling tests via LoadScopeScheduling
+
+tests/test_story_behaviours.py::test_cash_bucket_cap_rejected_on_anchor 
+tests/test_story_logic.py::test_story_chronology_zero_problems 
+[gw1] [  2%] PASSED tests/test_story_logic.py::test_story_chronology_zero_problems 
+tests/test_story_logic.py::test_no_code_path_deletes_or_resets_counters 
+[gw1] [  5%] PASSED tests/test_story_logic.py::test_no_code_path_deletes_or_resets_counters 
+tests/test_story_logic.py::test_story_sequences_have_no_gaps_inside_one_rebuild 
+[gw1] [  8%] PASSED tests/test_story_logic.py::test_story_sequences_have_no_gaps_inside_one_rebuild 
+tests/test_story_logic.py::test_story_due_window_coverage_every_band_non_empty 
+[gw1] [ 10%] PASSED tests/test_story_logic.py::test_story_due_window_coverage_every_band_non_empty 
+tests/test_story_logic.py::test_story_has_followups_due_on_the_as_of_day 
+[gw1] [ 13%] PASSED tests/test_story_logic.py::test_story_has_followups_due_on_the_as_of_day 
+tests/test_story_logic.py::test_followup_check_fails_when_none_due_on_a_db_copy 
+[gw1] [ 16%] PASSED tests/test_story_logic.py::test_followup_check_fails_when_none_due_on_a_db_copy 
+tests/test_story_logic.py::test_story_has_a_next_billing_stage 
+[gw1] [ 18%] PASSED tests/test_story_logic.py::test_story_has_a_next_billing_stage 
+tests/test_story_logic.py::test_band_check_fails_with_band_is_empty_on_a_db_copy 
+[gw1] [ 21%] PASSED tests/test_story_logic.py::test_band_check_fails_with_band_is_empty_on_a_db_copy 
+tests/test_structure_builder.py::test_structure_tree_counts_and_readiness 
+[gw0] [ 24%] PASSED tests/test_story_behaviours.py::test_cash_bucket_cap_rejected_on_anchor 
+[gw1] [ 27%] PASSED tests/test_structure_builder.py::test_structure_tree_counts_and_readiness 
+tests/test_story_behaviours.py::test_cheque_pending_clear_then_reverse 
+tests/test_structure_builder.py::test_structure_masks_real_status_for_sales 
+[gw1] [ 29%] PASSED tests/test_structure_builder.py::test_structure_masks_real_status_for_sales 
+tests/test_structure_builder.py::test_floors_preview_and_single_flat_duplicate 
+[gw1] [ 32%] PASSED tests/test_structure_builder.py::test_floors_preview_and_single_flat_duplicate 
+tests/test_structure_builder.py::test_structure_zero_access_employee_is_403 
+[gw1] [ 35%] PASSED tests/test_structure_builder.py::test_structure_zero_access_employee_is_403 
+tests/test_whole_rupee.py::test_pct_of_whole_rupee_and_telescoping 
+[gw1] [ 37%] PASSED tests/test_whole_rupee.py::test_pct_of_whole_rupee_and_telescoping 
+tests/test_whole_rupee.py::test_no_paise_remainders_in_system_amounts[demands-fields0-extra0] 
+[gw1] [ 40%] PASSED tests/test_whole_rupee.py::test_no_paise_remainders_in_system_amounts[demands-fields0-extra0] 
+tests/test_whole_rupee.py::test_no_paise_remainders_in_system_amounts[refunds-fields1-extra1] 
+[gw1] [ 43%] PASSED tests/test_whole_rupee.py::test_no_paise_remainders_in_system_amounts[refunds-fields1-extra1] 
+tests/test_whole_rupee.py::test_bounce_charges_whole_rupee 
+[gw1] [ 45%] PASSED tests/test_whole_rupee.py::test_bounce_charges_whole_rupee 
+tests/test_story_headline.py::test_story_headline_numbers_unchanged 
+[gw1] [ 48%] SKIPPED tests/test_story_headline.py::test_story_headline_numbers_unchanged 
+tests/test_story_headline.py::test_story_anchor_bk_2526_0013 
+[gw1] [ 51%] SKIPPED tests/test_story_headline.py::test_story_anchor_bk_2526_0013 
+tests/test_story_headline.py::test_story_ageing_bands_all_populated 
+[gw1] [ 54%] SKIPPED tests/test_story_headline.py::test_story_ageing_bands_all_populated 
+tests/test_surfaces_gate.py::test_public_and_portal_are_404_envelopes_when_parked 
+[gw1] [ 56%] PASSED tests/test_surfaces_gate.py::test_public_and_portal_are_404_envelopes_when_parked 
+tests/test_surfaces_gate.py::test_public_and_portal_answer_when_surfaces_enabled_for_test_process 
+[gw1] [ 59%] PASSED tests/test_surfaces_gate.py::test_public_and_portal_answer_when_surfaces_enabled_for_test_process 
+tests/test_surfaces_gate.py::test_bootstrap_reports_surfaces 
+[gw1] [ 62%] PASSED tests/test_surfaces_gate.py::test_bootstrap_reports_surfaces 
+tests/test_theme_contrast.py::test_avatar_palette_is_covered 
+[gw1] [ 64%] PASSED tests/test_theme_contrast.py::test_avatar_palette_is_covered 
+tests/test_theme_contrast.py::test_token_pairs_meet_wcag_aa[day] 
+[gw1] [ 67%] PASSED tests/test_theme_contrast.py::test_token_pairs_meet_wcag_aa[day] 
+tests/test_theme_contrast.py::test_token_pairs_meet_wcag_aa[night] 
+[gw1] [ 70%] PASSED tests/test_theme_contrast.py::test_token_pairs_meet_wcag_aa[night] 
+tests/test_transfer_money_law.py::test_transfer_keeps_the_money_law[False] 
+[gw0] [ 72%] PASSED tests/test_story_behaviours.py::test_cheque_pending_clear_then_reverse 
+tests/test_story_behaviours.py::test_block_percent_matches_completed_stage_weights 
+[gw0] [ 75%] PASSED tests/test_story_behaviours.py::test_block_percent_matches_completed_stage_weights 
+tests/test_story_behaviours.py::test_kyc_masked_for_sales_revealed_for_accounts 
+[gw0] [ 78%] PASSED tests/test_story_behaviours.py::test_kyc_masked_for_sales_revealed_for_accounts 
+tests/test_story_behaviours.py::test_roznamcha_identity_on_story_cash_day 
+[gw0] [ 81%] PASSED tests/test_story_behaviours.py::test_roznamcha_identity_on_story_cash_day 
+tests/test_story_behaviours.py::test_portal_me_masked_and_own_bookings_only 
+[gw0] [ 83%] PASSED tests/test_story_behaviours.py::test_portal_me_masked_and_own_bookings_only 
+tests/test_story_behaviours.py::test_portal_change_password_and_back_then_lockout 
+[gw1] [ 86%] PASSED tests/test_transfer_money_law.py::test_transfer_keeps_the_money_law[False] 
+tests/test_transfer_money_law.py::test_transfer_keeps_the_money_law[True] 
+[gw0] [ 89%] PASSED tests/test_story_behaviours.py::test_portal_change_password_and_back_then_lockout 
+tests/test_story_behaviours.py::test_rate_card_create_activate_apply_to_available 
+[gw1] [ 91%] PASSED tests/test_transfer_money_law.py::test_transfer_keeps_the_money_law[True] 
+tests/test_ttlcache_race.py::test_invalidate_during_compute_is_not_cached 
+[gw0] [ 94%] PASSED tests/test_story_behaviours.py::test_rate_card_create_activate_apply_to_available 
+[gw1] [ 97%] PASSED tests/test_ttlcache_race.py::test_invalidate_during_compute_is_not_cached 
+tests/test_ttlcache_race.py::test_manual_put_skips_after_invalidate 
+[gw1] [100%] PASSED tests/test_ttlcache_race.py::test_manual_put_skips_after_invalidate 
+
+======================== 34 passed, 3 skipped in 16.58s ========================

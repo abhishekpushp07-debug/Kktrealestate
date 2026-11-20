@@ -1,0 +1,1010 @@
+import asyncio
+import ctypes as _ct
+import gc
+import logging
+import shutil
+import tracemalloc
+from datetime import UTC, datetime, timedelta, timezone
+from pathlib import Path
+
+try:  # Phase J.2: cap glibc malloc arenas (motor thread pool → one arena per thread → RSS grows with data size); must run before any thread starts
+    _ct.CDLL("libc.so.6").mallopt(-8, 2)  # M_ARENA_MAX = 2
+except Exception:  # noqa: BLE001
+    logging.getLogger(__name__).debug("ignored non-fatal error", exc_info=True)
+import importlib
+import os
+import subprocess
+import time
+from contextlib import asynccontextmanager
+
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.responses import JSONResponse
+from pymongo.errors import (
+    AutoReconnect,
+    ConnectionFailure,
+    DuplicateKeyError,
+    ExecutionTimeout,
+    NetworkTimeout,
+    OperationFailure,
+    ServerSelectionTimeoutError,
+    WaitQueueTimeoutError,
+    WriteConcernError,
+)
+from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.middleware.cors import CORSMiddleware
+
+from db import client, db, ensure_indexes
+from deps import refresh_loadtest_projects, require
+from infra import (
+    START_TIME,
+    ETagMiddleware,
+    IdempotencyMiddleware,
+    ObservabilityMiddleware,
+    metrics_snapshot,
+    timed_job,
+)
+from migrate_phase7 import migrate_phase7, seed_phase7
+from migrate_phase_g import migrate_phase_g
+from routers import (
+    admin,
+    audit,
+    auth,
+    blocks,
+    bookings,
+    bootstrap,
+    catalogues,
+    cms,
+    construction,
+    crm,
+    customers,
+    dashboard,
+    dashboard_widgets,
+    demo_refresh,
+    documents,
+    flats,
+    home,
+    imports,
+    leads,
+    master,
+    masters_plus,
+    milestones,
+    notifications,
+    parking,
+    payments,
+    pdfs,
+    portal,
+    project_setup,
+    projects,
+    public,
+    rate_cards,
+    reports,
+    roles,
+    roznamcha,
+    search,
+    settings,
+    support,
+    users,
+    visits,
+)
+from routers.admin import reconcile_all
+from routers.notifications import overdue_demand_job
+from routers.parking import ensure_parking_slot_types
+from routers.visits import nudge_loop, seed_phase9
+from seed import seed_if_empty, seed_phase15
+from seed_phase2 import seed_phase2
+from seed_phase3 import seed_marketing_user, seed_phase3
+from seed_phase5 import seed_phase5
+from services import inventory as inv
+from services import job_runs as _jr
+from services.alerts import evaluate_and_notify
+from services.audit_archive import archive_old_rows
+from services.audit_archive import ensure_indexes as ensure_audit_archive_indexes
+from services.breakdown import migrate_bookings
+from services.counters import recompute_all
+from services.dues_engine import run_dues_for_all
+from services.integrity import backfill_demand_installments, integrity_report
+from services.leader import run_as_leader, try_acquire
+from services.messaging.outbox import ensure_indexes as ensure_outbox_indexes
+from services.messaging.outbox import run_message_send
+from services.messaging.reminders import run_overdue_reminders
+from services.notify import notify_roles
+from services.owner_bootstrap import ensure_owner, ensure_site_engineer_demo, mark_demo_accounts
+from services.portal_notify import sweep_notifications
+from services.pricing import dedupe_charge_heads, ensure_area_types, ensure_charge_heads, migrate_saleable
+from services.rbac import migrate_legacy_codes, register_routes
+from services.read_models import sweep_loop
+from services.trends import backfill_once
+from services.validators import apply_validators, backfill_price_paise
+from startup_phase11 import startup_phase11
+from storage import init_storage_async
+from uow import STATE as UOW_STATE
+from uow import detect_transaction_support
+
+logging.basicConfig(level=logging.INFO, format="%(message)s")
+logging.getLogger("uvicorn.access").disabled = True
+logger = logging.getLogger("kkt")
+VERSION = "11.0.0"
+
+STATUS_CODES = {
+    400: "BAD_REQUEST",
+    401: "UNAUTHENTICATED",
+    403: "FORBIDDEN",
+    404: "NOT_FOUND",
+    409: "CONFLICT",
+    413: "PAYLOAD_TOO_LARGE",
+    422: "VALIDATION_ERROR",
+    423: "LOCKED",
+    429: "RATE_LIMITED",
+}
+
+
+STARTUP = {
+    "phase": "booting",
+    "done": False,
+    "essential_done": False,
+    "started_at": None,
+    "finished_at": None,
+    "db": "unknown",
+    "steps": {},
+}
+_BG_TASKS: set = set()
+
+
+async def _owner_bootstrap():
+    STARTUP["owner_bootstrap"] = await ensure_owner()
+    STARTUP["site_engineer_demo"] = await ensure_site_engineer_demo()
+    await mark_demo_accounts()
+
+
+async def _system_roles():
+    for name, spec in __import__("permissions").SYSTEM_ROLES.items():
+        if not await db.roles.find_one({"name": name}):
+            c = await db.companies.find_one({}, {"_id": 0, "id": 1})
+            await db.roles.insert_one(
+                {
+                    **__import__("utils").base_doc(None, c["id"]),
+                    "name": name,
+                    "description": spec["description"],
+                    "permissions": spec["permissions"],
+                    "is_system": True,
+                }
+            )
+        else:
+            await db.roles.update_one({"name": name, "is_system": True}, {"$set": {"permissions": spec["permissions"]}})
+    await db.settings.update_one({"key": "roles_version"}, {"$inc": {"value": 1}}, upsert=True)
+    STARTUP["unregistered_permissions"] = await register_routes(app)
+    STARTUP["rbac_migrated"] = await migrate_legacy_codes()
+
+
+async def _counters_once():
+    if not await db.settings.find_one({"key": "counters_v1"}):
+        await recompute_all()
+        await db.settings.update_one({"key": "counters_v1"}, {"$set": {"value": True}}, upsert=True)
+
+
+async def _reconcile():
+    rec = await reconcile_all()
+    if rec["mismatches"]:
+        logger.warning("Ledger reconciliation found %d mismatches: %s", len(rec["mismatches"]), rec["mismatches"][:3])
+
+
+async def _integrity():
+    ir = await timed_job("integrity", integrity_report)
+    await db.settings.update_one({"key": "integrity_last_report"}, {"$set": {"value": ir}}, upsert=True)
+    logging.getLogger("kkt.integrity").info(
+        "[phase7] integrity: ok=%s bookings=%s counts=%s", ir["ok"], ir["bookings_checked"], ir["counts"]
+    )
+
+
+ONE_TIME_STEPS = {
+    "sweep_notifications",
+    "seed_if_empty",
+    "seed_phase15",
+    "seed_phase2",
+    "seed_phase3",
+    "seed_marketing_user",
+    "seed_phase5",
+    "migrate_phase7",
+    "seed_phase8",
+    "backfill_demand_installments",
+    "migrate_phase_g",
+    "seed_phase9",
+    "counters",
+    "startup_phase11",
+    "backfill_price_paise",
+    "backfill_paid_parts",
+    "redate_receipt_rows",
+}
+DAILY_STEPS = {
+    "integrity",
+    "reconcile",
+}  # O(all rows): at startup only when the last completed run is older than 24 h (nightly jobs own them)
+
+
+async def _watermark_skip(name: str) -> bool:
+    """Phase J.2: never rescan completed migrations. `migrations` holds (step, version) → done_at; daily steps skip within 24 h."""
+    if os.environ.get("KKT_FORCE_STARTUP"):
+        return False
+    if name in ONE_TIME_STEPS:
+        return await db.migrations.find_one({"step": name, "version": VERSION}, {"_id": 1}) is not None
+    if name in DAILY_STEPS:
+        m = await db.migrations.find_one({"step": name}, {"_id": 0, "done_at": 1})
+        return bool(m and m["done_at"] > (datetime.now(UTC) - timedelta(hours=24)).isoformat())
+    return False
+
+
+async def _step(name, coro_fn):
+    t0 = time.perf_counter()
+    STARTUP["phase"] = name
+    try:
+        if await _watermark_skip(name):
+            STARTUP["steps"][name] = "skipped (watermark)"
+            return
+        await coro_fn()
+        STARTUP["steps"][name] = round(time.perf_counter() - t0, 2)
+        if name in ONE_TIME_STEPS or name in DAILY_STEPS:
+            await db.migrations.update_one(
+                {"step": name},
+                {
+                    "$set": {
+                        "version": VERSION,
+                        "done_at": datetime.now(UTC).isoformat(),
+                        "took_s": round(time.perf_counter() - t0, 2),
+                    }
+                },
+                upsert=True,
+            )
+        logger.info("[startup] %s ok in %.2fs", name, time.perf_counter() - t0)
+    except Exception:
+        STARTUP["steps"][name] = "failed"
+        logger.exception("[startup] %s failed (continuing)", name)
+    finally:
+        _trim_memory()
+
+
+async def _backfill_paid_parts():
+    from services.backfill import backfill_paid_parts
+
+    logger.info("[startup] backfill_paid_parts %s", await backfill_paid_parts())
+
+
+async def _redate_receipt_rows():
+    from services.ledger import redate_receipt_rows
+
+    logger.info("[startup] redate_receipt_rows rebuilt %s bookings", await redate_receipt_rows())
+
+
+def _trim_memory():
+    """Return freed arenas to the OS after a heavy step (glibc keeps them otherwise → RSS never falls)."""
+    gc.collect()
+    try:
+        _ct.CDLL("libc.so.6").malloc_trim(0)
+    except Exception:  # noqa: BLE001
+        logging.getLogger(__name__).debug("ignored non-fatal error", exc_info=True)
+
+
+async def _inventory_masters():
+    """Phase N: allocation categories + hold reasons seeded per company; flats backfilled to Builder saleable."""
+    async for c in db.companies.find({}, {"_id": 0, "id": 1}):
+        await inv.ensure_masters(c["id"])
+        await inv.backfill(c["id"])
+
+
+async def _hold_expiry_loop():
+    while True:
+        try:
+            await inv.expire_holds()
+        except Exception:  # noqa: BLE001
+            logger.exception("[hold-expiry] sweep failed")
+        await asyncio.sleep(900)
+
+
+async def _pricing_ps():
+    await migrate_saleable()
+    await ensure_charge_heads()
+    await dedupe_charge_heads()
+    await ensure_parking_slot_types()
+    await ensure_area_types()
+    await migrate_bookings()
+
+
+async def startup_tasks():
+    """Heavy, idempotent work moved out of lifespan: runs once per deploy on the lease holder, never blocks serving."""
+    STARTUP["started_at"] = __import__("datetime").datetime.now(__import__("datetime").UTC).isoformat()
+    try:
+        leader, _ = await try_acquire("startup")
+    except Exception:
+        logging.getLogger(__name__).debug("handled error", exc_info=True)
+        leader = False
+    if not leader:
+        await _warm_reports()
+        STARTUP.update(phase="follower", done=True, finished_at=STARTUP["started_at"])
+        logger.info("[startup] another replica holds the startup lease; skipping migrations here")
+        return
+    steps = [
+        ("seed_if_empty", seed_if_empty),
+        ("seed_phase15", seed_phase15),
+        ("seed_phase2", seed_phase2),
+        ("seed_phase3", seed_phase3),
+        ("system_roles", _system_roles),
+        ("seed_marketing_user", seed_marketing_user),
+        ("owner_bootstrap", _owner_bootstrap),
+        ("seed_phase5", seed_phase5),
+        ("migrate_phase7", migrate_phase7),
+        ("seed_phase7", seed_phase7),
+        ("backfill_demand_installments", backfill_demand_installments),
+        ("migrate_phase_g", _migrate_phase_g),
+        ("sweep_notifications", sweep_notifications),
+        ("integrity_report", _integrity),
+        ("seed_phase9", seed_phase9),
+        ("inventory_masters", _inventory_masters),
+        ("counters", _counters_once),
+        ("seed_s1_templates", _templates.seed_s1_templates),
+        ("migrate_s1_templates", _templates.migrate_templates),
+        ("reconcile", _reconcile),
+        ("startup_phase11", startup_phase11),
+        ("pricing_ps", _pricing_ps),
+        ("schema_validators", apply_validators),
+        ("price_paise_backfill", backfill_price_paise),
+        ("backfill_paid_parts", _backfill_paid_parts),
+        ("redate_receipt_rows", _redate_receipt_rows),
+        ("money_snapshots", _money_snapshots),
+    ]
+    if await db.settings.find_one(
+        {"key": "story_mode", "value": True}
+    ):  # demo-data seeds are replaced by the Phase H story (admin/reseed story=true)
+        steps = [s for s in steps if s[0] not in ("seed_phase2", "seed_phase5", "seed_phase9")]
+
+    t0 = time.perf_counter()
+    for name, fn in steps:
+        await _step(name, fn)
+        try:
+            await try_acquire("startup")  # renew lease between steps
+        except Exception:
+            logging.getLogger(__name__).debug("ignored non-fatal error", exc_info=True)
+    try:  # 3I: every startup — System Health "Member numbers"
+        await __import__("services.member_no", fromlist=["x"]).record_check()
+    except Exception:  # noqa: BLE001
+        logger.exception("member number check failed")
+    await _warm_reports()
+    STARTUP.update(
+        phase="done", done=True, finished_at=__import__("datetime").datetime.now(__import__("datetime").UTC).isoformat()
+    )
+    logger.info("[startup] background tasks complete in %.1fs: %s", time.perf_counter() - t0, STARTUP["steps"])
+
+
+async def _money_snapshots():
+    """3I REQ-355: build any missing per-booking money snapshot once (a new database / first deploy); then a count."""
+    if await db.bookings.count_documents({"money_snapshot": {"$exists": False}}, limit=1):
+        from services.money_snapshot import in_step_check
+
+        await in_step_check()
+
+
+async def _warm_reports():
+    """3I: open every report once in this process (per company, as its Super Admin) so the first real open after a
+    save only recomputes the bookings / receipts that changed (per-booking row fingerprints, warm code paths)."""
+    if os.environ.get("KKT_REPORT_WARMUP", "1") != "1":
+        return
+    import httpx
+
+    from deps import create_access_token
+    from reports_v3.registry import REGISTRY
+
+    STARTUP["phase"] = "warm_reports"
+    t0 = time.perf_counter()
+    try:
+        role_ids = await db.roles.distinct("id", {"name": "Super Admin"})
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://warm", timeout=120) as c:
+            async for u in db.users.aggregate(
+                [
+                    {"$match": {"role_id": {"$in": role_ids}, "is_active": {"$ne": False}}},
+                    {"$group": {"_id": "$company_id", "u": {"$first": "$$ROOT"}}},
+                ]
+            ):
+                h = {"Authorization": f"Bearer {create_access_token(u['u'], minutes=5)}"}
+                for key in REGISTRY:
+                    await c.get(f"/api/reports/v3/{key}", headers=h, params={"page_size": 50})
+    except Exception:  # noqa: BLE001 — warming is best effort; reports compute on demand anyway
+        logger.warning("[startup] report warm-up failed", exc_info=True)
+    STARTUP["steps"]["warm_reports"] = f"{time.perf_counter() - t0:.1f}s"
+    gc.collect()
+    th = [int(x) for x in os.environ.get("KKT_GC_THRESHOLD", "20000,20,20").split(",")]
+    gc.set_threshold(*th)  # 3I: fewer, cheaper young passes; a full pass over big report caches is rare
+    gc.freeze()  # 3I: long-lived startup objects leave the GC's scans, so a gen-2 pass no longer stalls a report
+
+
+async def _migrate_phase_g():
+    if await db.settings.find_one({"key": "migration_phase_g"}, {"_id": 1}):
+        return {"skipped": True}
+    return await migrate_phase_g(dry_run=False)
+
+
+def _spawn(coro):
+    t = asyncio.create_task(coro)
+    _BG_TASKS.add(t)
+    t.add_done_callback(_BG_TASKS.discard)
+    return t
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    t0 = time.perf_counter()
+    try:
+        await asyncio.wait_for(db.command("ping"), timeout=3)
+        STARTUP["db"] = "ok"
+    except Exception as e:
+        logging.getLogger(__name__).debug("handled error", exc_info=True)
+        STARTUP["db"] = "unreachable"
+        logger.error("[startup] MongoDB unreachable at boot (%s); serving health only until it recovers", e)
+    if STARTUP["db"] == "ok":
+        try:
+            await asyncio.wait_for(ensure_indexes(), timeout=float(os.environ.get("INDEX_BUDGET_S", "30")))
+            logger.info("[startup] indexes ensured in %.2fs", time.perf_counter() - t0)
+        except asyncio.TimeoutError:
+            logger.warning("[startup] index budget exceeded; finishing index creation in background")
+            _spawn(ensure_indexes())
+        except Exception:
+            logger.exception("[startup] ensure_indexes failed (continuing)")
+        _co = await db.companies.find_one({}, {"_id": 0, "time_zone": 1}, sort=[("created_at", 1)]) or {}
+        __import__("services.clock", fromlist=["set_business_tz"]).set_business_tz(_co.get("time_zone"))  # REQ-60
+        _spawn(
+            __import__("services.invariants", fromlist=["ensure_invariants"]).ensure_invariants()
+        )  # Phase K: unique partial indexes + validators (idempotent, background)
+        _spawn(__import__("services.money_ops", fromlist=["x"]).repair_interrupted_refunds())  # 3G crash recovery
+        _spawn(__import__("services.loadshed", fromlist=["lag_probe"]).lag_probe())  # Phase K.7: event-loop lag probe
+        _spawn(__import__("services.alerts", fromlist=["loop"]).loop())  # Phase K.13: alert rules every minute
+        _spawn(_trim_loop())
+        if os.environ.get("KKT_TRACEMALLOC"):
+            _spawn(_tracemalloc_loop())
+        _spawn(_memory_loop())
+        try:
+            await asyncio.wait_for(detect_transaction_support(), timeout=2)
+        except Exception:
+            logging.getLogger(__name__).debug("handled error", exc_info=True)
+            logger.warning("[startup] transaction detection skipped")
+    STARTUP["essential_done"] = True
+    await refresh_loadtest_projects()  # Phase L: hide load_test projects from reports from the first request
+    if STARTUP["db"] == "ok":
+        try:
+            STARTUP["owner_bootstrap"] = await asyncio.wait_for(ensure_owner(), timeout=3)
+            await asyncio.wait_for(mark_demo_accounts(), timeout=2)
+        except Exception:
+            logger.exception("[startup] owner bootstrap failed (will retry after seeding)")
+    _spawn(startup_tasks())
+    _spawn(
+        run_as_leader(
+            "scheduler",
+            _overdue_loop,
+            _hold_expiry_loop,  # Phase N: HOLD_EXPIRY_SWEEP every 15 min (3I: leader only — not on every server)
+            _dues_loop,
+            nudge_loop,
+            sweep_loop,
+            _audit_archive_loop,
+            _reminders_loop,
+            _message_send_loop,
+            demo_refresh.nightly_loop,
+        )
+    )
+    _spawn(init_storage_async())
+    logger.info(
+        "KKT backend serving after %.2fs (uow=%s); background startup tasks running",
+        time.perf_counter() - t0,
+        UOW_STATE["mode"],
+    )
+    yield
+    from services import after_commit
+
+    await after_commit.drain(10)  # REQ-111: let queued snapshots / auto documents finish before closing the DB client
+    for t in list(_BG_TASKS):
+        t.cancel()
+    client.close()
+
+
+from fastapi.responses import ORJSONResponse
+
+app = FastAPI(
+    default_response_class=ORJSONResponse,
+    title="KKT Real Estate ERP",
+    version=VERSION,
+    openapi_url="/api/openapi.json",
+    docs_url="/api/docs",
+    redoc_url="/api/redoc",
+    lifespan=lifespan,
+)
+
+
+@app.exception_handler(StarletteHTTPException)
+@app.exception_handler(HTTPException)
+async def http_exc_handler(request: Request, exc: HTTPException):
+    code = getattr(exc, "code", None) or STATUS_CODES.get(exc.status_code, "ERROR")
+    detail = exc.detail if isinstance(exc.detail, str) else str(exc.detail)
+    rid = getattr(request.state, "request_id", None)
+    extra = getattr(exc, "extra", None) or {}
+    content = {
+        "detail": detail,
+        "code": code,
+        "request_id": rid,
+        **extra,
+        "error": {"code": code, "message": detail, "details": [extra] if extra else [], "request_id": rid},
+    }
+    headers = dict(getattr(exc, "headers", None) or {})
+    if exc.status_code == 429 and extra.get("retry_after"):
+        headers["Retry-After"] = str(extra["retry_after"])
+    return JSONResponse(status_code=exc.status_code, content=content, headers=headers)
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exc_handler(request: Request, exc: RequestValidationError):
+    errors = []
+    for e in exc.errors():
+        loc = ".".join(str(x) for x in e.get("loc", []) if x not in ("body", "query", "path"))
+        errors.append({"field": loc, "message": e.get("msg", "").replace("Value error, ", "")})
+    summary = "; ".join(f"{e['field']}: {e['message']}" if e["field"] else e["message"] for e in errors[:5])
+    rid = getattr(request.state, "request_id", None)
+    msg = summary or "Validation error"
+    return JSONResponse(
+        status_code=422,
+        content={
+            "detail": msg,
+            "code": "VALIDATION_ERROR",
+            "errors": errors,
+            "request_id": rid,
+            "error": {"code": "VALIDATION_ERROR", "message": msg, "details": errors, "request_id": rid},
+        },
+    )
+
+
+@app.exception_handler(Exception)
+async def unhandled_exc_handler(request: Request, exc: Exception):
+    rid = getattr(request.state, "request_id", None)
+    if isinstance(exc, ExecutionTimeout):  # Phase K.8/K.11: retryable DB envelopes
+        return _retryable(rid, 503, "QUERY_TIMEOUT", "Query exceeded its time budget; narrow the filters or retry", "5")
+    if isinstance(
+        exc,
+        (
+            AutoReconnect,
+            NetworkTimeout,
+            ServerSelectionTimeoutError,
+            WriteConcernError,
+            WaitQueueTimeoutError,
+            ConnectionFailure,
+        ),
+    ):  # J6: pool wait-queue timeouts are retryable DB_TIMEOUT
+        logger.warning("transient db error: %s", exc)
+        return _retryable(rid, 503, "DB_TIMEOUT", "Database temporarily unavailable; retry shortly", "2")
+    if isinstance(exc, OperationFailure) and (
+        exc.code in (112, 251, 246) or exc.has_error_label("TransientTransactionError")
+    ):
+        return _retryable(rid, 409, "CONFLICT_RETRY", "Write conflict; retry the request", "1")
+    if isinstance(exc, DuplicateKeyError):  # 3I: a business number / key taken a moment ago — never a 500
+        logger.warning("duplicate business key: %s", str(exc)[:200])
+        return _retryable(rid, 409, "DUPLICATE", "This entry was just saved by someone else; refresh and retry", "1")
+    logger.exception("Unhandled error")
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": "Internal server error",
+            "code": "INTERNAL_ERROR",
+            "request_id": rid,
+            "error": {"code": "INTERNAL_ERROR", "message": "Internal server error", "details": [], "request_id": rid},
+        },
+    )
+
+
+def _retryable(rid, status, code, msg, retry_after):
+    return JSONResponse(
+        status_code=status,
+        headers={"Retry-After": retry_after},
+        content={
+            "detail": msg,
+            "code": code,
+            "request_id": rid,
+            "error": {"code": code, "message": msg, "details": [], "request_id": rid},
+        },
+    )
+
+
+api_router = APIRouter(prefix="/api")
+
+
+async def _dues_loop():
+    """Daily at 00:30 IST (+ once on startup): raise time-triggered installments."""
+    ist = timezone(timedelta(hours=5, minutes=30))
+    first = True
+    while True:
+        if first:  # 3I: the startup pass is a catch-up — skip it when tonight's run already finished
+            first = False
+            now = datetime.now(ist)
+            since = now.replace(hour=0, minute=30, second=0, microsecond=0)
+            since -= timedelta(days=1) if since > now else timedelta(0)
+            done = {
+                r["job"]
+                async for r in db.job_runs.find(
+                    {
+                        "job": {"$in": ["DAILY_DUES", "NIGHTLY_INTEGRITY"]},
+                        "status": "OK",
+                        "started_at": {"$gte": since.astimezone(UTC).isoformat()},
+                    },
+                    {"_id": 0, "job": 1},
+                )
+            }
+            if len(done) == 2:
+                logger.info("[dues] tonight's run already finished; next at 00:30 IST")
+                nxt = since + timedelta(days=1)
+                await asyncio.sleep((nxt - now).total_seconds())
+        try:
+            from routers.admin import reseed_running
+
+            # a demo refresh replays history with its own clock and raises dues itself — a real-time run mid-story
+            # would stamp a February stage as today's bill (ledger/summary mismatch)
+            res = {"demands_raised": 0} if reseed_running() else await timed_job("dues_engine", run_dues_for_all)
+            if res["demands_raised"]:
+                logger.info("Dues engine raised %s demands", res["demands_raised"])
+            _run = await _jr.start("NIGHTLY_INTEGRITY")
+            try:
+                ir = await integrity_report()
+                await _jr.finish(_run, {"ok": ir["ok"], "counts": ir["counts"]})
+            except Exception as e:  # noqa: BLE001
+                await _jr.item_failed(_run, "integrity_report", e)
+                await _jr.finish(_run)
+                raise
+            _run = await _jr.start("REPORT_FIGURES_CHECK")  # 3I REQ-360: kept-ready figures vs recompute
+            try:
+                rf = await __import__("services.money_snapshot", fromlist=["x"]).in_step_check()
+                await _jr.finish(_run, {"differences": rf["differences"], "checked": rf["checked"]})
+            except Exception as e:  # noqa: BLE001
+                await _jr.item_failed(_run, "report_figures", e)
+                await _jr.finish(_run)
+            try:  # 3I: System Health "Member numbers" (duplicates listed, never renumbered)
+                await __import__("services.member_no", fromlist=["x"]).record_check()
+            except Exception:  # noqa: BLE001
+                logger.exception("member number check failed")
+            await _jr.sweep()
+            await _jr.notify_stale_if_needed()
+            if os.environ.get("BACKUP_ENABLED", "1") == "1":
+                backup_job = importlib.import_module(
+                    "tools.backup"
+                ).backup_job  # lazy: tools/ is a script package (pulls pymongo dump deps)
+                await backup_job()
+            await evaluate_and_notify()
+            logger.info("[phase7] nightly integrity: ok=%s counts=%s", ir["ok"], ir["counts"])
+            if ir["findings"]:
+                for cid in {f["booking_id"] for f in ir["findings"]} and {
+                    c["id"] for c in await db.companies.find({}, {"_id": 0, "id": 1}).to_list(None)
+                }:
+                    await notify_roles(
+                        cid,
+                        ["Super Admin", "Accounts"],
+                        "Dues integrity findings",
+                        f"{len(ir['findings'])} finding(s): " + ", ".join(f"{k} {v}" for k, v in ir["counts"].items()),
+                        "integrity.findings",
+                        "system",
+                        "dues",
+                        "/settings",
+                    )
+        except Exception as e:
+            logging.getLogger(__name__).debug("handled error", exc_info=True)
+            logger.warning("dues loop error: %s", e)
+        now = datetime.now(ist)
+        nxt = now.replace(hour=0, minute=30, second=0, microsecond=0)
+        if nxt <= now:
+            nxt += timedelta(days=1)
+        await asyncio.sleep((nxt - now).total_seconds())
+
+
+async def _audit_archive_loop():
+
+    await ensure_audit_archive_indexes()
+    while True:
+        now = datetime.now(UTC)
+        nxt = (now.replace(day=1, hour=2, minute=0, second=0, microsecond=0) + timedelta(days=32)).replace(day=1)
+        await asyncio.sleep((nxt - now).total_seconds())
+        try:
+            await timed_job("audit_archive", archive_old_rows)
+        except Exception:
+            logging.getLogger("kkt").exception("audit archive job failed")
+
+
+async def _reminders_loop():
+    """Phase Q: OVERDUE_REMINDERS — checks hourly, sends only inside the owner's IST window; thresholds dedupe via
+    unique index so hourly re-checks never double-send.
+    """
+    while True:
+        try:
+            await timed_job("overdue_reminders", run_overdue_reminders)
+        except Exception:
+            logging.getLogger("kkt").exception("reminders job failed")
+        await asyncio.sleep(3600)
+
+
+async def _message_send_loop():
+    """Phase Q: MESSAGE_SEND outbox — queued messages with due next_attempt_at, ×3 backoff."""
+    try:
+        await ensure_outbox_indexes()
+        await backfill_once()
+    except Exception:
+        logging.getLogger("kkt").exception("messaging indexes / trends backfill failed")
+    while True:
+        try:
+            await run_message_send()
+        except Exception:
+            logging.getLogger("kkt").exception("message send job failed")
+        await asyncio.sleep(60)
+
+
+async def _overdue_loop():
+    while True:
+        try:
+            await timed_job("overdue_notifications", overdue_demand_job)
+        except Exception:
+            logging.getLogger("kkt").exception("overdue job failed")
+        await asyncio.sleep(24 * 3600)
+
+
+async def _db_ping_ms():
+    t0 = time.perf_counter()
+    try:
+        await asyncio.wait_for(db.command("ping"), timeout=1)
+        STARTUP["db"] = "ok"
+        return round((time.perf_counter() - t0) * 1000, 2)
+    except Exception:
+        logging.getLogger(__name__).debug("handled error", exc_info=True)
+        STARTUP["db"] = "unreachable"
+        return None
+
+
+def _build_sha() -> str:
+    """L.3: git short sha from env BUILD_SHA, else `git rev-parse`, else 'unknown' (resolved once)."""
+    sha = os.environ.get("BUILD_SHA")
+    if not sha:
+        try:
+            sha = subprocess.run(
+                ["git", "rev-parse", "--short", "HEAD"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                cwd=os.path.dirname(os.path.abspath(__file__)),
+            ).stdout.strip()
+        except Exception:  # noqa: BLE001
+            sha = ""
+    return sha or "unknown"
+
+
+BUILD_SHA = _build_sha()
+
+
+def _health_payload(ping):
+    return {
+        "status": "ok" if ping is not None else "degraded",
+        "db": STARTUP["db"],
+        "db_ping_ms": ping,
+        "service": "kkt-erp",
+        "version": VERSION,
+        "build": BUILD_SHA,
+        "uptime_s": round(time.time() - START_TIME),
+        "startup": {"phase": STARTUP["phase"], "done": STARTUP["done"], "started_at": STARTUP["started_at"]},
+        "transaction_mode": UOW_STATE["mode"],
+        "transactions_supported": UOW_STATE["transactions"],
+        "workers": os.environ.get("WEB_CONCURRENCY", "1"),
+        "pid": os.getpid(),
+        "disk_free_pct": _disk_free_pct(),
+    }
+
+
+def _disk_free_pct():
+    try:
+        u = shutil.disk_usage(
+            os.environ.get("BACKUP_DIR", "/app/backups")
+            if os.path.isdir(os.environ.get("BACKUP_DIR", "/app/backups"))
+            else "/app"
+        )
+        return round(100 * u.free / u.total, 1)
+    except OSError:
+        return None
+
+
+@api_router.get("/health", tags=["system"])
+async def health():
+    return _health_payload(await _db_ping_ms())
+
+
+@api_router.get("/ready", tags=["system"])
+async def ready():
+    ping = await _db_ping_ms()
+    body = {
+        "ready": ping is not None and STARTUP["essential_done"],
+        "db": STARTUP["db"],
+        "startup": {"phase": STARTUP["phase"], "done": STARTUP["done"]},
+        "workers_hint": os.environ.get("WEB_CONCURRENCY", "1"),
+        "transaction_mode": UOW_STATE["mode"],
+    }
+    return body if body["ready"] else JSONResponse(body, status_code=503)
+
+
+@app.get("/health", include_in_schema=False)
+async def root_health():
+    return _health_payload(await _db_ping_ms())
+
+
+@api_router.get("/metrics", tags=["system"])
+async def metrics(user: dict = Depends(require("admin.system_health.view"))):
+    return metrics_snapshot()
+
+
+from routers import access as _access
+from routers import demand_register as _demand_register
+from routers import docgen as _docgen
+from routers import exports as _exports
+from routers import files as _files
+from routers import graph as _graph
+from routers import home_bundle as _home_bundle
+from routers import home_layout as _home_layout
+from routers import inventory as _inventory
+from routers import load_test as _load_test
+from routers import messaging as _messaging
+from routers import ops as _ops
+from routers import pricing as _pricing
+from routers import project_statement as _project_statement
+from routers import propagation
+from routers import reports_i as _reports_i
+from routers import reports_n as _reports_n
+from routers import reports_v3 as _reports_v3
+from routers import structure as _structure
+from routers import templates as _templates
+from routers import trends as _trends
+from routers import waivers as _waivers
+
+for r in (
+    _ops.router,
+    _waivers.router,
+    _waivers.reports_router,
+    _access.router,
+    _exports.router,
+    _files.router,
+    _inventory.router,
+    auth.router,
+    users.router,
+    roles.router,
+    master.router,
+    projects.router,
+    rate_cards.router,
+    blocks.router,
+    masters_plus.router,
+    flats.router,
+    parking.router,
+    settings.router,
+    audit.router,
+    dashboard.router,
+    search.router,
+    imports.router,
+    customers.router,
+    leads.router,
+    documents.router,
+    bookings.router,
+    milestones.router,
+    payments.router,
+    roznamcha.router,
+    admin.router,
+    demo_refresh.router,
+    cms.router,
+    public.router,
+    reports.router,
+    notifications.router,
+    pdfs.router,
+    dashboard_widgets.router,
+    portal.router,
+    portal.mgmt,
+    support.router,
+    construction.router,
+    visits.pub,
+    visits.router,
+    catalogues.router,
+    project_setup.router,
+    crm.router,
+    bootstrap.router,
+    home.router,
+    propagation.router,
+    _reports_i.router,
+    _project_statement.router,
+    _structure.router,
+    _pricing.router,
+    _templates.router,
+    _graph.router,
+    _home_layout.router,
+    _home_bundle.router,
+    _reports_n.router,
+    _reports_v3.router,
+    _docgen.router,
+    _demand_register.router,
+    _messaging.router,
+    _trends.router,
+    _load_test.router,
+):
+    api_router.include_router(r)
+
+app.include_router(api_router)
+
+_cors_list, _cors_regex = __import__("services.cors", fromlist=["parse_cors_origins"]).parse_cors_origins(
+    os.environ.get("CORS_ORIGINS")
+)
+# ERP is same-origin (served at `/`): default DENY. Explicit origins or a single-level host wildcard
+# (https://*.emergent.host) via CORS_ORIGINS; "*" is ignored (never wildcard + credentials).
+if _cors_list or _cors_regex:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_credentials=True,
+        allow_origins=_cors_list,
+        allow_origin_regex=_cors_regex,
+        allow_methods=["*"],
+        allow_headers=["*"],
+        expose_headers=[
+            "X-Request-ID",
+            "X-Response-Time",
+            "Server-Timing",
+            "ETag",
+            "Idempotent-Replayed",
+            "Content-Disposition",
+        ],
+    )
+app.add_middleware(ETagMiddleware)
+app.add_middleware(GZipMiddleware, minimum_size=1024, compresslevel=5)  # 3I: level 9 cost 90 ms per 3 MB
+app.add_middleware(IdempotencyMiddleware)
+app.add_middleware(ObservabilityMiddleware)
+app.add_middleware(
+    __import__("services.loadshed", fromlist=["LoadShedMiddleware"]).LoadShedMiddleware
+)  # Phase K.7: outermost — sheds before any work
+
+
+async def _trim_loop():
+    """Every 60 s return freed arenas to the OS (RSS otherwise never falls after a heavy job)."""
+    while True:
+        await asyncio.sleep(60)
+        _trim_memory()
+
+
+async def _tracemalloc_loop():
+    """KKT_TRACEMALLOC=1 profiling aid: after warm-up, log RSS, cache sizes and the top allocation growth every 60 s."""
+    while not STARTUP.get("done"):
+        await asyncio.sleep(5)
+    tracemalloc.start(int(os.environ.get("KKT_TRACEMALLOC_DEPTH", "1")))
+    base = tracemalloc.take_snapshot()
+    from reports_v3 import customers as _cu
+    from services import ttlcache as _tc
+
+    while True:
+        await asyncio.sleep(60)
+        gc.collect()
+        _trim_memory()
+        rss = int(Path("/proc/self/statm").read_text().split()[1]) * 4096 // 1048576
+        logger.warning(
+            "[mem] pid=%s rss=%sMB traced=%sMB ttl_entries=%s ttl_mb=%s tags=%s row_memo=%s inflight=%s",
+            os.getpid(),
+            rss,
+            tracemalloc.get_traced_memory()[0] // 1048576,
+            len(_tc._store),
+            round(_tc._BYTES[0] / 1048576),
+            len(_tc._TAG),
+            len(_cu._ROW_MEMO),
+            len(_tc._inflight),
+        )
+        fams: dict = {}
+        for k in list(_tc._store):
+            f = k.split("|")[0][:40]
+            fams[f] = fams.get(f, 0) + 1
+        logger.warning("[mem] families %s", sorted(fams.items(), key=lambda x: -x[1])[:8])
+        top = tracemalloc.take_snapshot().compare_to(base, "lineno")
+        for st in top[:10]:
+            logger.warning("[mem]   %s", str(st)[:220])
+
+
+async def _memory_loop():
+    """Phase J.2: decoded-document cycles (cursor batches, request scopes) linger until gen-2 GC; collect + trim
+    every KKT_GC_EVERY_S (3I: 120 s — a 20 s gen-2 pass stalled report opens; startup objects are gc.freeze()d).
+    """
+    every = float(os.environ.get("KKT_GC_EVERY_S", "120"))
+    while True:
+        await asyncio.sleep(every)
+        await asyncio.to_thread(_trim_memory)

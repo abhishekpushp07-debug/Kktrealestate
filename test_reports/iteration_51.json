@@ -1,0 +1,36 @@
+{
+  "summary": "Phase 3G close-out, backend only. Read-only preview API checks: 13/13 passed. Targeted pytest (2 tests on the private kkt_test snapshot): 2/2 passed. Reviewed the ledger, integrity, read_models and portal bulk-enable code: no blocking issues.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "verified": [
+    "1. GET /api/openapi.json returns 200 through the preview URL",
+    "2. POST /api/demands/manual with preview:true returns 201 with effect.udhar_delta_paise=100000 on BK-2627-2886. A booking summary read before and after showed no change, so nothing was written. Amount 0 returns 422; a due date before the demand date returns 422",
+    "2b. pytest test_manual_bill_counts_in_outstanding_and_ageing and test_outstanding_three_balances_law: 2 passed, run alone. The test proves: Outstanding +25,000 split per share (cash +5,000, account +20,000), band_0-30 aged by the manual bill's own due date, and the law holds",
+    "3. outstanding-v2: all 80 rows satisfy net == outstanding - advance == udhar - jama - waived, and Σ band_* == outstanding",
+    "4. On 3 bookings, summary.outstanding_paise matches the report row and summary.net_balance == total_udhar - total_jama",
+    "5. /api/admin/ops: all 5 uniqueness rules are 'applied'",
+    "6. integrity-report?fresh=true: ok true, 79 bookings checked, 0 findings"
+  ],
+  "test_report_links": ["/app/backend/tests/qa_phase3g_preview_api.py", "/app/test_reports/pytest/pytest_phase3g.xml"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "ledger.py: is_manual_bill keys only on trigger_type=='MANUAL'. manual_demand sets this for kind manual, other_charge and bounce, so bounce and other-charge bills raised through /demands/manual also count in Outstanding. This matches decision A as written; confirm the owner intends bounce charges to count too.",
+    "ledger.py: cancelled bookings still close the ledger. In rows, c_ord/a_ord = cash_paid/account_paid when closed and manual amounts are added only when not closed. In the final summary, a Cancelled status overrides to the paid amounts after manual totals are added. OK.",
+    "ledger.py, minor: rows use acc.closed, set by the CANCELLATION event, while the summary uses b.status=='Cancelled'. These agree unless a booking somehow has status Cancelled without a cancellation event (pre-existing, unchanged).",
+    "ledger.py: the FIFO demand-status loop puts manual bills into the per-bucket cumulative order by posted_at, so allocation order is unchanged as stated.",
+    "manual_demand sets cumulative_percent = max of previous demands. _demand then sets self.pct to that value, which is harmless (no plan % move).",
+    "integrity.py: summary raised is now compared with Σ all non-voided demands, which is consistent with summary.total_order_raised including manual bills.",
+    "read_models.recompute_all now also calls trends.on_dirty(project ids, set(), company ids), so monthly buckets are refreshed. OK.",
+    "portal.py portal_bulk_enable: hashing uses asyncio.to_thread under Semaphore(8). Duplicate phones in one batch and phones that already have accounts are skipped. The response shape {enabled, count} is unchanged. Remaining minor point: inserts are sequential and there is no catch for a DuplicateKey race with a concurrent enable (pre-existing)."
+  ],
+  "updated_files": ["/app/backend/tests/qa_phase3g_preview_api.py (new, standalone read-only script, not collected by pytest)"],
+  "success_rate": {"backend": "100%", "frontend": "not tested"},
+  "test_credentials": "admin@kkt.in / Kkt@12345",
+  "seed_data_creation": "None on preview. The manual-bill write path was checked only by the pytest on the kkt_test snapshot.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Run `python tests/qa_phase3g_preview_api.py` from /app/backend for a read-only preview regression of the 3G checks. Preview has 0 manual bills. Do not run portal bulk-enable on preview."
+}

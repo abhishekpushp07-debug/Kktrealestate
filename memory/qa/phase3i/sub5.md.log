@@ -1,0 +1,6 @@
+outstanding              first p95   341.5  cached p95   29.2
+receivables-forecast     first p95   309.3  cached p95   53.7
+transfers                first p95   287.1  cached p95    4.3
+booking-health           first p95   259.9  cached p95   22.4
+2/4 within budget ['outstanding', 'receivables-forecast']
+exit 1

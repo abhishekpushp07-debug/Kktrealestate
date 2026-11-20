@@ -1,0 +1,7 @@
+=== replset 00:27:33
+about to fork child process, waiting until server is ready for connections.
+forked process: 5595
+child process started successfully, parent exiting
+{ ok: 1 }
+restored 00:28:05
+setName rs0

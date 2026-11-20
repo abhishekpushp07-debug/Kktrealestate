@@ -1,0 +1,92 @@
+[
+ {
+  "flat_number": "V1",
+  "price": 10650000,
+  "price_paise": 1065000000,
+  "price_breakup": [
+   {
+    "label": "Base price (lump sum)",
+    "amount": 10500000
+   },
+   {
+    "label": "Vastu",
+    "amount": 150000
+   }
+  ]
+ },
+ {
+  "flat_number": "V4",
+  "price": 10650000,
+  "price_paise": 1065000000,
+  "price_breakup": [
+   {
+    "label": "Base price (lump sum)",
+    "amount": 10500000
+   },
+   {
+    "label": "Vastu",
+    "amount": 150000
+   }
+  ]
+ },
+ {
+  "flat_number": "P2",
+  "price": 10000000.0,
+  "price_paise": 1000000000,
+  "price_breakup": [
+   {
+    "label": "Lump sum",
+    "amount": 10000000.0
+   }
+  ]
+ },
+ {
+  "flat_number": "A-102",
+  "price": 6452500,
+  "price_paise": 645250000,
+  "price_breakup": [
+   {
+    "label": "Base \u20b94300/sq.ft \u00d7 1450",
+    "amount": 6235000
+   },
+   {
+    "label": "Park Facing \u20b9150/sq.ft",
+    "amount": 217500
+   }
+  ]
+ },
+ {
+  "flat_number": "A-103",
+  "price": 4567500,
+  "price_paise": 456750000,
+  "price_breakup": [
+   {
+    "label": "Base \u20b94200/sq.ft \u00d7 1050",
+    "amount": 4410000
+   },
+   {
+    "label": "Park Facing \u20b9150/sq.ft",
+    "amount": 157500
+   }
+  ]
+ },
+ {
+  "flat_number": "B-701",
+  "price": 7695000,
+  "price_paise": 769500000,
+  "price_breakup": [
+   {
+    "label": "Base \u20b94500/sq.ft \u00d7 1620",
+    "amount": 7290000
+   },
+   {
+    "label": "Floor Rise \u20b925/sq.ft \u00d7 6 floors",
+    "amount": 243000
+   },
+   {
+    "label": "Corner \u20b9100/sq.ft",
+    "amount": 162000
+   }
+  ]
+ }
+]

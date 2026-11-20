@@ -1,0 +1,298 @@
+COMMIT ceeac3b files: tests/test_frontend_history_scan.py tests/test_fuzz_walker.py tests/test_graph.py tests/test_hardening.py tests/test_hold_expiry_everywhere.py tests/test_home_bundle.py tests/test_home_layout.py tests/test_import_hygiene.py tests/test_index_audit.py tests/test_index_key_recognition.py tests/test_index_snapshot.py tests/test_kkt_erp.py tests/test_ledger_example.py tests/test_ledger_terminology.py
+============================= test session starts ==============================
+platform linux -- Python 3.11.18, pytest-9.1.1, pluggy-1.7.0 -- /root/.venv/bin/python
+rootdir: /app/backend
+configfile: pytest.ini
+plugins: locust-2.47.0, platformdirs-4.13.5, asyncio-1.4.0, anyio-4.15.1, xdist-3.8.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+created: 2/2 workers
+2 workers [134 items]
+
+scheduling tests via LoadScopeScheduling
+
+tests/test_home_bundle.py::test_every_home_number_ties_to_its_list[today-admin@kkt.in] 
+tests/test_index_audit.py::test_query_uses_index[customers list] 
+[gw1] [  0%] PASSED tests/test_home_bundle.py::test_every_home_number_ties_to_its_list[today-admin@kkt.in] 
+tests/test_home_bundle.py::test_every_home_number_ties_to_its_list[today-accounts@kkt.in] 
+[gw0] [  1%] PASSED tests/test_index_audit.py::test_query_uses_index[customers list] 
+tests/test_index_audit.py::test_query_uses_index[customers by RM followup] 
+[gw1] [  2%] PASSED tests/test_home_bundle.py::test_every_home_number_ties_to_its_list[today-accounts@kkt.in] 
+tests/test_home_bundle.py::test_every_home_number_ties_to_its_list[today-sales@kkt.in] 
+[gw0] [  2%] PASSED tests/test_index_audit.py::test_query_uses_index[customers by RM followup] 
+tests/test_index_audit.py::test_query_uses_index[customers phone prefix] 
+[gw1] [  3%] PASSED tests/test_home_bundle.py::test_every_home_number_ties_to_its_list[today-sales@kkt.in] 
+tests/test_home_bundle.py::test_every_home_number_ties_to_its_list[today-siteengineer@kkt.in] 
+[gw0] [  4%] PASSED tests/test_index_audit.py::test_query_uses_index[customers phone prefix] 
+tests/test_index_audit.py::test_query_uses_index[bookings list] 
+[gw1] [  5%] PASSED tests/test_home_bundle.py::test_every_home_number_ties_to_its_list[today-siteengineer@kkt.in] 
+tests/test_home_bundle.py::test_every_home_number_ties_to_its_list[month-admin@kkt.in] 
+[gw0] [  5%] PASSED tests/test_index_audit.py::test_query_uses_index[bookings list] 
+tests/test_index_audit.py::test_query_uses_index[bookings by customer] 
+[gw1] [  6%] PASSED tests/test_home_bundle.py::test_every_home_number_ties_to_its_list[month-admin@kkt.in] 
+tests/test_home_bundle.py::test_every_home_number_ties_to_its_list[month-accounts@kkt.in] 
+[gw0] [  7%] PASSED tests/test_index_audit.py::test_query_uses_index[bookings by customer] 
+tests/test_index_audit.py::test_query_uses_index[bookings by project status] 
+[gw1] [  8%] PASSED tests/test_home_bundle.py::test_every_home_number_ties_to_its_list[month-accounts@kkt.in] 
+tests/test_home_bundle.py::test_every_home_number_ties_to_its_list[month-sales@kkt.in] 
+[gw0] [  8%] PASSED tests/test_index_audit.py::test_query_uses_index[bookings by project status] 
+tests/test_index_audit.py::test_query_uses_index[bookings by block] 
+[gw1] [  9%] PASSED tests/test_home_bundle.py::test_every_home_number_ties_to_its_list[month-sales@kkt.in] 
+tests/test_home_bundle.py::test_every_home_number_ties_to_its_list[month-siteengineer@kkt.in] 
+[gw0] [ 10%] PASSED tests/test_index_audit.py::test_query_uses_index[bookings by block] 
+tests/test_index_audit.py::test_query_uses_index[payments list] 
+[gw1] [ 11%] PASSED tests/test_home_bundle.py::test_every_home_number_ties_to_its_list[month-siteengineer@kkt.in] 
+tests/test_home_bundle.py::test_every_home_number_ties_to_its_list[fy-admin@kkt.in] 
+[gw0] [ 11%] PASSED tests/test_index_audit.py::test_query_uses_index[payments list] 
+tests/test_index_audit.py::test_query_uses_index[payments by booking bucket] 
+[gw1] [ 12%] PASSED tests/test_home_bundle.py::test_every_home_number_ties_to_its_list[fy-admin@kkt.in] 
+tests/test_home_bundle.py::test_every_home_number_ties_to_its_list[fy-accounts@kkt.in] 
+[gw0] [ 13%] PASSED tests/test_index_audit.py::test_query_uses_index[payments by booking bucket] 
+tests/test_index_audit.py::test_query_uses_index[payments by project date] 
+[gw1] [ 14%] PASSED tests/test_home_bundle.py::test_every_home_number_ties_to_its_list[fy-accounts@kkt.in] 
+tests/test_home_bundle.py::test_every_home_number_ties_to_its_list[fy-sales@kkt.in] 
+[gw0] [ 14%] PASSED tests/test_index_audit.py::test_query_uses_index[payments by project date] 
+tests/test_index_audit.py::test_query_uses_index[cheques pending] 
+[gw1] [ 15%] PASSED tests/test_home_bundle.py::test_every_home_number_ties_to_its_list[fy-sales@kkt.in] 
+tests/test_home_bundle.py::test_every_home_number_ties_to_its_list[fy-siteengineer@kkt.in] 
+[gw0] [ 16%] PASSED tests/test_index_audit.py::test_query_uses_index[cheques pending] 
+tests/test_index_audit.py::test_query_uses_index[demands overdue] 
+[gw1] [ 17%] PASSED tests/test_home_bundle.py::test_every_home_number_ties_to_its_list[fy-siteengineer@kkt.in] 
+tests/test_home_bundle.py::test_role_widgets_are_enforced_server_side[admin@kkt.in-None] 
+[gw0] [ 17%] PASSED tests/test_index_audit.py::test_query_uses_index[demands overdue] 
+tests/test_index_audit.py::test_query_uses_index[demands by booking] 
+[gw0] [ 18%] PASSED tests/test_index_audit.py::test_query_uses_index[demands by booking] 
+[gw1] [ 19%] PASSED tests/test_home_bundle.py::test_role_widgets_are_enforced_server_side[admin@kkt.in-None] 
+tests/test_index_audit.py::test_query_uses_index[demands by customer] 
+tests/test_home_bundle.py::test_role_widgets_are_enforced_server_side[accounts@kkt.in-expected1] 
+[gw0] [ 20%] PASSED tests/test_index_audit.py::test_query_uses_index[demands by customer] 
+tests/test_index_audit.py::test_query_uses_index[leads list] 
+[gw0] [ 20%] PASSED tests/test_index_audit.py::test_query_uses_index[leads list] 
+tests/test_index_audit.py::test_query_uses_index[leads by phone] 
+[gw0] [ 21%] PASSED tests/test_index_audit.py::test_query_uses_index[leads by phone] 
+tests/test_index_audit.py::test_query_uses_index[leads followups] 
+[gw0] [ 22%] PASSED tests/test_index_audit.py::test_query_uses_index[leads followups] 
+tests/test_index_audit.py::test_query_uses_index[flats grid] 
+[gw0] [ 23%] PASSED tests/test_index_audit.py::test_query_uses_index[flats grid] 
+tests/test_index_audit.py::test_query_uses_index[flats by project status] 
+[gw0] [ 23%] PASSED tests/test_index_audit.py::test_query_uses_index[flats by project status] 
+tests/test_index_audit.py::test_query_uses_index[flats search] 
+[gw1] [ 24%] PASSED tests/test_home_bundle.py::test_role_widgets_are_enforced_server_side[accounts@kkt.in-expected1] 
+tests/test_home_bundle.py::test_role_widgets_are_enforced_server_side[sales@kkt.in-expected2] 
+[gw0] [ 25%] PASSED tests/test_index_audit.py::test_query_uses_index[flats search] 
+tests/test_index_audit.py::test_query_uses_index[visits calendar] 
+[gw0] [ 26%] PASSED tests/test_index_audit.py::test_query_uses_index[visits calendar] 
+tests/test_index_audit.py::test_query_uses_index[visits capacity] 
+[gw0] [ 26%] PASSED tests/test_index_audit.py::test_query_uses_index[visits capacity] 
+tests/test_index_audit.py::test_query_uses_index[visits by lead] 
+[gw0] [ 27%] PASSED tests/test_index_audit.py::test_query_uses_index[visits by lead] 
+tests/test_index_audit.py::test_query_uses_index[tickets list] 
+[gw0] [ 28%] PASSED tests/test_index_audit.py::test_query_uses_index[tickets list] 
+tests/test_index_audit.py::test_query_uses_index[tickets by customer] 
+[gw0] [ 29%] PASSED tests/test_index_audit.py::test_query_uses_index[tickets by customer] 
+tests/test_index_audit.py::test_query_uses_index[notifications unread] 
+[gw0] [ 29%] PASSED tests/test_index_audit.py::test_query_uses_index[notifications unread] 
+tests/test_index_audit.py::test_query_uses_index[ledger rows] 
+[gw0] [ 30%] PASSED tests/test_index_audit.py::test_query_uses_index[ledger rows] 
+tests/test_index_audit.py::test_query_uses_index[audit by entity] 
+[gw0] [ 31%] PASSED tests/test_index_audit.py::test_query_uses_index[audit by entity] 
+tests/test_index_audit.py::test_query_uses_index[audit by company] 
+[gw0] [ 32%] PASSED tests/test_index_audit.py::test_query_uses_index[audit by company] 
+tests/test_index_audit.py::test_query_uses_index[catalogue bundle] 
+[gw0] [ 32%] PASSED tests/test_index_audit.py::test_query_uses_index[catalogue bundle] 
+tests/test_index_audit.py::test_query_uses_index[catalogue type] 
+[gw0] [ 33%] PASSED tests/test_index_audit.py::test_query_uses_index[catalogue type] 
+tests/test_index_audit.py::test_query_uses_index[communications by customer] 
+[gw1] [ 34%] PASSED tests/test_home_bundle.py::test_role_widgets_are_enforced_server_side[sales@kkt.in-expected2] 
+tests/test_home_bundle.py::test_role_widgets_are_enforced_server_side[siteengineer@kkt.in-expected3] 
+[gw0] [ 35%] PASSED tests/test_index_audit.py::test_query_uses_index[communications by customer] 
+tests/test_index_audit.py::test_query_uses_index[documents by entity] 
+[gw0] [ 35%] PASSED tests/test_index_audit.py::test_query_uses_index[documents by entity] 
+tests/test_index_audit.py::test_query_uses_index[brochure stats] 
+[gw0] [ 36%] PASSED tests/test_index_audit.py::test_query_uses_index[brochure stats] 
+tests/test_index_audit.py::test_query_uses_index[project summaries] 
+[gw0] [ 37%] PASSED tests/test_index_audit.py::test_query_uses_index[project summaries] 
+tests/test_index_audit.py::test_query_uses_index[block summaries] 
+[gw0] [ 38%] PASSED tests/test_index_audit.py::test_query_uses_index[block summaries] 
+tests/test_index_audit.py::test_query_uses_index[customer summaries] 
+[gw0] [ 38%] PASSED tests/test_index_audit.py::test_query_uses_index[customer summaries] 
+tests/test_index_audit.py::test_query_uses_index[rate limits] 
+[gw0] [ 39%] PASSED tests/test_index_audit.py::test_query_uses_index[rate limits] 
+tests/test_index_audit.py::test_query_uses_index[idempotency] 
+[gw0] [ 40%] PASSED tests/test_index_audit.py::test_query_uses_index[idempotency] 
+tests/test_index_audit.py::test_query_uses_index[refresh tokens] 
+[gw0] [ 41%] PASSED tests/test_index_audit.py::test_query_uses_index[refresh tokens] 
+tests/test_index_audit.py::test_query_uses_index[users by email] 
+[gw0] [ 41%] PASSED tests/test_index_audit.py::test_query_uses_index[users by email] 
+tests/test_hardening.py::test_idempotency_replay_customer_create 
+[gw1] [ 42%] PASSED tests/test_home_bundle.py::test_role_widgets_are_enforced_server_side[siteengineer@kkt.in-expected3] 
+tests/test_home_bundle.py::test_ageing_widget_equals_outstanding_report_to_the_rupee 
+[gw0] [ 43%] PASSED tests/test_hardening.py::test_idempotency_replay_customer_create 
+tests/test_hardening.py::test_payment_without_idempotency_key_rejected 
+[gw1] [ 44%] PASSED tests/test_home_bundle.py::test_ageing_widget_equals_outstanding_report_to_the_rupee 
+tests/test_home_bundle.py::test_one_widget_failure_is_isolated 
+[gw1] [ 44%] PASSED tests/test_home_bundle.py::test_one_widget_failure_is_isolated 
+tests/test_home_bundle.py::test_saved_and_reset_layout_reach_the_bundle_at_once 
+[gw0] [ 45%] PASSED tests/test_hardening.py::test_payment_without_idempotency_key_rejected 
+tests/test_hardening.py::test_version_conflict_409 
+[gw0] [ 46%] PASSED tests/test_hardening.py::test_version_conflict_409 
+tests/test_hardening.py::test_405_uses_error_envelope 
+[gw0] [ 47%] PASSED tests/test_hardening.py::test_405_uses_error_envelope 
+tests/test_hardening.py::test_mongo_validators_reject_bad_docs 
+[gw0] [ 47%] PASSED tests/test_hardening.py::test_mongo_validators_reject_bad_docs 
+tests/test_hardening.py::test_regression_anchor_story 
+[gw0] [ 48%] PASSED tests/test_hardening.py::test_regression_anchor_story 
+tests/test_hardening.py::test_integrity_report_clean 
+[gw1] [ 49%] PASSED tests/test_home_bundle.py::test_saved_and_reset_layout_reach_the_bundle_at_once 
+tests/test_home_bundle.py::test_zero_bounced_drill_reads_zero 
+[gw0] [ 50%] PASSED tests/test_hardening.py::test_integrity_report_clean 
+tests/test_hardening.py::test_public_api_leak_scan 
+[gw1] [ 50%] PASSED tests/test_home_bundle.py::test_zero_bounced_drill_reads_zero 
+tests/test_import_hygiene.py::test_no_module_level_import_cycles 
+[gw0] [ 51%] PASSED tests/test_hardening.py::test_public_api_leak_scan 
+tests/test_hardening.py::test_bypass_token_not_in_env_files 
+[gw0] [ 52%] PASSED tests/test_hardening.py::test_bypass_token_not_in_env_files 
+tests/test_ledger_terminology.py::test_frontend_tiles_do_not_say_net_balance 
+[gw0] [ 52%] PASSED tests/test_ledger_terminology.py::test_frontend_tiles_do_not_say_net_balance 
+tests/test_ledger_terminology.py::test_frontend_has_no_udhar_jama 
+[gw0] [ 53%] PASSED tests/test_ledger_terminology.py::test_frontend_has_no_udhar_jama 
+tests/test_ledger_terminology.py::test_backend_user_facing_strings_have_no_udhar_jama 
+[gw1] [ 54%] PASSED tests/test_import_hygiene.py::test_no_module_level_import_cycles 
+tests/test_import_hygiene.py::test_leaf_layers_never_import_upward_even_lazily 
+[gw1] [ 55%] PASSED tests/test_import_hygiene.py::test_leaf_layers_never_import_upward_even_lazily 
+tests/test_import_hygiene.py::test_named_review_cycles_are_gone 
+[gw0] [ 55%] PASSED tests/test_ledger_terminology.py::test_backend_user_facing_strings_have_no_udhar_jama 
+tests/test_ledger_terminology.py::test_roznamcha_is_retained 
+[gw0] [ 56%] PASSED tests/test_ledger_terminology.py::test_roznamcha_is_retained 
+tests/test_ledger_terminology.py::test_two_sided_sign_convention[100-40-due--60] 
+[gw0] [ 57%] PASSED tests/test_ledger_terminology.py::test_two_sided_sign_convention[100-40-due--60] 
+tests/test_ledger_terminology.py::test_two_sided_sign_convention[40-100-advance-60] 
+[gw0] [ 58%] PASSED tests/test_ledger_terminology.py::test_two_sided_sign_convention[40-100-advance-60] 
+tests/test_ledger_terminology.py::test_two_sided_sign_convention[50-50-settled-0] 
+[gw0] [ 58%] PASSED tests/test_ledger_terminology.py::test_two_sided_sign_convention[50-50-settled-0] 
+tests/test_kkt_erp.py::TestBlock::test_create_block_and_generation 
+[gw0] [ 59%] PASSED tests/test_kkt_erp.py::TestBlock::test_create_block_and_generation 
+tests/test_kkt_erp.py::TestBlock::test_regenerate_409_on_hold 
+[gw0] [ 60%] PASSED tests/test_kkt_erp.py::TestBlock::test_regenerate_409_on_hold 
+tests/test_kkt_erp.py::TestBlock::test_booked_status_manual_blocked 
+[gw0] [ 61%] PASSED tests/test_kkt_erp.py::TestBlock::test_booked_status_manual_blocked 
+tests/test_kkt_erp.py::TestBlock::test_add_floors_and_bulk_price 
+[gw0] [ 61%] PASSED tests/test_kkt_erp.py::TestBlock::test_add_floors_and_bulk_price 
+tests/test_kkt_erp.py::TestBlock::test_block_grid 
+[gw0] [ 62%] PASSED tests/test_kkt_erp.py::TestBlock::test_block_grid 
+tests/test_kkt_erp.py::TestBlock::test_audit_log_flat_status 
+[gw0] [ 63%] PASSED tests/test_kkt_erp.py::TestBlock::test_audit_log_flat_status 
+tests/test_hold_expiry_everywhere.py::test_flat_status_and_bulk_status_refuse_hold_without_expiry 
+[gw0] [ 64%] PASSED tests/test_hold_expiry_everywhere.py::test_flat_status_and_bulk_status_refuse_hold_without_expiry 
+tests/test_hold_expiry_everywhere.py::test_transfer_refuses_old_unit_on_hold_without_expiry 
+[gw1] [ 64%] PASSED tests/test_import_hygiene.py::test_named_review_cycles_are_gone 
+tests/test_import_hygiene.py::test_every_module_imports_in_isolation 
+[gw0] [ 65%] PASSED tests/test_hold_expiry_everywhere.py::test_transfer_refuses_old_unit_on_hold_without_expiry 
+tests/test_hold_expiry_everywhere.py::test_hold_doc_refuses_without_expiry 
+[gw0] [ 66%] PASSED tests/test_hold_expiry_everywhere.py::test_hold_doc_refuses_without_expiry 
+tests/test_hold_expiry_everywhere.py::test_second_reseed_while_one_runs_is_409 
+[gw0] [ 67%] PASSED tests/test_hold_expiry_everywhere.py::test_second_reseed_while_one_runs_is_409 
+tests/test_kkt_erp.py::TestInfra::test_health 
+[gw0] [ 67%] PASSED tests/test_kkt_erp.py::TestInfra::test_health 
+tests/test_kkt_erp.py::TestInfra::test_openapi 
+[gw0] [ 68%] PASSED tests/test_kkt_erp.py::TestInfra::test_openapi 
+tests/test_kkt_erp.py::TestInfra::test_unauth_projects 
+[gw0] [ 69%] PASSED tests/test_kkt_erp.py::TestInfra::test_unauth_projects 
+tests/test_kkt_erp.py::TestInfra::test_employee_forbidden_on_users 
+[gw0] [ 70%] PASSED tests/test_kkt_erp.py::TestInfra::test_employee_forbidden_on_users 
+tests/test_kkt_erp.py::TestAuth::test_all_seeded_users_login 
+[gw0] [ 70%] PASSED tests/test_kkt_erp.py::TestAuth::test_all_seeded_users_login 
+tests/test_kkt_erp.py::TestAuth::test_me_returns_permissions 
+[gw0] [ 71%] PASSED tests/test_kkt_erp.py::TestAuth::test_me_returns_permissions 
+tests/test_kkt_erp.py::TestAuth::test_refresh_rotation_and_reuse_detection 
+[gw0] [ 72%] PASSED tests/test_kkt_erp.py::TestAuth::test_refresh_rotation_and_reuse_detection 
+tests/test_kkt_erp.py::TestAuth::test_logout_revokes 
+[gw0] [ 73%] PASSED tests/test_kkt_erp.py::TestAuth::test_logout_revokes 
+tests/test_kkt_erp.py::TestRBAC::test_projectadmin_scoped_to_SGH 
+[gw0] [ 73%] PASSED tests/test_kkt_erp.py::TestRBAC::test_projectadmin_scoped_to_SGH 
+tests/test_kkt_erp.py::TestRBAC::test_sales_cannot_post_master 
+[gw0] [ 74%] PASSED tests/test_kkt_erp.py::TestRBAC::test_sales_cannot_post_master 
+tests/test_kkt_erp.py::TestRBAC::test_sales_cannot_list_users 
+[gw0] [ 75%] PASSED tests/test_kkt_erp.py::TestRBAC::test_sales_cannot_list_users 
+tests/test_kkt_erp.py::TestRBAC::test_employee_read_only 
+[gw0] [ 76%] PASSED tests/test_kkt_erp.py::TestRBAC::test_employee_read_only 
+tests/test_kkt_erp.py::TestLists::test_flats_pagination 
+[gw0] [ 76%] PASSED tests/test_kkt_erp.py::TestLists::test_flats_pagination 
+tests/test_kkt_erp.py::TestLists::test_page_size_too_large 
+[gw0] [ 77%] PASSED tests/test_kkt_erp.py::TestLists::test_page_size_too_large 
+tests/test_kkt_erp.py::TestLists::test_search 
+[gw0] [ 78%] PASSED tests/test_kkt_erp.py::TestLists::test_search 
+tests/test_kkt_erp.py::TestLists::test_dashboard_total_matches 
+[gw1] [ 79%] PASSED tests/test_import_hygiene.py::test_every_module_imports_in_isolation 
+tests/test_import_hygiene.py::test_scripts_compile 
+[gw0] [ 79%] PASSED tests/test_kkt_erp.py::TestLists::test_dashboard_total_matches 
+tests/test_graph.py::test_graph_project_booking_customer_shapes 
+[gw0] [ 80%] PASSED tests/test_graph.py::test_graph_project_booking_customer_shapes 
+tests/test_graph.py::test_graph_masks_for_sales_and_hides_privileged_sections 
+[gw0] [ 81%] PASSED tests/test_graph.py::test_graph_masks_for_sales_and_hides_privileged_sections 
+tests/test_graph.py::test_graph_zero_access_403_and_unknown_entity_422 
+[gw1] [ 82%] PASSED tests/test_import_hygiene.py::test_scripts_compile 
+tests/test_import_hygiene.py::test_services_and_core_never_import_routers 
+[gw0] [ 82%] PASSED tests/test_graph.py::test_graph_zero_access_403_and_unknown_entity_422 
+tests/test_kkt_erp.py::TestUsersRoles::test_cannot_deactivate_self 
+[gw0] [ 83%] PASSED tests/test_kkt_erp.py::TestUsersRoles::test_cannot_deactivate_self 
+tests/test_kkt_erp.py::TestUsersRoles::test_delete_system_role 
+[gw0] [ 84%] PASSED tests/test_kkt_erp.py::TestUsersRoles::test_delete_system_role 
+tests/test_kkt_erp.py::TestUsersRoles::test_permissions_groups 
+[gw0] [ 85%] PASSED tests/test_kkt_erp.py::TestUsersRoles::test_permissions_groups 
+tests/test_ledger_example.py::test_owner_example_agreement_split 
+[gw0] [ 85%] PASSED tests/test_ledger_example.py::test_owner_example_agreement_split 
+tests/test_ledger_example.py::test_example_ledger_matches_owner_table 
+[gw0] [ 86%] PASSED tests/test_ledger_example.py::test_example_ledger_matches_owner_table 
+tests/test_ledger_example.py::test_csv_export_matches 
+[gw0] [ 87%] PASSED tests/test_ledger_example.py::test_csv_export_matches 
+tests/test_frontend_history_scan.py::test_every_entity_surface_has_history_control 
+[gw0] [ 88%] PASSED tests/test_frontend_history_scan.py::test_every_entity_surface_has_history_control 
+tests/test_frontend_history_scan.py::test_no_legacy_coarse_codes_in_frontend 
+[gw0] [ 88%] PASSED tests/test_frontend_history_scan.py::test_no_legacy_coarse_codes_in_frontend 
+tests/test_fuzz_walker.py::test_write_routes_never_500 
+[gw1] [ 89%] PASSED tests/test_import_hygiene.py::test_services_and_core_never_import_routers 
+tests/test_import_hygiene.py::test_no_import_cycles_including_function_level_among_app_layers 
+[gw0] [ 90%] PASSED tests/test_fuzz_walker.py::test_write_routes_never_500 
+tests/test_fuzz_walker.py::test_error_envelope_uniform 
+[gw0] [ 91%] PASSED tests/test_fuzz_walker.py::test_error_envelope_uniform 
+tests/test_home_layout.py::test_default_then_save_then_isolation_then_reset 
+[gw0] [ 91%] PASSED tests/test_home_layout.py::test_default_then_save_then_isolation_then_reset 
+tests/test_home_layout.py::test_schema_validation_and_permission_filter 
+[gw0] [ 92%] PASSED tests/test_home_layout.py::test_schema_validation_and_permission_filter 
+tests/test_kkt_erp.py::TestMasterDeactivate::test_deactivate_room_type_in_use 
+[gw0] [ 93%] PASSED tests/test_kkt_erp.py::TestMasterDeactivate::test_deactivate_room_type_in_use 
+tests/test_kkt_erp.py::TestMasterDeactivate::test_deactivate_unused_room_type 
+[gw0] [ 94%] PASSED tests/test_kkt_erp.py::TestMasterDeactivate::test_deactivate_unused_room_type 
+tests/test_index_key_recognition.py::test_existing_index_recognised_by_key 
+[gw0] [ 94%] PASSED tests/test_index_key_recognition.py::test_existing_index_recognised_by_key 
+tests/test_index_snapshot.py::test_index_set_matches_snapshot 
+[gw1] [ 95%] PASSED tests/test_import_hygiene.py::test_no_import_cycles_including_function_level_among_app_layers 
+tests/test_import_hygiene.py::test_server_imports_cleanly 
+[gw1] [ 96%] PASSED tests/test_import_hygiene.py::test_server_imports_cleanly 
+tests/test_kkt_erp.py::TestFlatType::test_create_flat_type_auto_area 
+[gw0] [ 97%] PASSED tests/test_index_snapshot.py::test_index_set_matches_snapshot 
+tests/test_kkt_erp.py::TestLockout::test_lockout_new_user 
+[gw1] [ 97%] PASSED tests/test_kkt_erp.py::TestFlatType::test_create_flat_type_auto_area 
+tests/test_kkt_erp.py::TestFlatType::test_create_flat_type_invalid_hierarchy 
+[gw1] [ 98%] PASSED tests/test_kkt_erp.py::TestFlatType::test_create_flat_type_invalid_hierarchy 
+[gw0] [ 99%] PASSED tests/test_kkt_erp.py::TestLockout::test_lockout_new_user 
+tests/test_kkt_erp.py::TestSettings::test_bank_account_masked 
+[gw0] [100%] PASSED tests/test_kkt_erp.py::TestSettings::test_bank_account_masked 
+
+=============================== warnings summary ===============================
+../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
+../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
+  /root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12: PendingDeprecationWarning: Please use `import python_multipart` instead.
+    import multipart
+
+tests/test_kkt_erp.py::TestBlock::test_create_block_and_generation
+tests/test_kkt_erp.py::TestFlatType::test_create_flat_type_auto_area
+  /root/.venv/lib/python3.11/site-packages/_pytest/fixtures.py:1313: PytestRemovedIn10Warning: Class-scoped fixture defined as instance method is deprecated.
+  Instance attributes set in this fixture will NOT be visible to test methods,
+  as each test gets a new instance while the fixture runs only once per class.
+  Use @classmethod decorator and set attributes on cls instead.
+  See https://docs.pytest.org/en/stable/deprecations.html#class-scoped-fixture-as-instance-method
+    fixturefunc = resolve_fixture_function(fixturedef, request)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================== 134 passed, 4 warnings in 73.46s (0:01:13) ==================

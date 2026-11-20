@@ -1,0 +1,45 @@
+{
+  "summary": "Phase 3H Reports close-out: read-only API spot checks (tests/spot_phase3h_api.py, run as a script, NOT pytest) + Playwright UI on preview as admin@kkt.in. Numbers all tie: Collections identity 'Bank-wise ₹14,64,18,177 + Cash ₹5,83,40,827 = Collections ₹20,47,59,004' identical on Bank-wise, no remainder line, Cheques in hand ₹40,000 (1 cheque) on both; Feb-2026 period shows Refunds paid out −₹4,22,892 on Collections. Bank-wise columns Bank/Mode/Receipts/Cleared/Reversed/Received. Bills vs Collection default line '= Customer status bills raised' ₹38,01,69,795 matches Customer status; Include cancelled adds '· cancelled' tower rows + 'Cancelled bookings ₹23,28,400'. Outstanding group-by has Project/Tower/Floor/Flat/Booking(+Customer/Sales), floor→flat grouping renders; As of 31 Oct = ₹3,54,60,791 (78) = Customer status As of 31 Oct; in-hand ₹3,43,288 (2 cheques); API as_of=2099-01-01 → 422 'As of can't be after today'. Outstanding PDF = A4 landscape (841.9×595.3pt), money cells single-line. Booking register lines '80 live' / '2 cancelled' present. Stacking plan: no CUST-/customer_id in API or UI. Cash vs account other-income line ₹4,95,868; Cancellations column 'Deduction kept (other income)'. System Health 'All 5 uniqueness rules applied'. 390px Night/Day: no horizontal overflow on Collections/Outstanding, lines wrap cleanly. MAIN FAILURE: every report-line drill link (in-hand, booking-register live/cancelled, refunds, other-income) is broken or loses its filter.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "GET /api/reports/v3/booking-register (lines[].link) — reports_v3/bookings.py:93", "issue": "Links are '/reports/booking-register?booking_status=…'. booking-register is not in the frontend LEGACY_REDIRECT, so the click opens the OLD Reports page with 'No data for these filters' instead of the register filtered to that status. The API itself filters fine (/api/reports/v3/booking-register?booking_status=Cancelled → 2, Active,Completed → 80). Fix: link to '/reports/v3/booking-register?booking_status=…'.", "priority": "HIGH"},
+      {"endpoint": "GET /api/reports/v3/collections | bank-receipts | outstanding (in-hand line) — registry.py:779", "issue": "The link '/reports/cheques?status=In+hand' goes through legacyTarget() in pages/Reports.jsx:1698, which only carries from_date/to_date/project_id. 'status' is dropped, so the user lands on /reports/v3/cheques with all 144 cheques and STATE=All. /reports/v3/cheques?status=In+hand works directly (1 cheque). Fix: link straight to '/reports/v3/cheques?status=In+hand', or have legacyTarget pass through unknown params.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "registry.py:783 & :1219 (refunds / cash-vs-account other-income lines)", "issue": "Link '/reports/cancellations' isn't in LEGACY_REDIRECT, so it opens the old Reports page (title 'reports.'). Even at /reports/v3/cancellations the default period is This FY, which shows 0 cancellations because both cancellations (27 Jan / 03 Mar 2026) are in FY25-26. The link should carry period_from/period_to (all-time, or the source report's period) so the ₹4,95,868 can be traced."},
+      {"endpoint": "in-hand line for a past As of / past period", "issue": "Outstanding As of 31 Oct shows 'Cheques in hand ₹3,43,288 (2 cheques)' and Collections Feb-2026 shows ₹7,35,000 (4 cheques), but the link opens today's in-hand list (1 cheque ₹40,000). The drill doesn't match the number it was tapped from."},
+      {"endpoint": "GET /api/reports/v3/outstanding totals", "issue": "Outstanding 'waived ₹31,250' vs Customer status 'waived ₹25,000' today. Totals still agree (₹4,48,61,305), so the difference is probably other-charge waivers, but the two Waived figures are not labelled the same way. Owner may question it."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Report-line drill links (ReportSheet.jsx report-line-*)", "issue": "booking-register live/cancelled and refunds/other-income lines open the legacy Reports page, and in-hand loses its status filter (see backend_issues). Clicking them gives the user a page that is wrong or empty.", "selector": "[data-testid=report-line-live], [data-testid=report-line-cancelled], [data-testid=report-line-in-hand], [data-testid=report-line-other-income]", "priority": "HIGH"},
+      {"component": "FilterBar As-of picker", "issue": "Future days are disabled in the calendar (max=today), so picking one does nothing. The toast 'As of can't be after today' never appears from the picker. The last valid date is kept, so the date is still refused, but the review spec expected a toast. Opening ?as_of=2099-01-01 directly gives a full-page 'Couldn't load this report — As of can't be after today' with a Retry button that can't help. It does not keep the last valid date or fall back to today.", "selector": "[data-testid=rf-as-of]", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Outstanding PDF (A4 landscape)", "issues": ["Flat column is truncated to 'SGH · T…' on every row, so the flat can't be identified", "Header 'Waived' wraps mid-word as 'Waive / d'", "The Cheques in hand line is not printed under the formula"]},
+      {"screen": "As-of calendar", "issues": ["The highlighted 'today' uses the browser's local date (18 Nov in a UTC browser) while the business date is 19 Nov IST. This is cosmetic for IST users."]},
+      {"screen": "Collections mobile total card", "issues": ["'Total · 500 shown' sits above whole-period totals (1,069 receipts), which is ambiguous"]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/spot_phase3h_api.py"],
+  "action_items": [
+    "Change line links to /reports/v3/...: reports_v3/bookings.py:93 base '/reports/v3/booking-register?booking_status=', registry.py:779 '/reports/v3/cheques?status=In+hand', registry.py:783 and :1219 '/reports/v3/cancellations' + period params. Alternatively make legacyTarget() in pages/Reports.jsx forward all non-legacy params and add booking-register/cancellations to LEGACY_REDIRECT.",
+    "When the in-hand line comes from a past As of / period, include that date in the drill (e.g. an in-hand-on-date filter) so the list matches the number tapped",
+    "Outstanding PDF: widen or don't truncate the Flat column, and stop the 'Waived' header from wrapping mid-word",
+    "Optional: make the As-of picker show the toast when a disabled future day is clicked (or drop that from the spec), and handle a future as_of in the URL by toasting and falling back instead of showing the error card"
+  ],
+  "critical_code_review_comments": [
+    "Line links are hard-coded legacy paths in the backend registry while the SPA's legacy redirect only handles a whitelist and 3 params. Links should be built from one helper that emits /reports/v3/<key>?<v3 params>.",
+    "_received_lines always links to today's in-hand list regardless of ctx as_of/period_to"
+  ],
+  "updated_files": ["/app/backend/tests/spot_phase3h_api.py (new, read-only spot script)"],
+  "success_rate": {"backend": "90% (all numbers / 422 / columns correct; link targets wrong)", "frontend": "75% (8 of 10 flows pass; drill links broken; future-date toast not shown)"},
+  "test_credentials": "admin@kkt.in / Kkt@12345 (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "None. No writes. The theme was switched only through the DOM data-theme attribute and was not saved to the profile.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Preview business date 19 Nov 2026 IST. Not tested: point 5 (payment against a fully-paid manual bill), because preview has 0 manual bills and money writes are disallowed. Retest by clicking report-line-in-hand (expect 1 cheque, STATE In hand), report-line-cancelled/live on booking-register (expect 2/80 rows in the v3 sheet), and report-line-other-income on cash-vs-account (expect the 2 cancellations). Backend pytest suite was deliberately not run.",
+  "rca of the issue": "Report-line links point at /reports/<key>. The route /reports/:key renders Reports.jsx, which redirects only keys in LEGACY_REDIRECT (lib/reportsV3.js) and rebuilds the query string from from_date/to_date/project_id only. So cheques loses ?status, and booking-register/cancellations (not whitelisted) render the old ReportView with no data. Repro: /reports/v3/booking-register → click '2 cancelled' → URL /reports/booking-register?booking_status=Cancelled → old page 'No data for these filters'. Mitigation: emit /reports/v3/... links from the backend."
+}

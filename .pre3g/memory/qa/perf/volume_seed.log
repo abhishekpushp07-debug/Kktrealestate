@@ -1,0 +1,32 @@
+projects=6 blocks=36 flats=2170
+customer failed 409 {"detail":"Phone already registered to Divya Prasad (CUST-2627-0014)","code":"DUPLICATE_PHONE","request_id":"9264e598874
+customer failed 409 {"detail":"Phone already registered to Priya Yadav (CUST-2627-0010)","code":"DUPLICATE_PHONE","request_id":"a130d380d26f
+customer failed 409 {"detail":"Phone already registered to Priya Yadav (CUST-2627-0016)","code":"DUPLICATE_PHONE","request_id":"ef05d300207f
+customer failed 409 {"detail":"Phone already registered to Rahul Tiwari (CUST-2627-0013)","code":"DUPLICATE_PHONE","request_id":"4280b86ee77
+customer failed 409 {"detail":"Phone already registered to Sneha Thakur (CUST-2627-0017)","code":"DUPLICATE_PHONE","request_id":"6015fdfa636
+customer failed 409 {"detail":"Phone already registered to Nitin Yadav (CUST-2627-0019)","code":"DUPLICATE_PHONE","request_id":"9f7d51446eaa
+customer failed 409 {"detail":"Phone already registered to Manish Kumar (CUST-2627-0018)","code":"DUPLICATE_PHONE","request_id":"1987838b3f5
+customer failed 409 {"detail":"Phone already registered to Sneha Verma (CUST-2627-0024)","code":"DUPLICATE_PHONE","request_id":"edeea66e85fd
+customer failed 409 {"detail":"Phone already registered to Sanjay Gupta (CUST-2627-0021)","code":"DUPLICATE_PHONE","request_id":"42d7e0cdabc
+customer failed 409 {"detail":"Phone already registered to Rahul Thakur (CUST-2627-0022)","code":"DUPLICATE_PHONE","request_id":"68469219e48
+customer failed 409 {"detail":"Phone already registered to Neha Yadav (CUST-2627-0023)","code":"DUPLICATE_PHONE","request_id":"b1556a67cf9d4
+customer failed 409 {"detail":"Phone already registered to Neha Thakur (CUST-2627-0020)","code":"DUPLICATE_PHONE","request_id":"2b30addd0ac9
+customer failed 409 {"detail":"Phone already registered to Divya Ranjan (CUST-2627-0025)","code":"DUPLICATE_PHONE","request_id":"88a85bba00b
+customer failed 409 {"detail":"Phone already registered to Suresh Sinha (CUST-2627-0027)","code":"DUPLICATE_PHONE","request_id":"c0501ddb5cd
+customer failed 409 {"detail":"Phone already registered to Sanjay Pandey (CUST-2627-0029)","code":"DUPLICATE_PHONE","request_id":"805147c743
+customer failed 409 {"detail":"Phone already registered to Suresh Pandey (CUST-2627-0026)","code":"DUPLICATE_PHONE","request_id":"5b69fd48e1
+customer failed 409 {"detail":"Phone already registered to Vikram Pandey (CUST-2627-0028)","code":"DUPLICATE_PHONE","request_id":"b422f2514b
+customer failed 409 {"detail":"Phone already registered to Neha Gupta (CUST-2627-0030)","code":"DUPLICATE_PHONE","request_id":"31bea16bb0e24
+customer failed 409 {"detail":"Phone already registered to Manish Srivastava (CUST-2627-0033)","code":"DUPLICATE_PHONE","request_id":"2f915d
+customer failed 409 {"detail":"Phone already registered to Sneha Gupta (CUST-2627-0031)","code":"DUPLICATE_PHONE","request_id":"882ba73389ae
+customer failed 409 {"detail":"Phone already registered to Kavita Tiwari (CUST-2627-0032)","code":"DUPLICATE_PHONE","request_id":"2849060882
+customer failed 409 {"detail":"Phone already registered to Sneha Mishra (CUST-2627-0034)","code":"DUPLICATE_PHONE","request_id":"5ed6a489e54
+customer failed 409 {"detail":"Phone already registered to Neha Tiwari (CUST-2627-0035)","code":"DUPLICATE_PHONE","request_id":"f29be2eec80b
+customer failed 409 {"detail":"Phone already registered to Deepak Gupta (CUST-2627-0036)","code":"DUPLICATE_PHONE","request_id":"ede6e9d3eb2
+customer failed 409 {"detail":"Phone already registered to Deepak Prasad (CUST-2627-0037)","code":"DUPLICATE_PHONE","request_id":"edb946c032
+customers=1975
+bookings=1500
+payments posted=19474
+TOTALS {'projects': 6, 'blocks': 36, 'flats': 2170, 'customers': 1975, 'bookings': 1500, 'payments': 19508, 'leads': 1498, 'site-visits': 74, 'service-requests': 200}
+INTEGRITY ok= True {}
+EXIT 0

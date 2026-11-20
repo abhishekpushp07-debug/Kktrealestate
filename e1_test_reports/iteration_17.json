@@ -1,0 +1,27 @@
+{
+ "iteration": 17, "phase": "3H", "passed": 15, "failed": 0, "retest_needed": false,
+ "bugs": [],
+ "action_items": [
+  {"type":"note","severity":"low","detail":"JRN-155: BK-2627-3030 is booked on 19 Nov 2026, so As of 18 Nov it is not in Outstanding at all. The 'later waiver ignored' rule is only trivially true here. A waiver on an older booking, approved after the As-of date, is needed for a real test. As of today the booking shows waived ₹26,250 (WV-2627-0052 ₹25,000 plus earlier waivers)."},
+  {"type":"note","severity":"low","detail":"The Cancellations link on the Feb 2026 Refunds line carries period_from=2000-01-01. Opening the Cancellations report with no period (default this FY) shows 0 rows, because both cancellations are dated FY25-26."},
+  {"type":"fixture","severity":"info","detail":"Preview writes: a tscheck ₹12,345 Account cheque was created and cleared on BK a4c0f93b…. A tscheck ₹20,000 manual bill plus ₹20,000 NEFT payment were posted on fully-paid booking 85b4bd88… (two manual bills now exist from the first and second runs). All of these are replaced by the nightly refresh. The seeded cheque KKT/2627/42976 was NOT cleared; the clearing journey used a cheque this test created."},
+  {"type":"note","severity":"info","detail":"Run the 3H backend files serially (-n 0). Under xdist, the manual-bill test's payment changes the Bank-wise total while the cheque test is reading it. This is a test-isolation issue, not an app bug."}
+ ],
+ "checks": [
+  {"criterion":"JRN-141/142","name":"test_tscheck_3h_cheque_in_hand.py","lane":"backend","status":"passed","evidence":"POST /payments cheque -> 201. Collections and Bank-wise Received unchanged, in_hand +1234500. Listed in cheques?in_hand_on. POST /payments/{id}/clear 200 -> Received +1234500 on both reports, in_hand back, booking outstanding -1234500"},
+  {"criterion":"JRN-141/142","name":"3h-cheque-in-hand-lines","lane":"browser","status":"passed","evidence":"Collections and Bank-wise show 'Cheques in hand ₹… (n cheques)'. Tapping the line opens the Cheque register, which lists KKT/2627/42976"},
+  {"criterion":"JRN-145","name":"test_tscheck_3h_identity.py","lane":"backend","status":"passed","evidence":"This month / Oct / FY: collections.total == bank-receipts.total + cash_mode, e.g. 14,60,30,789 + 5,83,40,827 = 20,43,71,616. No 'Unexplained' line"},
+  {"criterion":"JRN-147","name":"test_tscheck_3h_cancelled_refunds.py","lane":"backend","status":"passed","evidence":"Feb 2026 refunds_paid_paise=42289200, line 'Refunds paid out −₹4,22,892'. The link lists BK-2526-3428 refund_paid 42289200, forfeiture 4698800"},
+  {"criterion":"JRN-147","name":"3h-feb-refunds-line","lane":"browser","status":"passed","evidence":"Feb Collections shows 'Refunds paid out −₹4,22,892'. Tapping it opens Cancellations, which lists BK-2526-3428"},
+  {"criterion":"JRN-148/149","name":"test_tscheck_3h_bvc_cancelled.py","lane":"backend","status":"passed","evidence":"Default demand 38016979500 == customer-status bills_raised. include_cancelled: +232840000 == cancelled_demand, 'Cancelled bookings ₹23,28,400', sentence 'include cancelled'"},
+  {"criterion":"JRN-148/149","name":"3h-bvc-include-cancelled","lane":"browser","status":"passed","evidence":"Live line shown by default. Switch on -> 'Cancelled bookings ₹23,28,400' and sentence 'include cancelled'. Switch off -> cancelled line gone"},
+  {"criterion":"JRN-152/153/158","name":"test_tscheck_3h_as_of.py","lane":"backend","status":"passed","evidence":"default == as_of today == customer-status total_due. As of 31 Oct 3504349800 (78 bookings) == customer-status. Future date -> 4xx 'As of can't be after today'"},
+  {"criterion":"JRN-152/153/158","name":"3h-outstanding-as-of","lane":"browser","status":"passed","evidence":"Sentence '78 bookings · as of 31 Oct 2026', ₹3,50,43,498 visible. PDF export 200 with as_of=2026-10-31. A future URL shows the refusal message (accepted deviation)"},
+  {"criterion":"JRN-155/156","name":"test_tscheck_3h_waiver_cancel_asof.py","lane":"backend","status":"passed","evidence":"BK-2627-3030: as of today waived 2625000 (>=25,000); not present As of 18 Nov (see note). BK-2526-3428 absent As of 15 Jan 2026 and today"},
+  {"criterion":"JRN-160","name":"test_tscheck_3h_manual_bill_paid_share.py","lane":"backend","status":"passed","evidence":"POST /demands/manual ₹20,000 Account on a fully paid booking -> Outstanding +2000000. POST /payments ₹20,000 Account 201 (not capped) -> Outstanding back to original"},
+  {"criterion":"JRN-163-167","name":"test_tscheck_3h_presentation.py","lane":"backend","status":"passed","evidence":"Outstanding/Collections group project/tower/floor/flat/booking subtotals == totals. PDF MediaBox 841.89x595.28 (A4 landscape). Booking register lines 'N live','M cancelled'. /admin/ops 5 uniqueness rules applied"},
+  {"criterion":"JRN-163-167","name":"3h-presentation-phone","lane":"browser","status":"passed","evidence":"At 390px: register shows live/cancelled parts, and Cancelled opens a list with BK-2526-3428. scrollWidth 390 on register, outstanding and stacking. No CUST- ids on tiles. 'All 5 uniqueness rules applied'"},
+  {"criterion":"JRN-163-167","name":"stacking-plan-admin-sales","lane":"browser","status":"passed","evidence":"Re-run: 186 cells as admin and as sales, with no customer ids"},
+  {"criterion":"JRN-163-167","name":"3h-cheque-in-hand-lines (1440px)","lane":"browser","status":"passed","evidence":"Desktop 1440 run of the report sheets. Screenshots taken"}
+ ]
+}

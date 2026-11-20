@@ -1,0 +1,106 @@
+{
+ "vus": 20,
+ "duration_s": 65,
+ "requests": 1705,
+ "rps": 26.3,
+ "stopped": null,
+ "errors": {},
+ "assertions": {
+  "lead_created:ok": 141,
+  "lead_converted:ok": 141,
+  "booking_created:ok": 141,
+  "booking_total_matches_preview:ok": 141,
+  "payment_posted:ok": 141,
+  "c360_shows_booking:ok": 137,
+  "ledger_received_equals_payment:ok": 137,
+  "ledger_bill_raised_positive:ok": 137,
+  "inventory_flat_booked:ok": 137,
+  "receipt_pdf:ok": 137,
+  "demand_register:ok": 133,
+  "project_statement:ok": 133,
+  "stage_demands_match_active_bookings:ok": 5,
+  "documents_register:ok": 5,
+  "integrity_ok_after_stage:ok": 1
+ },
+ "failed_assertions": [],
+ "groups": {
+  "bookings": {
+   "n": 151,
+   "p50": 396.9,
+   "p95": 908.5,
+   "p99": 1137.6
+  },
+  "breakdown": {
+   "n": 141,
+   "p50": 22.0,
+   "p95": 38.1,
+   "p99": 46.4
+  },
+  "construction": {
+   "n": 10,
+   "p50": 751.0,
+   "p95": 4250.7,
+   "p99": 4250.7
+  },
+  "customers": {
+   "n": 278,
+   "p50": 25.6,
+   "p95": 55.6,
+   "p99": 74.2
+  },
+  "demand_register": {
+   "n": 133,
+   "p50": 6.9,
+   "p95": 13.0,
+   "p99": 34.3
+  },
+  "documents": {
+   "n": 5,
+   "p50": 8.1,
+   "p95": 9.6,
+   "p99": 9.6
+  },
+  "flats": {
+   "n": 137,
+   "p50": 15.4,
+   "p95": 33.7,
+   "p99": 40.6
+  },
+  "leads": {
+   "n": 282,
+   "p50": 44.9,
+   "p95": 150.6,
+   "p99": 160.2
+  },
+  "ledger": {
+   "n": 137,
+   "p50": 8.2,
+   "p95": 17.5,
+   "p99": 20.3
+  },
+  "login": {
+   "n": 20,
+   "p50": 237.8,
+   "p95": 241.5,
+   "p99": 241.5
+  },
+  "payments": {
+   "n": 141,
+   "p50": 246.3,
+   "p95": 347.7,
+   "p99": 378.7
+  },
+  "project_statement": {
+   "n": 133,
+   "p50": 22.2,
+   "p95": 40.3,
+   "p99": 46.3
+  },
+  "receipt_pdf": {
+   "n": 137,
+   "p50": 9.7,
+   "p95": 21.6,
+   "p99": 30.2
+  }
+ }
+}

@@ -1,0 +1,28 @@
+{
+  "summary": "Frontend-only retest of K1 (Upcoming dues read fix plus the 30/90/365 horizon selector, and a sweep of all reports) and K2 (Message templates heading, Masters breadcrumbs) on the preview build (frontend/build 05:23 UTC), logged in as admin@kkt.in. All requested items pass. K1: /reports/upcoming-dues shows 158 rows with the 11 expected columns. KPI tiles: Instalments 158 'next 90 days', Total ₹12.12 Cr 'Σ rows', With a date ₹0, Date not yet known ₹12.12 Cr. The Total column adds up to ₹1,21,190,212 in-page, which equals API total_paise 12119021200. rf-days offers Next 30/90/365 days, default 90 (first request ?days=90). Switching fires ?days=30 and ?days=365, and the tile caption changes to 'next 30 days' / 'next 365 days'. Rows stay 158, as expected for the undated stage-triggered dues. Project filter sends project_id: GGV gives 0 rows and the empty state (the API also returns items: [] for GGV), SGH gives 158. CSV downloads upcoming-dues.csv with 159 lines (header + 158). Sweep: all 25 reports in the left list, plus the 3 legacy URLs (collections, outstanding, roznamcha-range), show the same row count in the UI as in the API response captured on the network for the same filters. 0 mismatches. 'No data' appears only where the API returned 0 rows (cancellations in the FY range, project-statement with no project, landowner-share, masked-inventory). KPI tiles and charts render with 0 console errors. K2: templates-heading reads 'Message templates'. The selected template name shows as a sub-heading and changes when another template is picked (Demand raised → Receipt sent) while the main heading stays. Breadcrumbs read 'Masters › Hold Reasons', 'Masters › Allocation Categories', 'Masters › Message templates', 'Masters › Floor Templates', and '/masters' shows 'Masters'. There is no 'm' segment.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Topbar Crumbs (AppShell.jsx CRUMB map)", "issue": "14 report keys have no CRUMB label, so the breadcrumb shows the raw slug, e.g. 'Reports › data-quality'. Missing keys: cash-vs-account, collections-v2, construction-vs-plan, data-quality, hold-register, inventory-control, landowner-share, masked-inventory, other-charges, outstanding-v2, project-statement, receivables-forecast, roznamcha-summary, sales-team. Same kind of issue as K2, not in scope for K2.", "selector": "[data-testid=topbar] nav", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Reports → Upcoming dues table", "issues": ["Booking numbers wrap onto two lines (e.g. 'BK-2526-' / '2305'), and so do 'Tower C' and the project name; consider whitespace-nowrap on the Booking/Tower columns", "No sticky totals footer, unlike the other reports (adaptReport does not set totals); optional"]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Optional (LOW): add CRUMB labels for the 14 report keys listed above, or take the label from the reports registry name, so breadcrumbs don't show raw slugs",
+    "Optional (LOW): stop Booking/Tower cells wrapping in the Upcoming dues table; consider adding a totals row"
+  ],
+  "critical_code_review_comments": [
+    "Reports.jsx row key falls back to a join of the column values when r.id is missing; upcoming-dues rows have no id, so two identical rows would produce duplicate React keys. No warning was seen on the current data. Consider appending the index.",
+    "adaptReport only adapts when d.rows is missing, which is a safe guard. The upcoming-dues KPI 'Date not yet known' = total - dated_total_paise, which is correct."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped as requested)", "frontend": "100% (7/7 requested items)"},
+  "seed_data_creation": "None. No presets saved, no data changed.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "K1/K2 verified in iteration 33. The reports list has 25 entries; upcoming-dues, collections, outstanding and roznamcha-range are legacy keys reachable only by URL. Sweep method: capture /api/reports/<key> responses with page.on('response') and compare rows/items length with the number of tbody rows in [data-testid=report-table]. Upcoming dues: 158 rows, all SGH, all undated, total_paise 12119021200 on 2026-11-16."
+}

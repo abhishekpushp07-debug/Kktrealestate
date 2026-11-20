@@ -1,0 +1,260 @@
+{
+ "stages": [
+  {
+   "vus": 20,
+   "assertions": {
+    "lead_created:ok": 138,
+    "lead_converted:ok": 138,
+    "booking_created:ok": 138,
+    "booking_total_matches_preview:ok": 138,
+    "payment_posted:ok": 138,
+    "c360_shows_booking:ok": 138,
+    "ledger_received_equals_payment:ok": 138,
+    "ledger_bill_raised_positive:ok": 138,
+    "inventory_flat_booked:ok": 138,
+    "receipt_pdf:ok": 138,
+    "demand_register:ok": 134,
+    "project_statement:ok": 134,
+    "stage_demands_equal_active_bookings:ok": 2,
+    "documents_register:ok": 5,
+    "stage_demands_equal_active_bookings:FAIL": 3,
+    "integrity_ok_after_stage:ok": 1
+   },
+   "failed_assertions": [
+    {
+     "assertion": "stage_demands_equal_active_bookings",
+     "detail": "14 vs 15"
+    },
+    {
+     "assertion": "stage_demands_equal_active_bookings",
+     "detail": "19 vs 21"
+    },
+    {
+     "assertion": "stage_demands_equal_active_bookings",
+     "detail": "26 vs 29"
+    }
+   ]
+  },
+  {
+   "vus": 50,
+   "assertions": {
+    "lead_created:ok": 513,
+    "lead_converted:ok": 513,
+    "booking_created:ok": 50,
+    "booking_total_matches_preview:ok": 50,
+    "payment_posted:ok": 50,
+    "c360_shows_booking:ok": 50,
+    "ledger_received_equals_payment:ok": 50,
+    "ledger_bill_raised_positive:ok": 50,
+    "inventory_flat_booked:ok": 50,
+    "receipt_pdf:ok": 50,
+    "booking_created:FAIL": 451,
+    "demand_register:ok": 50,
+    "project_statement:ok": 50,
+    "integrity_ok_after_stage:ok": 1
+   },
+   "failed_assertions": [
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed"
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed"
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed"
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed"
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed"
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed"
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed"
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed"
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed"
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed"
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed"
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed"
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed"
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed"
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed"
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed"
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed"
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed"
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed"
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed"
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed"
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed"
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed"
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed"
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed"
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed"
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed"
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed"
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed"
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed"
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed"
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed"
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed"
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed"
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed"
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed"
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed"
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed"
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed"
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed"
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed"
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed"
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed"
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed"
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed"
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed"
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed"
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed"
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed"
+    },
+    {
+     "assertion": "booking_created",
+     "detail": "booking POST failed"
+    }
+   ]
+  }
+ ]
+}

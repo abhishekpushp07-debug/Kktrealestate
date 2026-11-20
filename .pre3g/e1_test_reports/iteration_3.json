@@ -1,0 +1,77 @@
+{
+  "iteration": 3,
+  "batch": "Phase 1 batch (c): JRN-4, 7, 18, 26, 27, 28",
+  "passed": 10,
+  "failed": 2,
+  "retest_needed": true,
+  "before_values_noted": {
+    "at": "2026-11-16T00:03Z (before any action)",
+    "highest_booking": "BK-2627-2047",
+    "highest_receipt": "KKT/2627/14994",
+    "masters_counts": {"payment_modes": 6, "hold_reasons": 5, "flat_types": 5, "payment_plans": 8, "bank_accounts": 1, "charge_types": 11, "projects": 2, "blocks": 5, "flats": 138, "users": 9},
+    "hold_reasons": ["Customer interest", "Legal/documentation", "Management", "Pricing review", "Token received"],
+    "unsold_flat_prices_paise": {"A-102": 645250000, "A-701": 681500000, "C-304": 456750000}
+  },
+  "bugs": [
+    {
+      "id": "BUG-1",
+      "severity": "high",
+      "criterion": "JRN-27 Refresh keeps setup and logins",
+      "title": "Demo refresh wipes the Hold Reasons master (5 reasons -> 1 'Token promised')",
+      "evidence": "Before refresh (DB + backup test_database-20261116T002006Z taken by the refresh itself): hold_reasons = [Customer interest, Legal/documentation, Management, Pricing review, Token received]. After POST /api/admin/demo-refresh/run finished (done, 00:25:06Z): GET /api/master/hold-reasons -> ['Token promised'] only (browser check refresh-keeps-setup, logged HOLD REASONS [\"Token promised\"]). After the next backend restart, 4 defaults came back with created_at 2026-11-16T00:32:24 (startup seeding) but 'Token received' is still gone: test_tscheck_refresh_state::test_hold_reason_master_kept -> ['Customer interest','Legal/documentation','Management','Pricing review','Token promised']. Other masters (payment modes, flat types, plans, bank, charge types, projects, tower names, 138 flats, 9 users) and the 3 noted flat prices are unchanged. Hold expiry is mandatory, so a missing reason list affects the Hold flow. Also note: block/project/flat ids are regenerated on every refresh (prices/names identical), which breaks any bookmarked /bookings/new?flat=<id> link."
+    },
+    {
+      "id": "BUG-2",
+      "severity": "medium",
+      "criterion": "JRN-26 Nightly refresh brings 'today' back",
+      "title": "Right after a demo refresh, System Health 'Last backup' shows 'never' although the pre-refresh backup exists",
+      "evidence": "Browser check demo-refresh-today (Settings): 'Demo last refreshed 2026-11-16 · done' OK, but ops-last-backup text = 'LAST BACKUP — never'. Same moment: GET /api/admin/backups -> last_backup: null, archives (6) include 'test_database-20261116T002006Z.archive.gz' = the backup recorded on the refresh's job row. The story rebuild apparently wipes the backups record collection. (It became non-null only later after the JRN-28 manual reseed wrote its own backup at 00:27.) Only the archive count, not the pre-refresh backup name, is visible in the UI."
+    }
+  ],
+  "action_items": [
+    {
+      "type": "tester_self_report",
+      "severity": "medium",
+      "detail": "My first JRN-26 trigger (00:12Z) was interrupted: I created a test file under /app/backend/e1_tests while it ran, uvicorn WatchFiles reloaded the backend, and the in-process job died, so it never wrote a job_runs row (the reseed itself had finished). I triggered a second clean refresh (00:20:06 -> 00:25:06 done), which is the one the report is based on. Builder hint: DEMO_REFRESH writes its job_runs row only at the end, so a restart mid-run leaves no trace and 'running' silently goes false; consider inserting a 'running' row at start. Data changed by these runs was the sanctioned demo rebuild; my own tscheck rows (tscheck-jrn4 customer, a tscheck plan) were wiped by it and recreated where needed."
+    },
+    {
+      "type": "note",
+      "severity": "low",
+      "criterion": "JRN-18",
+      "detail": "Payment plan at 95%: the form shows an inline 'Σ 95.00% ≠ 100' and turns Save off, so you can't save it and no error toast appears. The criterion expects an error toast on save. A valid 100% save shows the success toast 'Plan saved' (sonner). Whether the inline block is acceptable is a spec decision."
+    },
+    {
+      "type": "note",
+      "severity": "low",
+      "criterion": "JRN-18",
+      "detail": "Payment form has 5 fields (Booking, Amount, Date, Mode, Bank account) plus an optional Remarks field. With NEFT/RTGS selected it also shows Drawn on bank, Instrument/UTR no. and Instrument date, for 9 visible fields."
+    },
+    {
+      "type": "note",
+      "severity": "low",
+      "criterion": "JRN-7",
+      "detail": "The hold register shows 3 active holds but only 1 has an expiry (C-101, about 41.8 h left, 'Token promised tomorrow'). B-101 and B-104 are listed as 'legacy (no expiry)', which conflicts with 'hold expiry is mandatory'."
+    },
+    {
+      "type": "info",
+      "severity": "low",
+      "detail": "JRN-28 used exactly ONE manual reseed (00:27Z, POST /api/admin/reseed {confirm:RESEED, story:true}). The reseed recreates users, so the session token is invalidated: the first automated attempt got 401 USER_INACTIVE on the trigger. The trigger was then made right away with a fresh login while the reseed status was 'running'. The test file now re-logs in for future runs and is heavy (it starts a reseed), so run it on purpose only."
+    }
+  ],
+  "checks": [
+    {"criterion": "JRN-4 Numbers never reused", "name": "numbers-never-reused", "lane": "browser", "status": "passed", "evidence": "Pre-refresh: 3-step wizard on SGH Tower C C-1602 (₹69,96,250) created BK-2627-2048 (> highest BK-2627-2047). UPI receipt KKT/2627/14995 (> 14994). Reversed it from the booking's Payments tab ('Payment reversed') and cancelled the booking from the screens; DB shows the booking Cancelled, the receipt Reversed and C-1602 Available again. Post-refresh re-run: BK-2627-2097 / KKT/2627/16428."},
+    {"criterion": "JRN-18 Core flows unchanged after cleanup", "name": "core-flows-unchanged", "lane": "browser", "status": "passed", "evidence": "Wizard has 3 steps: Who / Price & Plan / Confirm. Payment labels: Booking, Amount, Date, Mode, Bank account (+Remarks; NEFT adds instrument fields, see note). Customer 360, Bills raised (/demands), Roznamcha, Reports and Masters all show content. Plan at 95%: Save disabled with inline Σ error, no toast (see note). Plan at 100%: success toast 'Plan saved'. Console errors: []."},
+    {"criterion": "JRN-7 Story covers every situation", "name": "story-in-reports", "lane": "browser", "status": "passed", "evidence": "Reports UI: Collections By mode shows Cash/Cheque/NEFT-RTGS/UPI. Cheque register shows Pending and Bounced. Outstanding shows 0-30/31-60/61-90/90+. Cancellations show Paid and Forfeited. Hold register shows C-101 'Token promised tomorrow' expiring. Lead funnel shows Lost. Site visits report and Leads visits tab load."},
+    {"criterion": "JRN-7 Story covers every situation", "name": "test_tscheck_story_coverage.py", "lane": "backend", "status": "passed", "evidence": "8 passed (pre- and post-refresh). Receipts exist for each mode (GET /payments?payment_mode_id). /reports/cheques by_status has Cleared/Bounced/Pending. Outstanding ageing has all 4 buckets > 0. /reports/cancellations has refund_status Paid (BK-2526-1384 ₹4,18,158) and Forfeited (BK-2526-1394). Audit has booking.transfer and booking.agreement_revision. Hold register expiring_48h=1. A Lost lead with reason; funnel Lost ≥1. /site-visits/today ≥1."},
+    {"criterion": "JRN-26 Nightly refresh brings 'today' back (preview)", "name": "demo-refresh-today", "lane": "browser", "status": "failed", "evidence": "Home: Visits today 1, Follow-ups due 1, Cheques to clear 1 · ₹40,000, Collected this month ₹1.55 Cr (1,54,85,546). Settings card: 'Demo last refreshed 2026-11-16 · done'. But 'Last backup' shows '— never' (BUG-2). Note: the check script asserts only visibility of the backup tile, so the tool reported PASSED; it is recorded as failed against the criterion."},
+    {"criterion": "JRN-26 Nightly refresh brings 'today' back (preview)", "name": "test_tscheck_refresh_state.py (refresh/home/backup tests)", "lane": "backend", "status": "passed", "evidence": "GET /admin/demo-refresh last_done: outcome done, as_of 2026-11-16, backup test_database-20261116T002006Z.archive.gz (started 00:20:06Z, finished 00:25:06Z). Home collections_mtd_paise>0, pending_cheques>0. The tscheck residue is gone: 0 tscheck customers/plans, 0 reversed receipts on BK-2526-1349. Backup-listed test passed only after the later reseed backup; immediately after the refresh last_backup was null (BUG-2)."},
+    {"criterion": "JRN-27 Refresh keeps setup and logins", "name": "refresh-keeps-setup", "lane": "browser", "status": "failed", "evidence": "sales@kkt.in UI login reaches Home; admin API login 200. Prices for A-102/A-701/C-304 are unchanged (645250000/681500000/456750000 paise). Hold reasons = ['Token promised'] vs the 5 before (BUG-1)."},
+    {"criterion": "JRN-27 Refresh keeps setup and logins", "name": "test_tscheck_refresh_state.py (logins/prices/masters/numbers)", "lane": "backend", "status": "failed", "evidence": "Logins 200 for admin and sales. Prices unchanged. Counters after refresh BK 2096 / RC 16427 (> 2048 / 14995 issued in JRN-4). New booking BK-2627-2097 and receipt KKT/2627/16428 are higher. test_hold_reason_master_kept FAILED: ['Customer interest','Legal/documentation','Management','Pricing review','Token promised'] != before ('Token received' lost; 4 came back only via startup seeding). Projects and tower names unchanged; ids regenerated."},
+    {"criterion": "JRN-28 Never on production, never on top of a running rebuild", "name": "test_tscheck_refresh_guard.py::test_production_host_disabled_changes_nothing", "lane": "backend", "status": "passed", "evidence": "POST /api/admin/demo-refresh/run {check_host:'billpe.com'} -> 200 outcome 'disabled: billpe.com is not a demo host'. Status last.outcome is disabled, running=false. bookings/payments/demands/flats counts unchanged. Flag-off case is builder-evidenced in tests/test_demo_refresh.py::test_guard_flag_absent_is_disabled (not run, per constraints)."},
+    {"criterion": "JRN-28 Never on production, never on top of a running rebuild", "name": "test_tscheck_refresh_guard.py::test_run_needs_permission", "lane": "backend", "status": "passed", "evidence": "sales@kkt.in POST /api/admin/demo-refresh/run -> 403."},
+    {"criterion": "JRN-28 Never on production, never on top of a running rebuild", "name": "test_tscheck_refresh_guard.py::test_skipped_while_reseed_runs", "lane": "backend", "status": "passed", "evidence": "Single manual reseed at 00:27Z. The automated trigger got 401 because the reseed recreates users (test_error in the harness, test fixed). The trigger was repeated right away with a fresh login while reseed status was 'running': response {id: DEMO_REFRESH-1794788914297, outcome: 'skipped: reseed running'}. History afterwards: 00:28:34 skipped: reseed running · 00:27:10 disabled · 00:20:06 done. No extra rebuild row; reseed finished 'done'."},
+    {"criterion": "JRN-18 Core flows unchanged after cleanup", "name": "console-clean (within core-flows-unchanged)", "lane": "browser", "status": "passed", "evidence": "Collected pageerror + console.error across wizard, payments, customer360, demands, roznamcha, reports, masters and plan form: []."}
+  ],
+  "residue": "tscheck-jrn4 Buyer customer (phone 9000004417) with Cancelled booking BK-2627-2097 and a Reversed receipt KKT/2627/16428 (post-refresh). A tscheck-plan-* payment plan and the pre-refresh BK-2627-2048 were wiped by the refresh. No seeded rows were edited. The JRN-28 reseed was sanctioned by the briefing.",
+  "notes": "Re-read /app/memory/qa/phase1/demo_journeys.md after the refresh: it was regenerated 2026-11-16 and its headline matches Home (₹15,485,546 this month; cheques 1 · ₹40,000; visits today 1; follow-ups due 1)."
+}

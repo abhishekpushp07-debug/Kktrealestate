@@ -1,0 +1,64 @@
+{
+  "summary": "Chunk 3-2 (3D restyle + 3E master audit) on the preview as admin, at 1440 and 390 px, plus targeted API checks. The core journeys work. JRN-69: the wizard has 3 steps, the slot search filters as you type, the payment sheet has 5 base fields, and AmountInput fields show ₹ 1,23,456, keep a paste of 1,23,456.50, and keep the caret in place when a digit is inserted. JRN-71: all 9 master lists and 4 template lists show Used in N, the active switch and the row menu, and the catalogue shows Used in. JRN-72: on the 3rd entry the form offers Save to Lead sources; clicking it saves and selects the value without leaving the form, and the catalogue shows it with Used in 2. The Lost reason and Drawn on bank fields use the same component. JRN-73: the MAINT GST change (18 to 12) reached the new wizard cost sheet; the older booking kept 18 and the CLUB project override stayed 18. Master value restored. Carry-overs pass: no duplicate 'Payment posted' rows, the checklist reads 'Towers added', and Connected to reads 'Bills raised' and 'KYC files'. The bill ⋯ menu has Print letter / Mark reminder sent / Void bill; the register ⋯ menu has Download again / Void document. Issues found: (1) JRN-70 is not met. 'demand' wording is still visible in the Manual bill sheet, 3 report pages and Settings, and the catalogue shows snake_case codes; the internal-words scan misses these because it only reads the first visible page text. (2) 3 amount fields are still plain type=number. (3) Backspace on a comma makes the caret jump to the end. (4) The deployed build is older than MasterEditNote.jsx, so the testid is still 'master-edit-note'.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/catalogues/{list}/typed-value", "issue": "Counts every lead with that source. Inactive or soft-deleted leads are not excluded (no deleted_at filter). Fine for now, but the count can include voided records."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Bills raised › Manual bill sheet (Demands.jsx:900)", "issue": "Submit button says 'Raise demand'. This breaks JRN-70; the owner word is Bill.", "selector": "[data-testid=md-save]", "priority": "HIGH"},
+      {"component": "Manual bill sheet: Account ₹", "issue": "md-account is type=number: no ₹ prefix, no grouping (shows 123456). md-cash next to it is an AmountInput.", "selector": "[data-testid=md-account]", "priority": "MEDIUM"},
+      {"component": "Booking › Revise agreement: Account agreed ₹", "issue": "rev-account is type=number (BookingDetail.jsx ~761). Shows 1293456 while rev-cash next to it shows ₹ 1,23,456.50.", "selector": "[data-testid=rev-account]", "priority": "MEDIUM"},
+      {"component": "Booking wizard › Account ₹", "issue": "wiz-account is type=number (BookingWizard.jsx ~665) and shows 2436000 ungrouped, while Agreement value and Discount are grouped.", "selector": "[data-testid=wiz-account]", "priority": "MEDIUM"},
+      {"component": "AmountInput caret", "issue": "Backspace right after a comma (e.g. '19,|23,456') deletes nothing and the caret jumps to the end (pos 9). Cause: the cleaned value is unchanged, so the useLayoutEffect on [shown] never runs to put the caret back. Fix: when the raw value is unchanged and a comma was removed, delete the digit before it, or always restore the caret.", "selector": "[data-testid=pp-amount], [data-testid=rev-cash]", "priority": "LOW"},
+      {"component": "MasterEditNote data-testid", "issue": "The source says data-testid='master-change-note' / 'master-change-used-in' (file changed 15:11). The served build (main.fc6bc4e3.js, 15:08) still renders 'master-edit-note' / 'master-edit-used-in'. Rebuild the frontend.", "selector": "[data-testid=master-change-note]", "priority": "MEDIUM"},
+      {"component": "Charge head card summary (MasterPage.jsx:49)", "issue": "Shows 'No default' when default_value is set (MAINT has default_value 60000). It only reads the legacy default_amount.", "selector": "[data-testid^=master-card-]", "priority": "LOW"}
+    ],
+    "integration_issues": [
+      {"flow": "JRN-70 internal words", "issue": "Words the scan misses. /reports/upcoming-dues: 'Demands that will trigger soon'. /reports/demand-vs-collection: breadcrumb 'Demand vs collection' and KPIs 'Cash demanded' / 'Account demanded'. /reports/construction-progress: 'demands per stage'. /settings: 'Demand number format', 'Demand due days', plus job keys DAILY_DUES / NIGHTLY_INTEGRITY and perf keys booking_detail / dues_engine. Also visible: Documents empty states 'No demands on this booking' / 'No demands match', C360 'No demands yet', print title 'Demand Letter'. The /settings/catalogues rows show snake_case codes (WALK_IN, FACEBOOK_INSTAGRAM, HOARDING_QA_T1) and a 'system' pill. The scan only reads the first page text, not sub-reports, sheets, dialogs or empty states.", "affected_selectors": ["[data-testid=md-save]", "/reports/*", "/settings", "/settings/catalogues"]}
+    ],
+    "design_issues": [
+      {"screen": "Booking wizard Price & Plan (1440)", "issues": ["Breakdown line name and amount inputs are cut off ('Club Mer', '1,00,00' / ',456.50'). The columns are too narrow."]},
+      {"screen": "Record payment sheet", "issues": ["Allocation preview shows ISO dates ('due 2025-04-11'); other screens use '11 Apr 2025'.", "The preview under Amount rounds 1,23,456.50 to ₹1,23,457.", "pp-date, pp-inst-date and the Bills raised filter / md-due use the browser's native mm/dd/yyyy picker, not the shadcn calendar.", "The mode option's accessible text runs together ('Chequeref. required')."]},
+      {"screen": "Masters at 390 px", "issues": ["The masters side list fills the whole first screen; the list content starts below the fold."]},
+      {"screen": "Masters header (1440)", "issues": ["The top breadcrumb says 'Masters › Charge types'; the inner breadcrumb says 'Settings › Catalogues › Charge Heads'. Two trails with different names."]},
+      {"screen": "Project overview", "issues": ["Header says 66 / 120 sold; Tower sales progress says 'Project total: 67 sold / booked'. Tower B counts 1 Blocked flat as sold."]},
+      {"screen": "Template edit note", "issues": ["Stage plan / tower template note says 'Existing bookings keep the values…'. For templates the thing that keeps its copy is the tower, not a booking."]},
+      {"screen": "Documents register", "issues": ["The 'sent' channel buttons show raw lowercase keys (hand / post / email / whatsapp)."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/memory/qa/phase3/agent_smokes/smoke_3_2_api.py",
+    "/app/memory/qa/phase3/agent_smokes/smoke_3_2_jrn73.py",
+    "/app/memory/qa/phase3/agent_smokes/smoke_3_2_jrn72_setup.py"
+  ],
+  "action_items": [
+    "Rename 'Raise demand' to 'Raise bill' in the Manual bill sheet. Replace the remaining visible 'demand' wording in /reports/upcoming-dues, /reports/demand-vs-collection, /reports/construction-progress descriptions, Settings 'Demand number format' / 'Demand due days', Documents and C360 empty states, and the print 'Demand Letter' title.",
+    "Hide or humanise the catalogue codes (WALK_IN…) on /settings/catalogues. Make the internal-words scan also read sub-report routes, open sheets/dialogs and empty states.",
+    "Switch md-account, rev-account and wiz-account to AmountInput. Also consider flat-pricing-rate.",
+    "Fix the AmountInput caret jump when backspacing or deleting over a comma.",
+    "Rebuild the frontend so the served build has data-testid master-change-note / master-change-used-in.",
+    "Charge head card summary: read default_value (fall back to default_amount).",
+    "Optional polish: widen the wizard breakdown inputs, show owner-format dates in the pp allocation preview, use the shadcn date picker instead of native date inputs, and fix the 66 vs 67 sold mismatch on project overview."
+  ],
+  "critical_code_review_comments": [
+    "AmountInput.jsx: when the cleaned value doesn't change (a comma was deleted) the input re-renders with the old string and the caret goes to the end. Handle this in change() or always restore the caret.",
+    "TypedMasterInput: offer requires can('masters.catalogue.create'). Sales users without it never see the offer (by design?). typed-value requires masters.catalogue.view; on a 403 it silently shows no offer.",
+    "catalogues.py _typed_uses counts all docs, including deleted_at/inactive leads and voided payments. Consider filtering deleted_at: None.",
+    "MasterPage: write = can('masters.payment_plan.edit') gates the toggle and menu for every master. The permission name doesn't match the master being edited.",
+    "Settings.jsx 'Demand number format' / 'Demand due days' labels and Reports.jsx descriptions (lines 66/77) still use 'demand'."
+  ],
+  "updated_files": [
+    "/app/memory/qa/phase3/agent_smokes/smoke_3_2_api.py",
+    "/app/memory/qa/phase3/agent_smokes/smoke_3_2_jrn73.py",
+    "/app/memory/qa/phase3/agent_smokes/smoke_3_2_jrn72_setup.py"
+  ],
+  "success_rate": {"backend": "100% of targeted API checks (masters usage, typed-value incl. regex/blank/bad-list, templates, breakdown-preview)", "frontend": "~80% (JRN-69 partly fails on 3 raw number fields and a caret edge case; JRN-70 fails; JRN-71/72/73 and carry-overs pass)"},
+  "seed_data_creation": "Data changes on the preview DB: (1) Charge head 'Maintenance (advance)' (07d28d8d-1be6-4126-afb2-bde31fd6f40d) default_gst_percent went 18 → 12 via the UI, then was RESTORED to 18 via PATCH (verified). (2) Created 2 leads, TEST_T1 Hoarding 1 / 2: LD-2627-5682 bad45362-9491-4bc9-8eda-c113d64eb755 and LD-2627-5683 75836b3a-8c89-44be-8292-fe3b9f32d61d, source 'Hoarding QA T1', stage New. There is no lead delete endpoint, so they remain. (3) Catalogue lead_source item 'Hoarding QA T1' (83cdcb2d-327c-452b-9bc0-8aa7bb658e19) was created by Save to master, then deactivated (is_active=false). No booking, payment, bill or project changes; the wizard was cancelled at Confirm and the dialogs were closed without saving. Project 'Ye' untouched. The KKT/2627/26974 posted+reversed pair on Priya's activity existed before this run.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Ids used: BK-2526-2331 696d665b-1086-4e56-8442-b765a4fef405 (Priya, has MAINT 18% and CLUB 18% lines), SGH 8e4ef80c-0ce8-4fe6-8c46-7b552afe0d8a, free flat A-101 eaf1dfc6-fa8d-4ce8-b0fe-aab507bdb16c (wizard: /bookings/new?project=SGH&flat=A-101, customer search 'Priya'), MAINT head 07d28d8d-1be6-4126-afb2-bde31fd6f40d. Only CLUB has a project GST override (SGH 18). MAINT and PARKING take the master GST directly. Free slots are named SB0xx/SS0xx, type Basement. To open the Lost dialog, use 390 px and lead-move-<id> › Lost. Retest: Manual bill button wording, the 3 raw number amount fields, the caret when backspacing a comma, the master-change-note testid after a rebuild, and the 'demand' words on report sub-pages and Settings.",
+  "test_credentials": "admin@kkt.in / Kkt@12345 (from /app/memory/test_credentials.md)"
+}

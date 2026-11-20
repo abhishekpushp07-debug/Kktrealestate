@@ -1,0 +1,162 @@
+bringing up nodes...
+bringing up nodes...
+
+........................................................................ [  9%]
+........................................................................ [ 18%]
+........................................................................ [ 28%]
+.............................................................s.......... [ 37%]
+........................................................................ [ 46%]
+.......................................................................F [ 56%]
+........................................................................ [ 65%]
+.....................................F.................................. [ 75%]
+........................................................................ [ 84%]
+.....................sss.............................F.................. [ 93%]
+.....s.....s...................................                          [100%]
+=================================== FAILURES ===================================
+_______________________ test_matrix_file_matches_runtime _______________________
+[gw1] linux -- Python 3.11.18 /root/.venv/bin/python
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-47/popen-gw1/test_matrix_file_matches_runti0')
+
+    def test_matrix_file_matches_runtime(tmp_path):
+        """Write the derived matrix next to the code so reviewers can diff it; fail if a tracked copy exists and differs."""
+        import json
+    
+        target = os.path.join(os.path.dirname(__file__), "..", "security", "permission_matrix.json")
+        doc = {
+            f"{m} {p}": sorted(v["perms"])
+            if v["perms"]
+            else (["<portal>"] if v["portal"] else (["<authenticated>"] if v["authed"] else ["<public>"]))
+            for (m, p), v in sorted(MATRIX.items())
+        }
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        if os.path.exists(target):
+>           assert json.loads(Path(target).read_text()) == doc, (
+                "security/permission_matrix.json is stale — regenerate by deleting it and re-running this test"
+            )
+E           AssertionError: security/permission_matrix.json is stale — regenerate by deleting it and re-running this test
+E           assert {'DELETE /api...s.edit'], ...} == {'DELETE /api...s.edit'], ...}
+E             
+E             Omitting 593 identical items, use -vv to show
+E             Right contains 1 more item:
+E             {'POST /api/inventory/holds/expire-sweep': ['inventory.hold.release']}
+E             Use -v to get more diff
+
+tests/test_permission_matrix.py:118: AssertionError
+____________ test_demand_register_grouping_ties_out_to_ledger_udhar ____________
+[gw1] linux -- Python 3.11.18 /root/.venv/bin/python
+
+admin_headers = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzMzlkNmM0ZS1lYTU1LTRmNjMtYjRjZi0xYjk1NzgwODA...iYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzk0ODExMzA0LCJleHAiOjE3OTQ4MTIyMDR9.7YtgVFiFW2OXkoaE_rk_pyyjIGNcPx7FSCz9Sbd7ZkQ'}
+
+    def test_demand_register_grouping_ties_out_to_ledger_udhar(admin_headers):
+        r = requests.get(
+            f"{BASE}/api/demands/register", params={"basis": "raised", "per_group": 500}, headers=admin_headers
+        )
+        assert r.status_code == 200 and r.headers.get("ETag")
+        d = r.json()
+        rows = [x for g in d["groups"] for p in g["projects"] for t in p["towers"] for x in t["rows"]]
+        assert len(rows) == d["row_count"]
+        assert (
+            d["tie_out"]["rows_total_paise"]
+            == d["tie_out"]["groups_total_paise"]
+            == d["totals"]["total_paise"]
+            == sum(x["total_paise"] for x in rows if not x["voided"])
+        )
+        for g in d["groups"]:
+            assert g["totals"]["total_paise"] == sum(p["totals"]["total_paise"] for p in g["projects"])
+            for p in g["projects"]:
+                assert p["totals"]["total_paise"] == sum(t["totals"]["total_paise"] for t in p["towers"])
+            assert all(
+                (x["due_date"] if d["basis"] == "due" else x["demand_date"]) == g["date"]
+                for p in g["projects"]
+                for t in p["towers"]
+                for x in t["rows"]
+            )
+        # vs ledger: Σ DEMAND Udhar rows across bookings == Σ register total (non-void, same company)
+        live_ids = [b["id"] for b in mongo.bookings.find({"status": {"$in": ["Active", "Completed"]}}, {"id": 1})]
+        led = sum(
+            e["amount_paise"]
+            for e in mongo.ledger_entries.find({"type": "DEMAND", "booking_id": {"$in": live_ids}}, {"amount_paise": 1})
+        )
+        assert led == d["totals"]["total_paise"], (led, d["totals"]["total_paise"])
+>       assert (
+            requests.get(
+                f"{BASE}/api/demands/register",
+                params={"basis": "raised"},
+                headers={**admin_headers, "If-None-Match": r.headers["ETag"]},
+            ).status_code
+            == 304
+        )
+E       assert 200 == 304
+E        +  where 200 = <Response [200]>.status_code
+E        +    where <Response [200]> = <function get at 0xfc20072ad9e0>('http://127.0.0.1:8021/api/demands/register', params={'basis': 'raised'}, headers={'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzMzlkNmM0ZS1lYTU1LTRmNjMtYjRjZi0xYjk1NzgwODA...k0ODExMzA0LCJleHAiOjE3OTQ4MTIyMDR9.7YtgVFiFW2OXkoaE_rk_pyyjIGNcPx7FSCz9Sbd7ZkQ', 'If-None-Match': '"c4aea2b6462e044c"'})
+E        +      where <function get at 0xfc20072ad9e0> = requests.get
+
+tests/test_phase_p.py:171: AssertionError
+______________________ test_snapshot_exists_and_not_stale ______________________
+[gw0] linux -- Python 3.11.18 /root/.venv/bin/python
+
+    def test_snapshot_exists_and_not_stale():
+        assert os.path.exists(PATH), "missing backend/docs/openapi/v1.json — run: python -m tools.openapi_snapshot --write"
+        old, live = json.loads(Path(PATH).read_text()), _live()
+        assert not breaking_diff(old, live), breaking_diff(old, live)
+>       assert not stale(old, live), (
+            "OpenAPI snapshot stale — run: cd /app/backend && python -m tools.openapi_snapshot --write"
+        )
+E       AssertionError: OpenAPI snapshot stale — run: cd /app/backend && python -m tools.openapi_snapshot --write
+E       assert not True
+E        +  where True = stale({'components': {'schemas': {'AccessUpdate': {'additionalProperties': False, 'properties': {'direct': {'default': [], '...tent': {...}, 'description': 'Successful Response'}}, 'security': [{'HTTPBearer': []}], 'summary': 'Tree', ...}}, ...}}, {'openapi': '3.1.0', 'info': {'title': 'KKT Real Estate ERP', 'version': '11.0.0'}, 'paths': {'/api/health': {'get': {...t', 'required': ['name', 'code'], ...}, ...}, 'securitySchemes': {'HTTPBearer': {'type': 'http', 'scheme': 'bearer'}}}})
+
+tests/test_openapi_snapshot.py:26: AssertionError
+=============================== warnings summary ===============================
+../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
+../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
+  /root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12: PendingDeprecationWarning: Please use `import python_multipart` instead.
+    import multipart
+
+../../root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854
+../../root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854
+  /root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854: DeprecationWarning: 'crypt' is deprecated and slated for removal in Python 3.13
+    from crypt import crypt as _crypt
+
+tests/test_startup_s1_s3_idempotent.py:71
+tests/test_startup_s1_s3_idempotent.py:71
+  /app/backend/tests/test_startup_s1_s3_idempotent.py:71: PytestUnknownMarkWarning: Unknown pytest.mark.timeout - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.timeout(900)
+
+tests/test_phase_k_p1.py::test_loadshed_sheds_with_prebuilt_503_and_exempts_probes
+  /root/.venv/lib/python3.11/site-packages/starlette/testclient.py:41: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    [], typing.ContextManager[anyio.abc.BlockingPortal]
+
+tests/test_phase_q.py::test_void_watermark_deterministic
+tests/test_phase_q.py::test_void_watermark_deterministic
+tests/test_phase_q.py::test_void_watermark_deterministic
+tests/test_phase_q.py::test_void_watermark_deterministic
+tests/test_phase_q.py::test_void_watermark_deterministic
+tests/test_phase_q.py::test_void_watermark_deterministic
+  /root/.venv/lib/python3.11/site-packages/pypdf/_page.py:1368: DeprecationWarning: Calling `PageObject.replace_contents()` for pages not assigned to a writer is deprecated and will be removed in pypdf 7.0.0. Attach the page to the writer first or use `PdfWriter(clone_from=...)` directly. The existing approach has proved being unreliable.
+    self.replace_contents(ContentStream(new_content_array, self.pdf))
+
+tests/test_kkt_erp.py::TestBlock::test_create_block_and_generation
+tests/test_kkt_erp.py::TestFlatType::test_create_flat_type_auto_area
+tests/test_phase_7.py::TestPortalPhase7::test_portal_booking_payment_plan
+tests/test_phase_7.py::TestPortalPhase7::test_portal_booking_payment_plan
+  /root/.venv/lib/python3.11/site-packages/_pytest/fixtures.py:1313: PytestRemovedIn10Warning: Class-scoped fixture defined as instance method is deprecated.
+  Instance attributes set in this fixture will NOT be visible to test methods,
+  as each test gets a new instance while the fixture runs only once per class.
+  Use @classmethod decorator and set attributes on cls instead.
+  See https://docs.pytest.org/en/stable/deprecations.html#class-scoped-fixture-as-instance-method
+    fixturefunc = resolve_fixture_function(fixturedef, request)
+
+tests/test_phase_5.py::TestPortalData::test_booking_detail_and_subresources
+  /root/.venv/lib/python3.11/site-packages/_pytest/python.py:171: PytestReturnNotNoneWarning: Test functions should return None, but tests/test_phase_5.py::TestPortalData::test_booking_detail_and_subresources returned <class 'str'>.
+  Did you mean to use `assert` instead of `return`?
+  See https://docs.pytest.org/en/stable/how-to/assert.html#return-not-none for more information.
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_permission_matrix.py::test_matrix_file_matches_runtime - As...
+FAILED tests/test_phase_p.py::test_demand_register_grouping_ties_out_to_ledger_udhar
+FAILED tests/test_openapi_snapshot.py::test_snapshot_exists_and_not_stale - A...
+3 failed, 758 passed, 6 skipped, 18 warnings in 805.51s (0:13:25)

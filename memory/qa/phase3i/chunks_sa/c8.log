@@ -1,0 +1,142 @@
+COMMIT ceeac3b files: tests/test_refresh_keeps_setup.py tests/test_refund_other_law.py tests/test_reports_contract.py tests/test_reseed_counters.py tests/test_roznamcha_cash_out.py tests/test_rule_eval.py tests/test_rupees_only.py tests/test_schedules_batched.py tests/test_seed_future_stamps.py tests/test_session_cookies.py tests/test_session_isolation.py tests/test_startup_migrations.py tests/test_startup_s1_s3_idempotent.py tests/test_static_gates.py
+============================= test session starts ==============================
+platform linux -- Python 3.11.18, pytest-9.1.1, pluggy-1.7.0 -- /root/.venv/bin/python
+rootdir: /app/backend
+configfile: pytest.ini
+plugins: locust-2.47.0, platformdirs-4.13.5, asyncio-1.4.0, anyio-4.15.1, xdist-3.8.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+created: 2/2 workers
+2 workers [58 items]
+
+scheduling tests via LoadScopeScheduling
+
+tests/test_rule_eval.py::test_allowed_grammar[snap['requests'] == 0 and snap['uptime_s'] > 900-False] 
+tests/test_refresh_keeps_setup.py::test_every_master_and_catalogue_collection_is_setup 
+[gw0] [  1%] PASSED tests/test_rule_eval.py::test_allowed_grammar[snap['requests'] == 0 and snap['uptime_s'] > 900-False] 
+tests/test_rule_eval.py::test_allowed_grammar[snap['requests'] >= 20 and snap['rate_5xx'] > 0.02-True] 
+[gw0] [  3%] PASSED tests/test_rule_eval.py::test_allowed_grammar[snap['requests'] >= 20 and snap['rate_5xx'] > 0.02-True] 
+tests/test_rule_eval.py::test_allowed_grammar[snap['requests'] >= 20 and (snap['p95_ms'] or 0) > 300-False] 
+[gw0] [  5%] PASSED tests/test_rule_eval.py::test_allowed_grammar[snap['requests'] >= 20 and (snap['p95_ms'] or 0) > 300-False] 
+tests/test_rule_eval.py::test_allowed_grammar[len(snap['jobs_failed_24h']) > 0-True] 
+[gw0] [  6%] PASSED tests/test_rule_eval.py::test_allowed_grammar[len(snap['jobs_failed_24h']) > 0-True] 
+tests/test_rule_eval.py::test_allowed_grammar[snap['backup_age_h'] is None or snap['backup_age_h'] > 26-True] 
+[gw0] [  8%] PASSED tests/test_rule_eval.py::test_allowed_grammar[snap['backup_age_h'] is None or snap['backup_age_h'] > 26-True] 
+tests/test_rule_eval.py::test_allowed_grammar[not snap['db_ok']-False] 
+[gw0] [ 10%] PASSED tests/test_rule_eval.py::test_allowed_grammar[not snap['db_ok']-False] 
+tests/test_rule_eval.py::test_allowed_grammar[snap.requests * 2 - 10 >= 90-True] 
+[gw1] [ 12%] PASSED tests/test_refresh_keeps_setup.py::test_every_master_and_catalogue_collection_is_setup 
+[gw0] [ 13%] PASSED tests/test_rule_eval.py::test_allowed_grammar[snap.requests * 2 - 10 >= 90-True] 
+tests/test_refresh_keeps_setup.py::test_refresh_wipe_keeps_a_custom_entry_in_every_setup_collection 
+tests/test_rule_eval.py::test_allowed_grammar[max(snap['shed_total'], 1) == 1-True] 
+[gw0] [ 15%] PASSED tests/test_rule_eval.py::test_allowed_grammar[max(snap['shed_total'], 1) == 1-True] 
+tests/test_rule_eval.py::test_allowed_grammar['x' in snap['jobs_failed_24h']-True] 
+[gw0] [ 17%] PASSED tests/test_rule_eval.py::test_allowed_grammar['x' in snap['jobs_failed_24h']-True] 
+tests/test_rule_eval.py::test_injection_rejected_at_compile[__import__('os').system('id')] 
+[gw0] [ 18%] PASSED tests/test_rule_eval.py::test_injection_rejected_at_compile[__import__('os').system('id')] 
+tests/test_rule_eval.py::test_injection_rejected_at_compile[().__class__.__bases__[0].__subclasses__()] 
+[gw0] [ 20%] PASSED tests/test_rule_eval.py::test_injection_rejected_at_compile[().__class__.__bases__[0].__subclasses__()] 
+tests/test_rule_eval.py::test_injection_rejected_at_compile[snap.__class__] 
+[gw0] [ 22%] PASSED tests/test_rule_eval.py::test_injection_rejected_at_compile[snap.__class__] 
+tests/test_rule_eval.py::test_injection_rejected_at_compile[open('/etc/passwd')] 
+[gw0] [ 24%] PASSED tests/test_rule_eval.py::test_injection_rejected_at_compile[open('/etc/passwd')] 
+tests/test_rule_eval.py::test_injection_rejected_at_compile[[x for x in snap]] 
+[gw0] [ 25%] PASSED tests/test_rule_eval.py::test_injection_rejected_at_compile[[x for x in snap]] 
+tests/test_rule_eval.py::test_injection_rejected_at_compile[lambda: 1] 
+[gw0] [ 27%] PASSED tests/test_rule_eval.py::test_injection_rejected_at_compile[lambda: 1] 
+tests/test_rule_eval.py::test_injection_rejected_at_compile[snap['a'] if True else 2] 
+[gw0] [ 29%] PASSED tests/test_rule_eval.py::test_injection_rejected_at_compile[snap['a'] if True else 2] 
+tests/test_rule_eval.py::test_injection_rejected_at_compile[f'{snap}'] 
+[gw0] [ 31%] PASSED tests/test_rule_eval.py::test_injection_rejected_at_compile[f'{snap}'] 
+tests/test_rule_eval.py::test_injection_rejected_at_compile[len(snap, key=1)] 
+[gw0] [ 32%] PASSED tests/test_rule_eval.py::test_injection_rejected_at_compile[len(snap, key=1)] 
+tests/test_rule_eval.py::test_injection_rejected_at_compile[other['x'] > 1] 
+[gw0] [ 34%] PASSED tests/test_rule_eval.py::test_injection_rejected_at_compile[other['x'] > 1] 
+tests/test_rule_eval.py::test_injection_rejected_at_compile[snap[1:2]] 
+[gw0] [ 36%] PASSED tests/test_rule_eval.py::test_injection_rejected_at_compile[snap[1:2]] 
+tests/test_rule_eval.py::test_injection_rejected_at_compile[snap['requests'] ** 10] 
+[gw0] [ 37%] PASSED tests/test_rule_eval.py::test_injection_rejected_at_compile[snap['requests'] ** 10] 
+tests/test_rule_eval.py::test_injection_rejected_at_compile[exec('1')] 
+[gw0] [ 39%] PASSED tests/test_rule_eval.py::test_injection_rejected_at_compile[exec('1')] 
+tests/test_rule_eval.py::test_injection_rejected_at_compile[import os] 
+[gw0] [ 41%] PASSED tests/test_rule_eval.py::test_injection_rejected_at_compile[import os] 
+tests/test_rule_eval.py::test_injection_rejected_at_compile[] 
+[gw0] [ 43%] PASSED tests/test_rule_eval.py::test_injection_rejected_at_compile[] 
+tests/test_rule_eval.py::test_real_rules_compile_and_module_has_no_eval 
+[gw0] [ 44%] PASSED tests/test_rule_eval.py::test_real_rules_compile_and_module_has_no_eval 
+tests/test_rule_eval.py::test_evaluate_reports_rule_error_not_crash 
+[gw0] [ 46%] PASSED tests/test_rule_eval.py::test_evaluate_reports_rule_error_not_crash 
+tests/test_session_cookies.py::test_login_sets_hardened_cookies 
+[gw0] [ 48%] PASSED tests/test_session_cookies.py::test_login_sets_hardened_cookies 
+tests/test_session_cookies.py::test_cookie_refresh_requires_csrf_then_rotates_and_detects_reuse 
+[gw0] [ 50%] PASSED tests/test_session_cookies.py::test_cookie_refresh_requires_csrf_then_rotates_and_detects_reuse 
+tests/test_session_cookies.py::test_body_refresh_still_works_for_api_clients 
+[gw0] [ 51%] PASSED tests/test_session_cookies.py::test_body_refresh_still_works_for_api_clients 
+tests/test_session_cookies.py::test_logout_revokes_cookie_token_and_clears_cookies 
+[gw0] [ 53%] PASSED tests/test_session_cookies.py::test_logout_revokes_cookie_token_and_clears_cookies 
+tests/test_session_isolation.py::test_every_cached_read_is_keyed_by_the_signed_in_user 
+[gw0] [ 55%] PASSED tests/test_session_isolation.py::test_every_cached_read_is_keyed_by_the_signed_in_user 
+tests/test_session_isolation.py::test_logout_and_every_sign_in_switch_the_session 
+[gw0] [ 56%] PASSED tests/test_session_isolation.py::test_logout_and_every_sign_in_switch_the_session 
+tests/test_session_isolation.py::test_session_switch_wipes_user_caches 
+[gw0] [ 58%] PASSED tests/test_session_isolation.py::test_session_switch_wipes_user_caches 
+tests/test_session_isolation.py::test_no_module_level_user_state_left_in_home 
+[gw0] [ 60%] PASSED tests/test_session_isolation.py::test_no_module_level_user_state_left_in_home 
+tests/test_static_gates.py::test_ruff_undefined_unused_bugbear_whole_backend 
+[gw0] [ 62%] PASSED tests/test_static_gates.py::test_ruff_undefined_unused_bugbear_whole_backend 
+tests/test_static_gates.py::test_ruff_complexity_runtime_code 
+[gw0] [ 63%] PASSED tests/test_static_gates.py::test_ruff_complexity_runtime_code 
+tests/test_static_gates.py::test_no_dynamic_code_execution_or_weak_hash 
+[gw1] [ 65%] PASSED tests/test_refresh_keeps_setup.py::test_refresh_wipe_keeps_a_custom_entry_in_every_setup_collection 
+tests/test_refresh_keeps_setup.py::test_refresh_leaves_owner_setup_byte_identical 
+[gw0] [ 67%] PASSED tests/test_static_gates.py::test_no_dynamic_code_execution_or_weak_hash 
+tests/test_static_gates.py::test_ruff_complexity_core_layers_15 
+[gw1] [ 68%] PASSED tests/test_refresh_keeps_setup.py::test_refresh_leaves_owner_setup_byte_identical 
+tests/test_refresh_keeps_setup.py::test_refresh_restores_setup_bytes 
+[gw0] [ 70%] PASSED tests/test_static_gates.py::test_ruff_complexity_core_layers_15 
+tests/test_reports_contract.py::test_upcoming_dues_has_an_adapter 
+[gw0] [ 72%] PASSED tests/test_reports_contract.py::test_upcoming_dues_has_an_adapter 
+tests/test_reports_contract.py::test_every_report_returns_what_the_page_reads 
+[gw1] [ 74%] PASSED tests/test_refresh_keeps_setup.py::test_refresh_restores_setup_bytes 
+tests/test_seed_future_stamps.py::test_today_capped_at_run_time_before_1030 
+[gw1] [ 75%] PASSED tests/test_seed_future_stamps.py::test_today_capped_at_run_time_before_1030 
+tests/test_seed_future_stamps.py::test_past_days_and_after_1030_unchanged 
+[gw1] [ 77%] PASSED tests/test_seed_future_stamps.py::test_past_days_and_after_1030_unchanged 
+tests/test_seed_future_stamps.py::test_full_timestamp_as_of_is_capped_too 
+[gw1] [ 79%] PASSED tests/test_seed_future_stamps.py::test_full_timestamp_as_of_is_capped_too 
+tests/test_roznamcha_cash_out.py::test_cash_refund_shows_as_row_and_in_cash_paid_out 
+[gw0] [ 81%] PASSED tests/test_reports_contract.py::test_every_report_returns_what_the_page_reads 
+tests/test_reports_contract.py::test_upcoming_dues_days_selector_and_total 
+[gw0] [ 82%] PASSED tests/test_reports_contract.py::test_upcoming_dues_days_selector_and_total 
+tests/test_refund_other_law.py::test_refund_of_other_charge_keeps_the_law[full] 
+[gw0] [ 84%] PASSED tests/test_refund_other_law.py::test_refund_of_other_charge_keeps_the_law[full] 
+tests/test_refund_other_law.py::test_refund_of_other_charge_keeps_the_law[partial] 
+[gw1] [ 86%] PASSED tests/test_roznamcha_cash_out.py::test_cash_refund_shows_as_row_and_in_cash_paid_out 
+tests/test_roznamcha_cash_out.py::test_roznamcha_page_renders_refund_rows_and_paid_out_tile 
+[gw1] [ 87%] PASSED tests/test_roznamcha_cash_out.py::test_roznamcha_page_renders_refund_rows_and_paid_out_tile 
+tests/test_rupees_only.py::test_frontend_has_no_visible_paise_strings 
+[gw1] [ 89%] PASSED tests/test_rupees_only.py::test_frontend_has_no_visible_paise_strings 
+tests/test_rupees_only.py::test_pdfs_and_csv_have_no_paise 
+[gw0] [ 91%] PASSED tests/test_refund_other_law.py::test_refund_of_other_charge_keeps_the_law[partial] 
+tests/test_reseed_counters.py::test_reseed_leaves_every_counter_at_or_above_previous 
+[gw1] [ 93%] PASSED tests/test_rupees_only.py::test_pdfs_and_csv_have_no_paise 
+tests/test_startup_migrations.py::test_startup_idempotent_on_pre_phase7_db 
+[gw0] [ 94%] PASSED tests/test_reseed_counters.py::test_reseed_leaves_every_counter_at_or_above_previous 
+tests/test_schedules_batched.py::test_schedules_for_batches_queries_and_matches_naive 
+[gw1] [ 96%] PASSED tests/test_startup_migrations.py::test_startup_idempotent_on_pre_phase7_db 
+tests/test_startup_s1_s3_idempotent.py::test_startup_twice_on_db_copy_is_idempotent_and_non_destructive 
+[gw0] [ 98%] PASSED tests/test_schedules_batched.py::test_schedules_for_batches_queries_and_matches_naive 
+[gw1] [100%] PASSED tests/test_startup_s1_s3_idempotent.py::test_startup_twice_on_db_copy_is_idempotent_and_non_destructive 
+
+=============================== warnings summary ===============================
+../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
+../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
+  /root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12: PendingDeprecationWarning: Please use `import python_multipart` instead.
+    import multipart
+
+tests/test_startup_s1_s3_idempotent.py:71
+tests/test_startup_s1_s3_idempotent.py:71
+  /app/backend/tests/test_startup_s1_s3_idempotent.py:71: PytestUnknownMarkWarning: Unknown pytest.mark.timeout - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.timeout(900)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================== 58 passed, 4 warnings in 230.83s (0:03:50) ==================

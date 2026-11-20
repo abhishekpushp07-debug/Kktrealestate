@@ -1,0 +1,10 @@
+customer-status          first p95   525.8  cached p95   28.0
+collections              first p95  1158.8  cached p95   23.1
+bank-receipts            first p95   167.0  cached p95    4.1
+cheques                  first p95   903.7  cached p95   22.8
+outstanding              first p95   610.3  cached p95   23.9
+receivables-forecast     first p95   579.8  cached p95   23.2
+transfers                first p95   591.3  cached p95    4.2
+booking-health           first p95   577.1  cached p95   22.6
+1/8 within budget ['customer-status', 'collections', 'cheques', 'outstanding', 'receivables-forecast', 'transfers', 'booking-health']
+exit 1

@@ -1,0 +1,43 @@
+{
+  "iteration": 10,
+  "phase": "3",
+  "passed": 7,
+  "failed": 2,
+  "retest_needed": true,
+  "bugs": [
+    {
+      "severity": "high",
+      "criterion": "JRN-79 + JRN-89 Project banners and photos",
+      "title": "Edit project -> Save fails with 409 conflict after you change photos in the same dialog",
+      "evidence": "On QA Photo Test (QAPT) in Edit project -> Photos I added 2 images, reordered them (Move left) and starred a cover. Each change saved to the backend right away (GET /api/projects shows QAPT cover_photo_id updated). Then I clicked project-save and the dialog showed a 409 conflict error and stayed open (screenshot p3-project-banners-photos-failure.png). The likely cause is that each photo change bumps the project version, so the form submits an old version. Separate issue: if you close the dialog with Escape instead, the project page hero keeps the old cover until you reload (seen in an earlier run). The non-image file was refused correctly with 'Photo must be an image under 15 MB'."
+    },
+    {
+      "severity": "medium",
+      "criterion": "JRN-91 Reports hub",
+      "title": "On a 390 phone, a report opens scrolled down instead of at the top",
+      "evidence": "At 390, tapping hub-tile-outstanding-v2 opens the report with window.scrollY=1529. The screenshot shows table cards in the middle of the report, and the sheet header and '‹ all reports' are off screen. It failed the same way on rerun, so it is not flaky. The API works (outstanding-v2 returns 200 and the tile shows ₹7.43 Cr)."
+    }
+  ],
+  "action_items": [
+    {"type": "note", "detail": "Shalini Thakur's customer page says 'Next due: Nothing due — all bills settled' while the same page shows ₹6.4 L due (unpaid other charges). The Record payment form for her shows 'Can accept up to ₹0' with Other charges ₹6.4 L (checked before choosing a Mode)."},
+    {"type": "note", "detail": "One customer card status reads 'DUE NOW', which is not in the specified set (OVERDUE N DAYS / DUE ON / ADVANCE HELD / NEXT ·). The segment chip is labelled 'needs attention', not 'overdue'. The chips still add up: 12+65+1+0+2 = 80 = All."},
+    {"type": "note", "detail": "Record payment shows Booking, Amount, Date, Mode plus a Remarks field. Bank account did not show before a Mode was chosen, so the 5-field rule is unclear."},
+    {"type": "note", "detail": "The empty search result on Receipts says 'No receipts. Post the first payment to see it here.' 'Post' does not match the 'Record payment' wording, and 'first payment' is misleading when the list is only filtered."},
+    {"type": "note", "detail": "The Leads & Visits header is a tagline, not a numbers summary, and has several primary actions (Book visit / New lead / Add / Do next). Leads shows 'Follow-ups due 0' while Admin Home shows '1 follow-ups due'."},
+    {"type": "note", "detail": "The Sales Home inventory widget says '79 of 186 booked or sold' and Admin Home says '78 of 186'."},
+    {"type": "note", "detail": "The Project Statement tile caption 'pick one for its full statement' does not end with this FY / till today / today."},
+    {"type": "note", "detail": "Not exercised: opening the Outstanding report from Home's 90+ band to see 'ageing band 90+ days' in the header."},
+    {"type": "residue", "detail": "I created the project 'QA Photo Test' (QAPT, id 823ceb0a-b48b-4f78-a478-2d22b0c4920b) through the API for the photo test, and its test photos were deleted afterwards. It now shows on /projects and in the report project filters. The admin theme was switched during the theme test and put back to Day. SGH and Ye were not edited."}
+  ],
+  "checks": [
+    {"criterion": "JRN-88 report totals reconcile (API)", "name": "test_tscheck_phase3_reports_reconcile.py", "lane": "backend", "status": "passed", "evidence": "4 passed: in outstanding-v2 the bands add up to the outstanding total, and bills raised minus received equals the net balance; in collections-v2 the carried line (opening + billed - received) equals the closing figure, and closing equals Outstanding's net balance; the segments add up to all (80); calling without a token returns 401/403."},
+    {"criterion": "JRN-93 Home silver hero + widgets", "name": "p3-home-silver-hero-widgets", "lane": "browser", "status": "passed", "evidence": "The group pills match their widget counts (Money 5, Today's work 4, Sales & stock 3, Construction 4). Outstanding ₹7.43 Cr matches the report total. Call today opens a list with WhatsApp. Ready to bill shows towers with Raise, and ₹1.51 Cr + ₹2.61 Cr = ₹4.12 Cr. Layout is 4 per row at 1440 and 2 per row at 390 with no horizontal scroll. Sales and siteengineer Homes show their own widgets."},
+    {"criterion": "JRN-81 + JRN-90 Customer cards and member card", "name": "p3-customer-cards-member-card", "lane": "browser", "status": "passed", "evidence": "Title 'customers.'; chips add up 12+65+1+2 = 80. Shalini's card figures (₹1.06 Cr / ₹1 Cr / ₹6.4 L) match her page. The member card flips to the back, which has the QR or the empty-QR text, and there is one quick-actions set. At 390 there is a Filters button and one scrolling chip row."},
+    {"criterion": "JRN-79 + JRN-89 Project banners and photos", "name": "p3-project-banners-photos", "lane": "browser", "status": "failed", "evidence": "Banners pass: SGH 66 of 120, GGV 12 of 18 with no photo band, photo band at 390. The non-image file is refused with the right message. Adding, reordering and starring photos all work. Clicking Save in Edit project then returns 409."},
+    {"criterion": "JRN-83 / D-16 Booking page", "name": "p3-booking-page-hero-plan", "lane": "browser", "status": "passed", "evidence": "The hero has no Billed or Balance figures and has the history button. The plan bar has one segment per plan row. Ritu Malhotra's timeline marks unbilled rows '(est.)'. No '₹0 of ₹0' and no '₹ ' gap anywhere."},
+    {"criterion": "JRN-88 Report sheet explains its total", "name": "p3-report-sheet-explains-total", "lane": "browser", "status": "passed", "evidence": "There is one print control, a GRAND TOTAL with a formula in words, and no 'rows', 'v2' or Σ. The Collections carried line matches Outstanding's net balance. The Bills vs Collection bridge adds up to ₹41.81 Cr of bills raised."},
+    {"criterion": "JRN-91 Reports hub", "name": "p3-reports-hub-tiles", "lane": "browser", "status": "failed", "evidence": "Group order is Sales, Money, Construction, Inventory, Admin; each pill equals its tile count; all tiles share one surface; Outstanding shows ₹7.43 Cr. At 390 the report opens at scrollY=1529, not at the top (same on rerun)."},
+    {"criterion": "JRN-92 Lists and forms one product", "name": "p3-lists-forms-one-product", "lane": "browser", "status": "passed", "evidence": "The headers are 'payments.', 'bookings.' and 'customers.' with summaries. The Payments sidebar has Received / Bills raised / Roznamcha and the inner tabs are Receipts and Cheques. Each receipt row has one ⋯ menu, and the pending cheque keeps Clear/Bounce. No mm/dd/yyyy anywhere. The empty filtered list shows an empty state. The booking wizard says 'Step 1 of 3'."},
+    {"criterion": "JRN-87 / JRN-84 Night + Day consistency", "name": "p3-night-day-consistency", "lane": "browser", "status": "passed", "evidence": "The switch has 2 choices. All 13 screens × Night/Day × 1440/390 render with the Figtree font, no horizontal scroll and no technical words. Night stays selected after logging in again."}
+  ]
+}

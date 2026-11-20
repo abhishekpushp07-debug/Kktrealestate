@@ -1,0 +1,38 @@
+{
+  "summary": "Retest of the iteration-37 Home Command Center fixes (Phase 2 Chunk 2D) on the preview URL only, never production. I ran the API checks in backend/tests/home_retest_iter38.py plus home_drill_tie_smoke.py for admin and sales. I ran the UI checks with Playwright as admin (Customize, drill links) and as sales (inventory chip and flat-cell drills). All 8 retest items pass. Customize Save -> immediate reload keeps the saved layout, in the API and the UI. Reset restores the defaults straight away. Holds expiring 1 -> /flats?hold_expiring=1 lists 1 flat (C-204). Tower B 'Hold 2' -> /flats?block_id&status=Hold lists 2. Clicking a flat cell -> /flats?block_id&status=Hold lists 2. Construction and milestone links open /construction with the right project and tower already selected (SGH Tower B, 55%). Pipeline for this month: Leads 7=7, Lost 2=2, Visits 0=0, Bookings 0=0. Pipeline for FY, checked through the API: Leads 50=50, Visits 24=24, Bookings 24=24, Lost 6=6. Follow-ups due 1=1. Ageing links are now /reports/outstanding-v2?bucket=<band>, with no x=1. For sales, each inventory row total equals the sum of the masked counts (Tower B 13+2+17=32), so no real Booked/Blocked split leaks. Sold 17 -> list of 17. Switching on a hidden widget shows the widget-inflow_30-pending placeholder, not a skeleton. Drill ties: admin 41/42 (the 1 miss is the Bounced 0-count case the brief accepts), sales 15/15.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/home/bundle attention.bounced", "issue": "drill.pick 'Bounced.count' returns None when there are 0 bounced cheques. The brief accepts this; listed only for completeness."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Overdue by age band -> /reports/outstanding-v2?bucket=0-30", "issue": "Reports.jsx ignores the bucket param, and the report API is called without a bucket filter. The report shows the full ₹7.43 Cr list instead of the ₹49.9 L / 10-booking band, so the band figure does not equal the list total. The link format fix (no x=1) passes; band filtering is still missing.", "affected_selectors": ["[data-testid^='ageing-band-']"]}
+    ],
+    "design_issues": [
+      {"screen": "/flats and /leads?tab=list opened from a drill link", "issues": ["Filters that come from the URL (block_id, hold_expiring, created_from/created_to, due_today) are not shown as chips. There is no visible block filter and no 'clear filter' control, so a user can't tell why the list is short or how to reset it. Example: the /flats?hold_expiring=1 status dropdown says 'All statuses' while only 1 flat is listed."]},
+      {"screen": "/bookings?status=Active,Completed", "issues": ["None of the status chips (All/Active/Completed/Cancelled) is highlighted for the combined status, so the filter state is unclear."]},
+      {"screen": "Home - Next billing milestone", "issues": ["Still shows 'No bookings to bill' for SGH Tower A, which has 20 active bookings (iteration-37 action item, not in this retest scope)."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/home_retest_iter38.py", "/app/backend/tests/home_drill_tie_smoke.py"],
+  "action_items": [
+    "Optional: make the ageing band drill filter by band. Reports.jsx should read sp.get('bucket') and pass it to /reports/outstanding-v2, and the report should filter or highlight that band so the band total equals the figure.",
+    "Optional UX: show URL drill filters as removable chips on Flats, Leads and Bookings (block, hold expiring, created range, due today, multi-status).",
+    "Optional: change the 'No bookings to bill' text when active_bookings > 0 (carried over from iteration 37)."
+  ],
+  "critical_code_review_comments": [
+    "home_layout.py PUT/DELETE now call ttlcache.invalidate(f'home:bundle:{user_id}:'), which is correct and verified.",
+    "Home.jsx pending check is `data && !loading && !st`. It works, but it relies on the bundle omitting widgets that are hidden in the layout. If a widget is ever truly missing because of a backend bug, it would show 'Save your layout' instead of an error.",
+    "Bookings.jsx passes the comma-separated status through unchanged. The backend accepts it (the FY tie of 24 matched)."
+  ],
+  "updated_files": ["/app/backend/tests/home_retest_iter38.py"],
+  "success_rate": {"backend": "100% of retest items (8/8); drill ties admin 41/42 (accepted Bounced 0-case), sales 15/15", "frontend": "100% of retest items; 1 minor gap (ageing band list not filtered)"},
+  "test_credentials": "admin@kkt.in, sales@kkt.in / Kkt@12345 (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "None. The admin home layout was changed for the test and then reset with DELETE /api/me/home-layout; it was default before and is default (is_default true) after.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Login lands on /dashboard, not /home: build deep links from the origin, not from page.url. home_retest_iter38.py writes /tmp/tokens.json (admin, sales) for home_drill_tie_smoke.py. Test the pipeline with period=fy to get non-zero visit and booking counts; the month counts are 0. Tower B block_id is cabe48b7-d5fe-40ed-ae75-0ab01d693877 (admin: Hold 2, Booked 16, Blocked 1; sales masked: Sold 17). Not run: the full pytest suite and test_home_bundle.py (memory cap, per the brief), and the accounts and siteengineer UI."
+}

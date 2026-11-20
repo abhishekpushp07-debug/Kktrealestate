@@ -1,0 +1,9 @@
+........................................................................ [ 50%]
+....................................................................s... [100%]
+=============================== warnings summary ===============================
+tests/test_phase3f_engine.py::test_registry_declares_full_filter_standard
+  /root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12: PendingDeprecationWarning: Please use `import python_multipart` instead.
+    import multipart
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+143 passed, 1 skipped, 1 warning in 36.42s

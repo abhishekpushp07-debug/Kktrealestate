@@ -1,0 +1,235 @@
+COMMIT ceeac3b files: tests/test_phase_a_print.py tests/test_phase_b4_backend_sanity.py tests/test_phase_b_hardening_review.py tests/test_phase_c_refocus.py tests/test_phase_d_perf.py tests/test_phase_i_reports.py tests/test_phase_j4_files.py tests/test_phase_j_exports.py tests/test_phase_k_ops.py tests/test_phase_k_p0.py tests/test_phase_k_p1.py tests/test_phase_l.py tests/test_phase_m1_followup.py tests/test_phase_m_masters.py
+============================= test session starts ==============================
+platform linux -- Python 3.11.18, pytest-9.1.1, pluggy-1.7.0 -- /root/.venv/bin/python
+rootdir: /app/backend
+configfile: pytest.ini
+plugins: locust-2.47.0, platformdirs-4.13.5, asyncio-1.4.0, anyio-4.15.1, xdist-3.8.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+created: 2/2 workers
+2 workers [103 items]
+
+scheduling tests via LoadScopeScheduling
+
+tests/test_phase_b_hardening_review.py::test_health_fast_with_security_headers 
+tests/test_phase_i_reports.py::test_registry_lists_every_phase_i_report_with_purpose 
+[gw0] [  0%] PASSED tests/test_phase_b_hardening_review.py::test_health_fast_with_security_headers 
+tests/test_phase_b_hardening_review.py::test_error_envelope_404_unknown_booking 
+[gw1] [  1%] PASSED tests/test_phase_i_reports.py::test_registry_lists_every_phase_i_report_with_purpose 
+tests/test_phase_i_reports.py::test_report_json_csv_pdf_and_etag[collections-v2] 
+[gw1] [  2%] PASSED tests/test_phase_i_reports.py::test_report_json_csv_pdf_and_etag[collections-v2] 
+tests/test_phase_i_reports.py::test_report_json_csv_pdf_and_etag[outstanding-v2] 
+[gw0] [  3%] PASSED tests/test_phase_b_hardening_review.py::test_error_envelope_404_unknown_booking 
+tests/test_phase_b_hardening_review.py::test_error_envelope_422_validation 
+[gw1] [  4%] PASSED tests/test_phase_i_reports.py::test_report_json_csv_pdf_and_etag[outstanding-v2] 
+tests/test_phase_i_reports.py::test_report_json_csv_pdf_and_etag[cash-vs-account] 
+[gw0] [  5%] PASSED tests/test_phase_b_hardening_review.py::test_error_envelope_422_validation 
+tests/test_phase_b_hardening_review.py::test_error_envelope_401_anonymous 
+[gw1] [  6%] PASSED tests/test_phase_i_reports.py::test_report_json_csv_pdf_and_etag[cash-vs-account] 
+tests/test_phase_i_reports.py::test_report_json_csv_pdf_and_etag[receivables-forecast] 
+[gw0] [  7%] PASSED tests/test_phase_b_hardening_review.py::test_error_envelope_401_anonymous 
+tests/test_phase_b_hardening_review.py::test_error_envelope_405_method_not_allowed 
+[gw1] [  8%] PASSED tests/test_phase_i_reports.py::test_report_json_csv_pdf_and_etag[receivables-forecast] 
+tests/test_phase_i_reports.py::test_report_json_csv_pdf_and_etag[other-charges] 
+[gw0] [  9%] PASSED tests/test_phase_b_hardening_review.py::test_error_envelope_405_method_not_allowed 
+tests/test_phase_b_hardening_review.py::test_error_envelope_428_idempotency_before_body_validation 
+[gw1] [ 10%] PASSED tests/test_phase_i_reports.py::test_report_json_csv_pdf_and_etag[other-charges] 
+tests/test_phase_i_reports.py::test_report_json_csv_pdf_and_etag[roznamcha-summary] 
+[gw0] [ 11%] PASSED tests/test_phase_b_hardening_review.py::test_error_envelope_428_idempotency_before_body_validation 
+tests/test_phase_b_hardening_review.py::test_anonymous_rejected[/bookings] 
+[gw1] [ 12%] PASSED tests/test_phase_i_reports.py::test_report_json_csv_pdf_and_etag[roznamcha-summary] 
+tests/test_phase_i_reports.py::test_report_json_csv_pdf_and_etag[site-visits] 
+[gw0] [ 13%] PASSED tests/test_phase_b_hardening_review.py::test_anonymous_rejected[/bookings] 
+tests/test_phase_b_hardening_review.py::test_anonymous_rejected[/customers] 
+[gw1] [ 14%] PASSED tests/test_phase_i_reports.py::test_report_json_csv_pdf_and_etag[site-visits] 
+tests/test_phase_i_reports.py::test_report_json_csv_pdf_and_etag[sales-team] 
+[gw0] [ 15%] PASSED tests/test_phase_b_hardening_review.py::test_anonymous_rejected[/customers] 
+tests/test_phase_b_hardening_review.py::test_anonymous_rejected[/payments] 
+[gw1] [ 16%] PASSED tests/test_phase_i_reports.py::test_report_json_csv_pdf_and_etag[sales-team] 
+tests/test_phase_i_reports.py::test_report_json_csv_pdf_and_etag[construction-vs-plan] 
+[gw0] [ 17%] PASSED tests/test_phase_b_hardening_review.py::test_anonymous_rejected[/payments] 
+tests/test_phase_b_hardening_review.py::test_anonymous_rejected[/admin/integrity-report] 
+[gw1] [ 18%] PASSED tests/test_phase_i_reports.py::test_report_json_csv_pdf_and_etag[construction-vs-plan] 
+tests/test_phase_i_reports.py::test_report_json_csv_pdf_and_etag[data-quality] 
+[gw0] [ 19%] PASSED tests/test_phase_b_hardening_review.py::test_anonymous_rejected[/admin/integrity-report] 
+tests/test_phase_b_hardening_review.py::test_portal_token_rejected_on_erp[/bookings] 
+[gw1] [ 20%] PASSED tests/test_phase_i_reports.py::test_report_json_csv_pdf_and_etag[data-quality] 
+tests/test_phase_i_reports.py::test_unknown_param_rejected_and_group_invariant 
+[gw0] [ 21%] PASSED tests/test_phase_b_hardening_review.py::test_portal_token_rejected_on_erp[/bookings] 
+tests/test_phase_b_hardening_review.py::test_portal_token_rejected_on_erp[/customers] 
+[gw0] [ 22%] PASSED tests/test_phase_b_hardening_review.py::test_portal_token_rejected_on_erp[/customers] 
+tests/test_phase_b_hardening_review.py::test_portal_token_rejected_on_erp[/payments] 
+[gw0] [ 23%] PASSED tests/test_phase_b_hardening_review.py::test_portal_token_rejected_on_erp[/payments] 
+tests/test_phase_b_hardening_review.py::test_portal_token_rejected_on_erp[/admin/integrity-report] 
+[gw0] [ 24%] PASSED tests/test_phase_b_hardening_review.py::test_portal_token_rejected_on_erp[/admin/integrity-report] 
+tests/test_phase_b_hardening_review.py::test_customers_idempotency_replay 
+[gw0] [ 25%] PASSED tests/test_phase_b_hardening_review.py::test_customers_idempotency_replay 
+tests/test_phase_b_hardening_review.py::test_customers_version_conflict 
+[gw1] [ 26%] PASSED tests/test_phase_i_reports.py::test_unknown_param_rejected_and_group_invariant 
+tests/test_phase_i_reports.py::test_registry_has_no_unregistered_codes 
+[gw1] [ 27%] PASSED tests/test_phase_i_reports.py::test_registry_has_no_unregistered_codes 
+[gw0] [ 28%] PASSED tests/test_phase_b_hardening_review.py::test_customers_version_conflict 
+tests/test_phase_i_reports.py::test_demands_honour_block_id_and_planned_date_roundtrip 
+tests/test_phase_b_hardening_review.py::test_integrity_report_ok 
+[gw1] [ 29%] PASSED tests/test_phase_i_reports.py::test_demands_honour_block_id_and_planned_date_roundtrip 
+tests/test_phase_i_reports.py::test_collections_date_basis_and_csv_shape 
+[gw0] [ 30%] PASSED tests/test_phase_b_hardening_review.py::test_integrity_report_ok 
+tests/test_phase_b_hardening_review.py::test_receipt_pdf_text_and_deterministic 
+[gw1] [ 31%] PASSED tests/test_phase_i_reports.py::test_collections_date_basis_and_csv_shape 
+tests/test_phase_i_reports.py::test_outstanding_three_balances_law 
+[gw0] [ 32%] PASSED tests/test_phase_b_hardening_review.py::test_receipt_pdf_text_and_deterministic 
+tests/test_phase_b_hardening_review.py::test_allotment_pdf_has_signature 
+[gw1] [ 33%] PASSED tests/test_phase_i_reports.py::test_outstanding_three_balances_law 
+tests/test_phase_i_reports.py::test_manual_bill_counts_in_outstanding_and_ageing 
+[gw0] [ 33%] PASSED tests/test_phase_b_hardening_review.py::test_allotment_pdf_has_signature 
+tests/test_phase_b_hardening_review.py::test_demand_letter_pdf_has_signature 
+[gw0] [ 34%] PASSED tests/test_phase_b_hardening_review.py::test_demand_letter_pdf_has_signature 
+tests/test_phase_k_p0.py::test_poisoned_booking_does_not_stop_dues_run 
+[gw1] [ 35%] PASSED tests/test_phase_i_reports.py::test_manual_bill_counts_in_outstanding_and_ageing 
+tests/test_phase_k_p1.py::test_loadshed_sheds_with_prebuilt_503_and_exempts_probes 
+[gw1] [ 36%] PASSED tests/test_phase_k_p1.py::test_loadshed_sheds_with_prebuilt_503_and_exempts_probes 
+tests/test_phase_k_p1.py::test_health_fast_and_ops_shows_shed 
+[gw1] [ 37%] PASSED tests/test_phase_k_p1.py::test_health_fast_and_ops_shows_shed 
+tests/test_phase_k_p1.py::test_query_timeout_envelope 
+[gw0] [ 38%] PASSED tests/test_phase_k_p0.py::test_poisoned_booking_does_not_stop_dues_run 
+tests/test_phase_k_p0.py::test_sweep_marks_stuck_runs_abandoned_and_health_flags_stale 
+[gw0] [ 39%] PASSED tests/test_phase_k_p0.py::test_sweep_marks_stuck_runs_abandoned_and_health_flags_stale 
+tests/test_phase_k_p0.py::test_invariant_indexes_and_validators_reject_bad_docs 
+[gw1] [ 40%] PASSED tests/test_phase_k_p1.py::test_query_timeout_envelope 
+tests/test_phase_k_p1.py::test_budgets_wired_into_search_and_reports 
+[gw1] [ 41%] PASSED tests/test_phase_k_p1.py::test_budgets_wired_into_search_and_reports 
+tests/test_phase_k_p1.py::test_transient_db_errors_map_to_retryable_envelopes 
+[gw1] [ 42%] PASSED tests/test_phase_k_p1.py::test_transient_db_errors_map_to_retryable_envelopes 
+tests/test_phase_k_p1.py::test_frontend_retries_idempotent_get_once_on_503 
+[gw1] [ 43%] PASSED tests/test_phase_k_p1.py::test_frontend_retries_idempotent_get_once_on_503 
+tests/test_phase_k_p1.py::test_r1_cannot_change_own_roles_or_reset_own_password 
+[gw1] [ 44%] PASSED tests/test_phase_k_p1.py::test_r1_cannot_change_own_roles_or_reset_own_password 
+tests/test_phase_k_p1.py::test_r2_r3_r4_escalation_blocked 
+[gw0] [ 45%] PASSED tests/test_phase_k_p0.py::test_invariant_indexes_and_validators_reject_bad_docs 
+tests/test_phase_k_p0.py::test_twenty_parallel_bookings_on_one_flat_exactly_one_wins 
+[gw0] [ 46%] PASSED tests/test_phase_k_p0.py::test_twenty_parallel_bookings_on_one_flat_exactly_one_wins 
+tests/test_phase_k_p0.py::test_app_connection_cannot_update_or_delete_audit_rows 
+[gw1] [ 47%] PASSED tests/test_phase_k_p1.py::test_r2_r3_r4_escalation_blocked 
+tests/test_phase_k_p1.py::test_unknown_vs_known_identifier_same_response_and_timing 
+[gw0] [ 48%] PASSED tests/test_phase_k_p0.py::test_app_connection_cannot_update_or_delete_audit_rows 
+tests/test_phase_k_p0.py::test_idempotency_mismatch_and_reuse 
+[gw0] [ 49%] PASSED tests/test_phase_k_p0.py::test_idempotency_mismatch_and_reuse 
+tests/test_phase_k_p0.py::test_idempotency_in_progress_and_abandoned_claim 
+[gw1] [ 50%] PASSED tests/test_phase_k_p1.py::test_unknown_vs_known_identifier_same_response_and_timing 
+tests/test_phase_k_p1.py::test_pair_lockout_from_login_events 
+[gw1] [ 51%] PASSED tests/test_phase_k_p1.py::test_pair_lockout_from_login_events 
+tests/test_phase_k_p1.py::test_refresh_reuse_and_sessions_exist 
+[gw1] [ 52%] PASSED tests/test_phase_k_p1.py::test_refresh_reuse_and_sessions_exist 
+tests/test_phase_m_masters.py::test_stage_master_quick_add_and_booking_pseudo_stage 
+[gw1] [ 53%] PASSED tests/test_phase_m_masters.py::test_stage_master_quick_add_and_booking_pseudo_stage 
+tests/test_phase_m_masters.py::test_stage_plan_create_sets_tower_sequence 
+[gw1] [ 54%] PASSED tests/test_phase_m_masters.py::test_stage_plan_create_sets_tower_sequence 
+tests/test_phase_m_masters.py::test_payment_plan_validation_and_create 
+[gw1] [ 55%] PASSED tests/test_phase_m_masters.py::test_payment_plan_validation_and_create 
+tests/test_phase_m_masters.py::test_stage_removal_blocked_when_referenced 
+[gw1] [ 56%] PASSED tests/test_phase_m_masters.py::test_stage_removal_blocked_when_referenced 
+tests/test_phase_m_masters.py::test_owner_flow_udhar_jama_balance 
+[gw1] [ 57%] PASSED tests/test_phase_m_masters.py::test_owner_flow_udhar_jama_balance 
+tests/test_phase_m_masters.py::test_ledger_csv_has_two_sided_columns 
+[gw1] [ 58%] PASSED tests/test_phase_m_masters.py::test_ledger_csv_has_two_sided_columns 
+tests/test_phase_m_masters.py::test_registry_has_phase_m_codes 
+[gw1] [ 59%] PASSED tests/test_phase_m_masters.py::test_registry_has_phase_m_codes 
+tests/test_phase_m_masters.py::test_catch_up_gst_attributed_per_stage_and_undo_unwinds_only_last 
+[gw1] [ 60%] PASSED tests/test_phase_m_masters.py::test_catch_up_gst_attributed_per_stage_and_undo_unwinds_only_last 
+tests/test_phase_c_refocus.py::test_public_projects_parked_404 
+[gw1] [ 61%] PASSED tests/test_phase_c_refocus.py::test_public_projects_parked_404 
+tests/test_phase_c_refocus.py::test_portal_config_parked_404 
+[gw1] [ 62%] PASSED tests/test_phase_c_refocus.py::test_portal_config_parked_404 
+tests/test_phase_c_refocus.py::test_bootstrap_surfaces_and_company_name 
+[gw1] [ 63%] PASSED tests/test_phase_c_refocus.py::test_bootstrap_surfaces_and_company_name 
+tests/test_phase_c_refocus.py::test_settings_company 
+[gw1] [ 64%] PASSED tests/test_phase_c_refocus.py::test_settings_company 
+tests/test_phase_c_refocus.py::test_receipt_pdf_text_kkt 
+[gw1] [ 65%] PASSED tests/test_phase_c_refocus.py::test_receipt_pdf_text_kkt 
+tests/test_phase_c_refocus.py::test_collections_csv_no_paise 
+[gw1] [ 66%] PASSED tests/test_phase_c_refocus.py::test_collections_csv_no_paise 
+tests/test_phase_c_refocus.py::test_health_under_500ms 
+[gw1] [ 66%] PASSED tests/test_phase_c_refocus.py::test_health_under_500ms 
+tests/test_phase_d_perf.py::test_admin_ops 
+[gw1] [ 67%] PASSED tests/test_phase_d_perf.py::test_admin_ops 
+tests/test_phase_d_perf.py::test_integrity_report_cached_fast 
+[gw1] [ 68%] PASSED tests/test_phase_d_perf.py::test_integrity_report_cached_fast 
+tests/test_phase_d_perf.py::test_integrity_report_fresh 
+[gw0] [ 69%] PASSED tests/test_phase_k_p0.py::test_idempotency_in_progress_and_abandoned_claim 
+tests/test_phase_k_p0.py::test_idempotency_concurrent_duplicates_create_once 
+[gw1] [ 70%] PASSED tests/test_phase_d_perf.py::test_integrity_report_fresh 
+tests/test_phase_d_perf.py::test_payments_list_pagination 
+[gw1] [ 71%] PASSED tests/test_phase_d_perf.py::test_payments_list_pagination 
+tests/test_phase_d_perf.py::test_health_fast 
+[gw1] [ 72%] PASSED tests/test_phase_d_perf.py::test_health_fast 
+tests/test_phase_d_perf.py::test_cors_evil_origin 
+[gw1] [ 73%] PASSED tests/test_phase_d_perf.py::test_cors_evil_origin 
+tests/test_phase_d_perf.py::test_stages_forward_only_and_undo_roundtrip 
+[gw0] [ 74%] PASSED tests/test_phase_k_p0.py::test_idempotency_concurrent_duplicates_create_once 
+tests/test_phase_k_p0.py::test_idempotency_secret_replay_rejected 
+[gw0] [ 75%] PASSED tests/test_phase_k_p0.py::test_idempotency_secret_replay_rejected 
+tests/test_phase_k_p0.py::test_pending_cheque_headroom_warning 
+[gw0] [ 76%] PASSED tests/test_phase_k_p0.py::test_pending_cheque_headroom_warning 
+tests/test_phase_j_exports.py::test_smart_count_estimates_above_threshold 
+[gw0] [ 77%] PASSED tests/test_phase_j_exports.py::test_smart_count_estimates_above_threshold 
+tests/test_phase_j_exports.py::test_list_endpoint_reports_total_estimated_flag 
+[gw0] [ 78%] PASSED tests/test_phase_j_exports.py::test_list_endpoint_reports_total_estimated_flag 
+tests/test_phase_j_exports.py::test_paginate_budget_param_exists 
+[gw0] [ 79%] PASSED tests/test_phase_j_exports.py::test_paginate_budget_param_exists 
+tests/test_phase_j_exports.py::test_async_export_job_download_and_limits 
+[gw1] [ 80%] PASSED tests/test_phase_d_perf.py::test_stages_forward_only_and_undo_roundtrip 
+tests/test_phase_j4_files.py::test_200mb_upload_resumes_after_dropped_part 
+[gw0] [ 81%] PASSED tests/test_phase_j_exports.py::test_async_export_job_download_and_limits 
+tests/test_phase_j_exports.py::test_sync_csv_carries_export_headers 
+[gw1] [ 82%] PASSED tests/test_phase_j4_files.py::test_200mb_upload_resumes_after_dropped_part 
+tests/test_phase_j4_files.py::test_magic_bytes_and_extension_allow_list 
+[gw0] [ 83%] PASSED tests/test_phase_j_exports.py::test_sync_csv_carries_export_headers 
+tests/test_phase_a_print.py::test_erp_pdfs_inline_download_and_404 
+[gw1] [ 84%] PASSED tests/test_phase_j4_files.py::test_magic_bytes_and_extension_allow_list 
+tests/test_phase_j4_files.py::test_corrupt_image_does_not_stop_variant_batch 
+[gw0] [ 85%] PASSED tests/test_phase_a_print.py::test_erp_pdfs_inline_download_and_404 
+tests/test_phase_a_print.py::test_portal_and_erp_pdfs_identical 
+[gw0] [ 86%] PASSED tests/test_phase_a_print.py::test_portal_and_erp_pdfs_identical 
+tests/test_phase_a_print.py::test_public_verify_code 
+[gw0] [ 87%] PASSED tests/test_phase_a_print.py::test_public_verify_code 
+tests/test_phase_b4_backend_sanity.py::test_health_fast 
+[gw0] [ 88%] PASSED tests/test_phase_b4_backend_sanity.py::test_health_fast 
+tests/test_phase_b4_backend_sanity.py::test_bookings_list 
+[gw0] [ 89%] PASSED tests/test_phase_b4_backend_sanity.py::test_bookings_list 
+tests/test_phase_b4_backend_sanity.py::test_integrity_report_ok 
+[gw1] [ 90%] PASSED tests/test_phase_j4_files.py::test_corrupt_image_does_not_stop_variant_batch 
+tests/test_phase_j4_files.py::test_legal_hold_blocks_delete_and_storage_card 
+[gw0] [ 91%] PASSED tests/test_phase_b4_backend_sanity.py::test_integrity_report_ok 
+tests/test_phase_k_ops.py::test_backup_manifest_and_restore_drill_records_job_run 
+[gw1] [ 92%] PASSED tests/test_phase_j4_files.py::test_legal_hold_blocks_delete_and_storage_card 
+tests/test_phase_j4_files.py::test_raw_storage_key_never_in_api_responses 
+[gw1] [ 93%] PASSED tests/test_phase_j4_files.py::test_raw_storage_key_never_in_api_responses 
+tests/test_phase_m1_followup.py::test_tower_create_without_project_version_and_cosmetic_patch_without_version 
+[gw1] [ 94%] PASSED tests/test_phase_m1_followup.py::test_tower_create_without_project_version_and_cosmetic_patch_without_version 
+tests/test_phase_m1_followup.py::test_statement_pdf_two_sided 
+[gw1] [ 95%] PASSED tests/test_phase_m1_followup.py::test_statement_pdf_two_sided 
+tests/test_phase_m1_followup.py::test_allotment_pdf_two_sided_position 
+[gw1] [ 96%] PASSED tests/test_phase_m1_followup.py::test_allotment_pdf_two_sided_position 
+tests/test_phase_l.py::test_load_test_tagging_and_purge 
+[gw0] [ 97%] PASSED tests/test_phase_k_ops.py::test_backup_manifest_and_restore_drill_records_job_run 
+tests/test_phase_k_ops.py::test_ops_has_backup_and_alerts_cards 
+[gw1] [ 98%] PASSED tests/test_phase_l.py::test_load_test_tagging_and_purge 
+[gw0] [ 99%] PASSED tests/test_phase_k_ops.py::test_ops_has_backup_and_alerts_cards 
+tests/test_phase_k_ops.py::test_each_alert_rule_fires_on_synthetic_data 
+[gw0] [100%] PASSED tests/test_phase_k_ops.py::test_each_alert_rule_fires_on_synthetic_data 
+
+=============================== warnings summary ===============================
+tests/test_phase_k_p1.py::test_loadshed_sheds_with_prebuilt_503_and_exempts_probes
+tests/test_phase_j_exports.py::test_paginate_budget_param_exists
+  /root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12: PendingDeprecationWarning: Please use `import python_multipart` instead.
+    import multipart
+
+tests/test_phase_k_p1.py::test_loadshed_sheds_with_prebuilt_503_and_exempts_probes
+  /root/.venv/lib/python3.11/site-packages/starlette/testclient.py:41: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    [], typing.ContextManager[anyio.abc.BlockingPortal]
+
+tests/test_phase_k_p1.py::test_query_timeout_envelope
+  /root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854: DeprecationWarning: 'crypt' is deprecated and slated for removal in Python 3.13
+    from crypt import crypt as _crypt
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================= 103 passed, 4 warnings in 271.91s (0:04:31) ==================

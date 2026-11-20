@@ -1,0 +1,105 @@
+{
+ "vus": 3,
+ "duration_s": 31,
+ "requests": 101,
+ "rps": 3.3,
+ "stopped": null,
+ "errors": {},
+ "assertions": {
+  "lead_created:ok": 15,
+  "lead_converted:ok": 15,
+  "booking_created:ok": 14,
+  "booking_total_matches_preview:ok": 14,
+  "payment_posted:ok": 13,
+  "journey_exception:FAIL": 12,
+  "integrity_ok_after_stage:ok": 1
+ },
+ "failed_assertions": [
+  {
+   "assertion": "journey_exception",
+   "detail": "AttributeError: 'str' object has no attribute 'get'"
+  },
+  {
+   "assertion": "journey_exception",
+   "detail": "AttributeError: 'str' object has no attribute 'get'"
+  },
+  {
+   "assertion": "journey_exception",
+   "detail": "AttributeError: 'str' object has no attribute 'get'"
+  },
+  {
+   "assertion": "journey_exception",
+   "detail": "AttributeError: 'str' object has no attribute 'get'"
+  },
+  {
+   "assertion": "journey_exception",
+   "detail": "AttributeError: 'str' object has no attribute 'get'"
+  },
+  {
+   "assertion": "journey_exception",
+   "detail": "AttributeError: 'str' object has no attribute 'get'"
+  },
+  {
+   "assertion": "journey_exception",
+   "detail": "AttributeError: 'str' object has no attribute 'get'"
+  },
+  {
+   "assertion": "journey_exception",
+   "detail": "AttributeError: 'str' object has no attribute 'get'"
+  },
+  {
+   "assertion": "journey_exception",
+   "detail": "AttributeError: 'str' object has no attribute 'get'"
+  },
+  {
+   "assertion": "journey_exception",
+   "detail": "AttributeError: 'str' object has no attribute 'get'"
+  },
+  {
+   "assertion": "journey_exception",
+   "detail": "AttributeError: 'str' object has no attribute 'get'"
+  },
+  {
+   "assertion": "journey_exception",
+   "detail": "AttributeError: 'str' object has no attribute 'get'"
+  }
+ ],
+ "groups": {
+  "bookings": {
+   "n": 14,
+   "p50": 200.0,
+   "p95": 220.2,
+   "p99": 220.2
+  },
+  "breakdown": {
+   "n": 14,
+   "p50": 16.1,
+   "p95": 19.5,
+   "p99": 19.5
+  },
+  "customers": {
+   "n": 27,
+   "p50": 18.5,
+   "p95": 26.4,
+   "p99": 30.8
+  },
+  "leads": {
+   "n": 30,
+   "p50": 31.1,
+   "p95": 53.1,
+   "p99": 58.1
+  },
+  "login": {
+   "n": 3,
+   "p50": 233.8,
+   "p95": 237.5,
+   "p99": 237.5
+  },
+  "payments": {
+   "n": 13,
+   "p50": 123.9,
+   "p95": 146.1,
+   "p99": 146.1
+  }
+ }
+}

@@ -1,0 +1,191 @@
+=== reports1 19:58:48 2aae3a1 df= 2.6G
+customer-status          first p95   227.0  cached p95   15.3
+customer-statement       first p95    24.4  cached p95    9.0
+customer-ageing          first p95   182.0  cached p95   15.5
+advance-holders          first p95   176.3  cached p95   11.1
+call-list                first p95   209.3  cached p95   15.2
+kyc-pending              first p95   214.2  cached p95   15.1
+payment-behaviour        first p95   266.9  cached p95    8.0
+customer-directory       first p95   199.8  cached p95   10.2
+cancelled-customers      first p95    23.8  cached p95    4.0
+collections              first p95   146.4  cached p95   15.5
+day-book                 first p95    96.4  cached p95    5.0
+bank-receipts            first p95   160.6  cached p95    4.0
+cheques                  first p95   160.9  cached p95   15.8
+bills-vs-collection      first p95   170.9  cached p95    4.5
+outstanding              first p95   202.6  cached p95   15.3
+cash-vs-account          first p95   131.8  cached p95   15.9
+other-charges            first p95   152.6  cached p95   15.9
+receivables-forecast     first p95   248.3  cached p95   15.6
+waivers                  first p95    49.1  cached p95    4.2
+booking-register         first p95   221.0  cached p95   17.8
+sales-summary            first p95   204.5  cached p95    4.1
+discount-register        first p95    57.3  cached p95    4.7
+plan-position            first p95   220.1  cached p95   15.3
+agreements               first p95   218.9  cached p95   15.4
+cancellations            first p95    50.1  cached p95    4.4
+transfers                first p95   216.3  cached p95    4.0
+sales-team               first p95   228.7  cached p95    4.3
+realised-rate            first p95   222.7  cached p95   16.7
+booking-health           first p95   222.9  cached p95   15.6
+project-statement        first p95    72.9  cached p95    6.6
+inventory-status         first p95   176.8  cached p95   15.6
+stacking-plan            first p95   181.2  cached p95   16.2
+price-list               first p95   160.9  cached p95    7.3
+hold-register            first p95   157.0  cached p95    3.5
+landowner                first p95   153.3  cached p95    4.1
+parking                  first p95    21.9  cached p95    3.7
+construction-vs-plan     first p95   160.6  cached p95    4.7
+stage-bills              first p95   171.5  cached p95    4.9
+sales-velocity           first p95   163.4  cached p95    3.7
+lead-funnel              first p95   125.8  cached p95    3.5
+lead-register            first p95    73.7  cached p95    4.1
+source-performance       first p95   130.6  cached p95    3.3
+follow-ups               first p95    68.4  cached p95    3.5
+visit-register           first p95    65.9  cached p95    3.8
+visit-conversion         first p95    56.7  cached p95    3.9
+lost-leads               first p95    68.1  cached p95    3.6
+response-time            first p95    70.5  cached p95    4.0
+team-pipeline            first p95   131.9  cached p95    3.5
+lead-ageing              first p95    69.5  cached p95    3.7
+service-sla              first p95    55.7  cached p95    4.5
+50/50 within budget []
+exit 0
+=== reports2 20:00:40 2aae3a1 df= 2.6G
+customer-status          first p95   231.4  cached p95   13.9
+customer-statement       first p95    25.0  cached p95    8.8
+customer-ageing          first p95   181.4  cached p95   15.1
+advance-holders          first p95   177.2  cached p95   11.1
+call-list                first p95   209.1  cached p95   14.9
+kyc-pending              first p95   213.4  cached p95   15.4
+payment-behaviour        first p95   270.5  cached p95    8.5
+customer-directory       first p95   201.0  cached p95    9.8
+cancelled-customers      first p95    24.2  cached p95    4.3
+collections              first p95   146.6  cached p95   15.4
+day-book                 first p95    96.2  cached p95    4.3
+bank-receipts            first p95   175.8  cached p95    5.0
+cheques                  first p95   158.8  cached p95   15.4
+bills-vs-collection      first p95   169.0  cached p95    4.4
+outstanding              first p95   199.3  cached p95   15.2
+cash-vs-account          first p95   133.9  cached p95   15.7
+other-charges            first p95   152.6  cached p95   16.3
+receivables-forecast     first p95   250.6  cached p95   15.6
+waivers                  first p95    48.5  cached p95    4.0
+booking-register         first p95   219.8  cached p95   15.3
+sales-summary            first p95   206.3  cached p95    4.5
+discount-register        first p95    55.8  cached p95    4.6
+plan-position            first p95   221.2  cached p95   15.9
+agreements               first p95   219.1  cached p95   21.4
+cancellations            first p95    50.7  cached p95    4.0
+transfers                first p95   214.1  cached p95    4.4
+sales-team               first p95   233.0  cached p95    3.9
+realised-rate            first p95   221.9  cached p95   14.9
+booking-health           first p95   222.1  cached p95   15.2
+project-statement        first p95    70.3  cached p95    6.1
+inventory-status         first p95   175.2  cached p95   15.7
+stacking-plan            first p95   179.4  cached p95   16.2
+price-list               first p95   160.0  cached p95    7.9
+hold-register            first p95   155.3  cached p95    3.4
+landowner                first p95   153.0  cached p95    3.4
+parking                  first p95    22.1  cached p95    3.9
+construction-vs-plan     first p95   159.7  cached p95    4.5
+stage-bills              first p95   168.7  cached p95    5.2
+sales-velocity           first p95   163.3  cached p95    3.9
+lead-funnel              first p95   125.1  cached p95    3.4
+lead-register            first p95    75.6  cached p95    4.0
+source-performance       first p95   133.9  cached p95    3.1
+follow-ups               first p95    67.9  cached p95    3.4
+visit-register           first p95    66.9  cached p95    3.4
+visit-conversion         first p95    56.2  cached p95    4.1
+lost-leads               first p95    68.9  cached p95    3.3
+response-time            first p95    72.5  cached p95    4.1
+team-pipeline            first p95   130.1  cached p95    4.2
+lead-ageing              first p95    74.6  cached p95    3.4
+service-sla              first p95    53.7  cached p95    3.8
+50/50 within budget []
+exit 0
+=== reports3 20:02:35 2aae3a1 df= 2.6G
+customer-status          first p95   230.1  cached p95   15.3
+customer-statement       first p95    26.4  cached p95    8.3
+customer-ageing          first p95   183.8  cached p95   14.0
+advance-holders          first p95   178.4  cached p95   11.5
+call-list                first p95   208.1  cached p95   15.0
+kyc-pending              first p95   214.4  cached p95   15.5
+payment-behaviour        first p95   270.7  cached p95    8.0
+customer-directory       first p95   201.8  cached p95    8.7
+cancelled-customers      first p95    22.1  cached p95    4.0
+collections              first p95   145.0  cached p95   15.6
+day-book                 first p95    96.6  cached p95    4.2
+bank-receipts            first p95   147.4  cached p95    4.6
+cheques                  first p95   157.8  cached p95   15.5
+bills-vs-collection      first p95   169.9  cached p95    4.3
+outstanding              first p95   202.5  cached p95   15.4
+cash-vs-account          first p95   129.8  cached p95   16.1
+other-charges            first p95   154.6  cached p95   17.1
+receivables-forecast     first p95   244.0  cached p95   15.5
+waivers                  first p95    49.1  cached p95    4.8
+booking-register         first p95   220.0  cached p95   15.4
+sales-summary            first p95   210.6  cached p95    4.0
+discount-register        first p95    55.4  cached p95    4.7
+plan-position            first p95   219.4  cached p95   18.4
+agreements               first p95   222.8  cached p95   15.7
+cancellations            first p95    50.9  cached p95    4.0
+transfers                first p95   214.8  cached p95    4.1
+sales-team               first p95   227.7  cached p95    3.7
+realised-rate            first p95   222.6  cached p95   16.1
+booking-health           first p95   220.6  cached p95   14.9
+project-statement        first p95    70.1  cached p95    5.6
+inventory-status         first p95   170.4  cached p95   16.1
+stacking-plan            first p95   173.9  cached p95   16.8
+price-list               first p95   153.9  cached p95    7.8
+hold-register            first p95   149.9  cached p95    4.1
+landowner                first p95   151.1  cached p95    3.7
+parking                  first p95    22.0  cached p95    3.8
+construction-vs-plan     first p95   154.8  cached p95    4.1
+stage-bills              first p95   173.5  cached p95    4.5
+sales-velocity           first p95   157.8  cached p95    3.8
+lead-funnel              first p95   124.7  cached p95    3.8
+lead-register            first p95    73.7  cached p95    3.6
+source-performance       first p95   129.7  cached p95    3.7
+follow-ups               first p95    67.6  cached p95    3.8
+visit-register           first p95    66.8  cached p95    3.6
+visit-conversion         first p95    55.9  cached p95    4.1
+lost-leads               first p95    67.9  cached p95    3.7
+response-time            first p95    71.7  cached p95    3.9
+team-pipeline            first p95   136.5  cached p95    3.9
+lead-ageing              first p95    63.9  cached p95    4.3
+service-sla              first p95    53.0  cached p95    3.6
+50/50 within budget []
+exit 0
+=== budget1 20:04:32 2aae3a1 df= 2.6G
+exit 0
+ Home Command Center (month)  |  7.3   8.0   180.2  |  yes 
+ Bills raised page  |  5.0   5.3   220.1  |  yes 
+ Home Command Center (month) — first after a save  |  184.6   197.7     |  yes 
+ Bills raised page — first after a save  |  144.7   216.6     |  NO 
+ Post payment (auto allocation + ledger)  |  67.3   76.8     |  yes 
+ Create booking  |  137.8   194.2     |  yes 
+ Stage complete (33 bookings)  |  380.5   400.6     |  yes 
+=== budget2 20:06:15 2aae3a1 df= 2.6G
+exit 0
+ Home Command Center (month)  |  7.1   7.8   180.3  |  yes 
+ Bills raised page  |  5.0   5.6   219.9  |  yes 
+ Home Command Center (month) — first after a save  |  189.2   195.1     |  yes 
+ Bills raised page — first after a save  |  147.4   222.6     |  NO 
+ Post payment (auto allocation + ledger)  |  67.9   74.9     |  yes 
+ Create booking  |  137.9   201.7     |  yes 
+ Stage complete (33 bookings)  |  376.0   401.5     |  yes 
+=== budget3 20:07:57 2aae3a1 df= 2.6G
+exit 0
+ Home Command Center (month)  |  8.2   8.9   180.1  |  yes 
+ Bills raised page  |  5.3   7.2   221.5  |  yes 
+ Home Command Center (month) — first after a save  |  195.8   204.5     |  NO 
+ Bills raised page — first after a save  |  153.9   229.7     |  NO 
+ Post payment (auto allocation + ledger)  |  83.8   105.2     |  yes 
+ Create booking  |  179.0   254.6     |  yes 
+ Stage complete (33 bookings)  |  416.6   436.6     |  yes 
+=== replset 20:09:54 2aae3a1 df= 2.5G
+=== replset 20:53:04 529e594 df= 2.7G
+5 failed, 917 passed, 3 skipped, 19 warnings in 2933.64s (0:48:53)
+=== pytest 21:43:34 529e594 df= 2.7G
+=== replset 22:17:08 851e963 df= 2.6G

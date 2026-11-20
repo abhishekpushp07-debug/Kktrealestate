@@ -1,0 +1,104 @@
+bringing up nodes...
+bringing up nodes...
+
+........................................................................ [  7%]
+........................................................................ [ 14%]
+........................................................................ [ 22%]
+........................................................................ [ 29%]
+........................................................................ [ 37%]
+...........................................s............................ [ 44%]
+........................................................................ [ 52%]
+........................................................................ [ 59%]
+........................................................................ [ 67%]
+........................................................................ [ 74%]
+........................................................................ [ 82%]
+........................................................sss............. [ 89%]
+................................F.......................s......s........ [ 96%]
+.............................                                            [100%]
+=================================== FAILURES ===================================
+___________________ test_tower_sales_real_vs_display_masking ___________________
+[gw1] linux -- Python 3.11.18 /root/.venv/bin/python
+
+    def test_tower_sales_real_vs_display_masking():
+        A = _hdr("admin@kkt.in")
+        pid = _sgh(A)
+        real = requests.get(f"{BASE}/api/projects/{pid}/tower-sales", params={"view": "real"}, headers=A, timeout=60).json()
+        assert (
+            real["view"] == "real"
+            and real["can_toggle"] is True
+            and set(real["categories"]) == {"sold", "available", "hold", "landowner", "blocked"}
+        )
+        for t in real["towers"]:
+            assert t["total"] == sum(t[c] for c in real["categories"])
+        assert real["total"]["total"] == sum(t["total"] for t in real["towers"])
+        S = _hdr("sales@kkt.in")
+        disp = requests.get(f"{BASE}/api/projects/{pid}/tower-sales", params={"view": "real"}, headers=S, timeout=60).json()
+        assert disp["view"] == "display" and disp["can_toggle"] is False
+        assert set(disp["categories"]) == {"sold", "available", "hold"}
+        for t in disp["towers"]:
+            assert "landowner" not in t and "blocked" not in t and t["total"] == t["sold"] + t["available"] + t["hold"]
+        assert (
+            requests.get(f"{BASE}/api/projects/{pid}/tower-sales", headers=_hdr("employee@kkt.in"), timeout=30).status_code
+            == 403
+        )
+        admin_disp = requests.get(
+            f"{BASE}/api/projects/{pid}/tower-sales", params={"view": "display"}, headers=A, timeout=60
+        ).json()
+        strip = lambda d: {k: v for k, v in d.items() if k != "can_toggle"}  # noqa: E731
+>       assert strip(admin_disp) == strip(disp), "admin view=display must be byte-for-byte the Sales payload"
+E       AssertionError: admin view=display must be byte-for-byte the Sales payload
+E       assert {'project_id'....}, ...], ...} == {'project_id'....}, ...], ...}
+E         
+E         Omitting 5 identical items, use -vv to show
+E         Differing items:
+E         {'total': {'sold': 86, 'available': 459, 'hold': 5, 'total': 550, ...}} != {'total': {'sold': 85, 'available': 460, 'hold': 5, 'total': 550, ...}}
+E         {'towers': [{'block_id': 'cd3a2291-8dd4-4b8a-9123-43f6377be0e8', 'tower': 'Own-T04B', 'code': 'T04B', 'sold': 0, ...},... ...}, {'block_id': '8fdf90fd-5dce-4b02-bc71-85a6209fafc9', 'tower': 'Own-T4DE', 'code': 'T4DE', 'sold': 1, ...}, ...]} != {'towers': [{'block_id': 'cd3a2291-8dd4-4b8a-9123-43f6377be0e8', 'tower': 'Own-T04B', 'code': 'T04B', 'sold': 0, ...},... ...},...
+E         
+E         ...Full output truncated (2 lines hidden), use '-vv' to show
+
+tests/test_phase_y.py:57: AssertionError
+=============================== warnings summary ===============================
+../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
+../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
+  /root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12: PendingDeprecationWarning: Please use `import python_multipart` instead.
+    import multipart
+
+../../root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854
+../../root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854
+  /root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854: DeprecationWarning: 'crypt' is deprecated and slated for removal in Python 3.13
+    from crypt import crypt as _crypt
+
+tests/test_startup_s1_s3_idempotent.py:71
+tests/test_startup_s1_s3_idempotent.py:71
+  /app/backend/tests/test_startup_s1_s3_idempotent.py:71: PytestUnknownMarkWarning: Unknown pytest.mark.timeout - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.timeout(900)
+
+tests/test_phase_k_p1.py::test_loadshed_sheds_with_prebuilt_503_and_exempts_probes
+  /root/.venv/lib/python3.11/site-packages/starlette/testclient.py:41: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    [], typing.ContextManager[anyio.abc.BlockingPortal]
+
+tests/test_phase_q.py: 10 warnings
+  /root/.venv/lib/python3.11/site-packages/pypdf/_page.py:1368: DeprecationWarning: Calling `PageObject.replace_contents()` for pages not assigned to a writer is deprecated and will be removed in pypdf 7.0.0. Attach the page to the writer first or use `PdfWriter(clone_from=...)` directly. The existing approach has proved being unreliable.
+    self.replace_contents(ContentStream(new_content_array, self.pdf))
+
+tests/test_kkt_erp.py::TestBlock::test_create_block_and_generation
+tests/test_kkt_erp.py::TestFlatType::test_create_flat_type_auto_area
+tests/test_phase_7.py::TestPortalPhase7::test_portal_booking_payment_plan
+tests/test_phase_7.py::TestPortalPhase7::test_portal_booking_payment_plan
+  /root/.venv/lib/python3.11/site-packages/_pytest/fixtures.py:1313: PytestRemovedIn10Warning: Class-scoped fixture defined as instance method is deprecated.
+  Instance attributes set in this fixture will NOT be visible to test methods,
+  as each test gets a new instance while the fixture runs only once per class.
+  Use @classmethod decorator and set attributes on cls instead.
+  See https://docs.pytest.org/en/stable/deprecations.html#class-scoped-fixture-as-instance-method
+    fixturefunc = resolve_fixture_function(fixturedef, request)
+
+tests/test_phase_5.py::TestPortalData::test_booking_detail_and_subresources
+  /root/.venv/lib/python3.11/site-packages/_pytest/python.py:171: PytestReturnNotNoneWarning: Test functions should return None, but tests/test_phase_5.py::TestPortalData::test_booking_detail_and_subresources returned <class 'str'>.
+  Did you mean to use `assert` instead of `return`?
+  See https://docs.pytest.org/en/stable/how-to/assert.html#return-not-none for more information.
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_phase_y.py::test_tower_sales_real_vs_display_masking - Asse...
+1 failed, 958 passed, 6 skipped, 22 warnings in 1384.25s (0:23:04)

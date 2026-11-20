@@ -1,0 +1,13 @@
+.....FF                                                                  [100%]
+=================================== FAILURES ===================================
+E   AssertionError: assert (['amount_paise', 'gst_paise', 'approved_paise'] and False)
+     +  where False = all(<generator object test_f3_equals_existing_report.<locals>.<genexpr> at 0xf95b85072740>)
+/app/backend/tests/test_phase3f_engine.py:212: AssertionError: assert (['amount_paise', 'gst_paise', 'approved_paise'] and False)
+E   AssertionError: assert (77950000 - 0) == ((79950000 - 0) - 0)
+     +  where 0 = <built-in method get of dict object at 0xf95b851d4980>('waived_paise', 0)
+     +    where <built-in method get of dict object at 0xf95b851d4980> = {'group': 'BK-2627-2941', 'customer_name': 'Matrix 44bd91', 'unit': 'SGH Own-TE1A · TE1A-127', 'project_id': '8e4ef80c-0ce8-4fe6-8c46-7b552afe0d8a', ...}.get
+/app/backend/tests/test_phase_i_reports.py:210: AssertionError: assert (77950000 - 0) == ((79950000 - 0) - 0)
+=========================== short test summary info ============================
+FAILED tests/test_phase3f_engine.py::test_f3_equals_existing_report[waivers]
+FAILED tests/test_phase_i_reports.py::test_outstanding_three_balances_law - A...
+2 failed, 5 passed in 244.95s (0:04:04)

@@ -1,0 +1,54 @@
+{
+  "summary": "Phase D (performance/observability) end-to-end verified on preview ROOT as admin@kkt.in. BACKEND pytest 6/6 pass (/app/backend/tests/test_phase_d_perf.py, junit /app/test_reports/pytest/phase_d_perf.xml): (1) GET /api/admin/ops 200 with keys uptime_s/startup/process/requests.by_group/jobs/read_models/db_pool.config.maxPoolSize; (2) GET /api/admin/integrity-report (after priming via ?fresh=1) 200, cached=true, served in ~<100ms (<300ms budget met); (3) ?fresh=1 recomputes with ok=true; (4) GET /api/payments?page_size=50 200 with items[] (48 total) + pagination keys {total,page,page_size,next_cursor} — NOTE spec said 'items + totals' but impl returns 'total' (count) rather than 'totals' (aggregates); (5) GET /api/health 200 in <500ms (~75–195ms from edge); (6) CORS probe GET /api/health with Origin: https://evil.example → ingress returns ACAO='https://evil.example' (reflection); the FastAPI app itself does not add any CORS headers (verified by inspecting backend logs/code — ops.py and routers add none). Reporting-only per spec. FRONTEND (Playwright, performance.getEntriesByType('resource') with clearResourceTimings() between navigations; excluding /api/bootstrap and /api/auth/*): Home/Dashboard = 3 calls (/api/settings/company, /api/notifications/unread-count, /api/dashboard/home — the first two are app-shell polls so page-specific is 1; target ≤2 met if shell is excluded, slightly over if not). Customers list = 7 calls total, but /api/catalogues was fetched 4 TIMES on the same screen and /api/customers hit 2 times (one count-only + one list). Customers search 'Sinha' = 1 call /api/customers?...&search=Sinha&page=1 returning exactly 1 result (Amit Kumar Sinha) ✓ no duplicate. Customer 360 (Amit Kumar Sinha) = 7 calls (customer, customer/ledgers×2, timeline, communications, documents, document-types) — OVER the ≤3 target and /customers/{id}/ledgers is duplicated. Booking detail (BK-2526-0001) = 2 calls (/bookings/{id}, /bookings/{id}/ledger) ✓ no dupes. Payments = 4 calls (payments list, payments/cheques-in-hand, dashboard/home, payments/demands) ✓ no dupes. Leads board drag + undo: dragged lead 'Notif QA' from New → Contacted; sonner toast appeared with title 'Notif QA → Contacted', description 'Moved from New', action button 'Undo' ✓; clicked Undo → confirmation toast 'Notif QA back in New' ✓ and card returned to New column (screenshots 06_lead_undo.jpeg + 06_lead_undo_after.jpeg). Settings → System health card renders KPIs (Requests 101/P50 10ms/P95 32ms/Uptime 2 min/Pool 0/50), route-group table ([data-testid=ops-groups] present with rows admin/auth/booking_detail/bookings/bootstrap/crm/customer_detail/customers/dashboard/other), and refresh button ([data-testid=ops-refresh] present) → clicked refresh, no errors (07_system_health.jpeg).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/payments?page_size=50", "issue": "Spec says response has 'totals'; implementation returns 'total' (count) + page/page_size/next_cursor. If 'totals' (aggregate sums per bucket) is a Phase D deliverable, it is missing."},
+      {"endpoint": "/api/health (CORS)", "issue": "Ingress reflects Origin: https://evil.example back as Access-Control-Allow-Origin. Backend app itself sends none, so the leak is purely at the ingress layer. Spec called this out as expected but worth confirming with platform ops."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Leads sonner toast", "issue": "code sets data-testid='lead-move-toast' inside the sonner options object but sonner does not forward unknown option keys to the toast DOM; page.locator('[data-testid=lead-move-toast]').count() == 0 even though the toast renders. The toast itself works (title + description 'Moved from <stage>' + Undo action verified). Consider using `className` or `id` passed via sonner's supported option keys, or wrap with a custom JSX element.", "selector": "[data-testid=lead-move-toast]", "priority": "LOW"}
+    ],
+    "integration_issues": [
+      {"flow": "Customers list screen", "issue": "/api/catalogues fetched 4 times on a single navigation (also seen 10–13× on the first unauthenticated-cache run). Looks like each registration of a catalogue consumer in children triggers an independent fetch instead of a shared cache. Target in task was 'no duplicate URLs on the same screen' — violated.", "affected_selectors": ["/api/catalogues"]},
+      {"flow": "Customer 360", "issue": "7 /api calls on open vs target ≤3. /api/customers/{id}/ledgers duplicated (fired twice ~100ms apart). Likely two independent components mount and both call ledgers.", "affected_selectors": ["/api/customers/{id}/ledgers"]},
+      {"flow": "Home/Dashboard", "issue": "3 /api calls vs target ≤2 (page-specific is actually 1 if the two app-shell polls /api/settings/company and /api/notifications/unread-count are considered chrome, not screen-specific). Clarify whether target counts the shell."},
+      {"flow": "Customers list", "issue": "/api/customers is fired twice on open (one '?page_size=1&with_total=true' + one '?page_size=24&page=1'). The count call could be merged with the list by using `with_total=true` on the real list request."}
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase_d_perf.py",
+    "/app/test_reports/pytest/phase_d_perf.xml"
+  ],
+  "action_items": [
+    "Deduplicate /api/catalogues fetching on Customers list (fired 4× on one navigation). Likely needs React Query/SWR shared cache or a provider that fetches once and shares.",
+    "Deduplicate /api/customers/{id}/ledgers on Customer 360 (fired 2×). Consolidate the two consumers.",
+    "Trim Customer 360 initial fetches to ≤3 (currently 7). Candidates to lazy-load behind tabs: timeline, communications, documents, document-types.",
+    "Consider merging the two /api/customers calls on list open (count + first page) via with_total=true on the list query.",
+    "Decide whether /api/payments response should include aggregate 'totals' as per spec, or update the spec to reference the existing 'total' count field.",
+    "If data-testid on the sonner lead-move toast is meant to be queryable from the DOM, switch to the className/id option or render a custom toast component — currently the testid prop is dropped by sonner."
+  ],
+  "critical_code_review_comments": [
+    "App.js lines 8–12: toast.error wrapper correctly prepends description='Request ID <id>' when lastError.request_id was set within the last 5000ms. Clean and small. Implementation verified by code review; UI reproduction in this run was blocked because Post Payment sheet closed when I clicked the autocomplete match (text match hit outside the sheet). Not an app bug — a Playwright selector gotcha for the next agent.",
+    "frontend/src/pages/v2/Leads.jsx line 117: data-testid is set inside the second argument of toast.success (sonner options). Sonner does not pass unknown option keys down to the toast DOM; use `className` or render a custom JSX via `toast.custom` if a stable testid on the toast is desired.",
+    "backend/routers/ops.py: /api/admin/ops payload shape matches the spec exactly (uptime_s, startup, process, requests.by_group, jobs, read_models, db_pool.config.maxPoolSize). Clean.",
+    "backend/routers/construction.py integrity_report_route: caching layer behaves as specified — plain GET served <100ms with cached=true after a ?fresh=1 priming call. 300ms budget met with large headroom.",
+    "Catalogues N+1 on Customers list is the single largest perf regression surfaced in this iteration (4–13 identical GETs). Priority 1 on the Phase D agenda."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_phase_d_perf.py (new, 6 tests)"
+  ],
+  "success_rate": {
+    "backend": "100% (6/6)",
+    "frontend": "~85% (5/5 perf screens measured; Leads undo verified; System health verified; error-toast Request ID reproduction partially blocked by sheet-close bug in test selector — code path is proven to add Request ID by App.js wrapper review)"
+  },
+  "test_credentials": "admin@kkt.in / Kkt@12345 (from /app/memory/test_credentials.md).",
+  "seed_data_creation": "No seed data created. Lead stage move + undo returns the system to prior state. No payments posted this run.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Screenshots saved under /app/memory/qa/perf/ (01_home.jpeg, 02_customers.jpeg, 02_customers_sinha.jpeg, 03_customer360.jpeg, 04_booking.jpeg, 05_payments.jpeg, 06_lead_undo.jpeg, 06_lead_undo_after.jpeg, 07_system_health.jpeg, 08_error_toast.jpeg). To reproduce the error toast with Request ID, you must FIRST get past the booking selector in the Post Payment sheet: clicking plain text 'Priya Verma' in the dropdown causes a selector collision with the payment-list row below (both are inside role=document), so the sheet closes. Use the autocomplete option INSIDE the sheet via [role=dialog] >> text=Priya Verma or data-testid on the option itself. Then select pp-category-*, set pp-amount to a value far above the agreed cap, choose a mode via pp-mode-trigger, and click pp-submit. Expected: the error toast description reads 'Request ID <uuid>' (wrapper in /app/frontend/src/App.js:8-12).",
+  "rca of the issue": "Catalogues N+1 on Customers list: /api/catalogues is called once per consumer component mounting instead of being hoisted into a provider or cached via React Query. Mitigation: register catalogues under useQuery(['catalogues'], ...) at a parent so all siblings share one in-flight request + cache; or move to the bootstrap payload so the ERP never hits /api/catalogues after login. Ledgers duplication on Customer 360 likely has the same root cause (two consumer components, no shared cache)."
+}

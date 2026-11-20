@@ -1,0 +1,404 @@
+144	144	0	0.2	tests/test_phase_3.py::test_public_endpoint_200[/public/site]
+144	144	0	0.0	tests/test_phase_3.py::test_public_endpoint_200[/public/home]
+144	144	0	0.0	tests/test_phase_3.py::test_public_endpoint_200[/public/projects]
+144	144	0	0.0	tests/test_phase_3.py::test_public_endpoint_200[/public/projects/shree-ganesh-heights]
+144	144	0	0.0	tests/test_phase_3.py::test_public_endpoint_200[/public/projects/ganesh-green-villas]
+144	144	0	0.0	tests/test_phase_3.py::test_public_endpoint_200[/public/flat-types]
+144	144	0	0.0	tests/test_phase_3.py::test_public_endpoint_200[/public/published-projects]
+144	144	0	0.0	tests/test_phase_3.py::test_public_endpoint_200[/public/posts]
+144	144	0	0.0	tests/test_phase_3.py::test_public_endpoint_200[/public/posts/sgh-tower-a-60-percent]
+144	144	0	0.0	tests/test_phase_3.py::test_public_endpoint_200[/public/pages/about]
+144	144	0	0.0	tests/test_phase_3.py::test_public_endpoint_200[/public/pages/privacy]
+144	144	0	0.0	tests/test_phase_3.py::test_public_endpoint_200[/public/pages/disclaimer]
+144	144	0	0.0	tests/test_phase_3.py::test_public_endpoint_200[/public/gallery]
+144	144	0	0.0	tests/test_phase_3.py::test_public_endpoint_200[/public/sitemap.xml]
+144	144	0	0.0	tests/test_phase_3.py::test_public_endpoint_200[/public/robots.txt]
+144	144	0	0.0	tests/test_phase_3.py::test_public_etag_and_304[/public/site]
+144	144	0	0.0	tests/test_phase_3.py::test_public_etag_and_304[/public/home]
+144	144	0	0.0	tests/test_phase_3.py::test_public_etag_and_304[/public/projects]
+144	144	0	0.0	tests/test_phase_3.py::test_public_etag_and_304[/public/projects/shree-ganesh-heights]
+144	144	0	0.0	tests/test_phase_3.py::test_public_etag_and_304[/public/projects/ganesh-green-villas]
+144	144	0	0.0	tests/test_phase_3.py::test_public_etag_and_304[/public/flat-types]
+144	144	0	0.0	tests/test_phase_3.py::test_public_etag_and_304[/public/published-projects]
+144	144	0	0.0	tests/test_phase_3.py::test_public_etag_and_304[/public/posts]
+144	144	0	0.0	tests/test_phase_3.py::test_public_etag_and_304[/public/posts/sgh-tower-a-60-percent]
+144	144	0	0.0	tests/test_phase_3.py::test_public_etag_and_304[/public/pages/about]
+144	144	0	0.0	tests/test_phase_3.py::test_public_etag_and_304[/public/pages/privacy]
+144	144	0	0.0	tests/test_phase_3.py::test_public_etag_and_304[/public/pages/disclaimer]
+144	144	0	0.0	tests/test_phase_3.py::test_public_etag_and_304[/public/gallery]
+144	144	0	0.0	tests/test_phase_3.py::test_public_project_404
+144	144	0	0.0	tests/test_phase_3.py::test_sgh_detail_projection
+144	144	0	0.0	tests/test_phase_3.py::test_home_projection
+144	144	0	0.0	tests/test_phase_3.py::test_ggv_price_on_request
+144	144	0	0.0	tests/test_phase_3.py::test_enquiry_invalid_phone
+144	144	0	0.0	tests/test_phase_3.py::test_enquiry_missing_consent
+144	144	0	0.3	tests/test_phase_3.py::test_enquiry_honeypot
+144	144	0	0.1	tests/test_phase_3.py::test_enquiry_success_and_lead
+144	144	0	0.1	tests/test_phase_3.py::test_enquiry_rate_limit_429
+144	144	0	0.0	tests/test_phase_3.py::test_cms_site_401
+144	144	0	0.2	tests/test_phase_3.py::test_cms_site_403_sales
+144	144	0	0.0	tests/test_phase_3.py::test_cms_site_200_admin
+144	144	0	0.0	tests/test_phase_3.py::test_cms_collection_counts[banners-3]
+144	144	0	0.0	tests/test_phase_3.py::test_cms_collection_counts[gallery-18]
+144	144	0	0.0	tests/test_phase_3.py::test_cms_collection_counts[posts-5]
+144	144	0	0.0	tests/test_phase_3.py::test_cms_collection_counts[pages-3]
+144	144	0	0.0	tests/test_phase_3.py::test_cms_collection_counts[people-3]
+144	144	0	0.1	tests/test_phase_3.py::test_testimonial_crud
+144	144	0	0.0	tests/test_phase_3.py::test_project_website_get
+144	144	0	0.0	tests/test_phase_3.py::test_project_website_duplicate_slug
+144	144	0	0.1	tests/test_phase_3.py::test_project_website_unpublish_republish
+144	144	0	0.3	tests/test_phase_3.py::test_project_admin_scope
+144	144	0	0.0	tests/test_phase_3.py::test_reseed_wrong_body
+144	144	0	0.0	tests/test_phase_3.py::test_reseed_forbidden_sales
+144	144	0	0.0	tests/test_phase_3.py::test_posts_only_published
+144	144	0	0.0	tests/test_phase_3.py::test_post_draft_404
+144	144	0	0.0	tests/test_phase_3.py::test_post_sgh_tower_a
+144	145	0	0.0	tests/test_index_audit.py::test_query_uses_index[customers list]
+145	145	0	0.0	tests/test_index_audit.py::test_query_uses_index[customers by RM followup]
+145	145	0	0.0	tests/test_index_audit.py::test_query_uses_index[customers phone prefix]
+145	145	0	0.0	tests/test_index_audit.py::test_query_uses_index[bookings list]
+145	145	0	0.0	tests/test_index_audit.py::test_query_uses_index[bookings by customer]
+145	145	0	0.0	tests/test_index_audit.py::test_query_uses_index[bookings by project status]
+145	145	0	0.0	tests/test_index_audit.py::test_query_uses_index[bookings by block]
+145	145	0	0.0	tests/test_index_audit.py::test_query_uses_index[payments list]
+145	145	0	0.0	tests/test_index_audit.py::test_query_uses_index[payments by booking bucket]
+145	145	0	0.0	tests/test_index_audit.py::test_query_uses_index[payments by project date]
+145	145	0	0.0	tests/test_index_audit.py::test_query_uses_index[cheques pending]
+145	145	0	0.0	tests/test_index_audit.py::test_query_uses_index[demands overdue]
+145	145	0	0.0	tests/test_index_audit.py::test_query_uses_index[demands by booking]
+145	145	0	0.0	tests/test_index_audit.py::test_query_uses_index[demands by customer]
+145	145	0	0.0	tests/test_index_audit.py::test_query_uses_index[leads list]
+145	145	0	0.0	tests/test_index_audit.py::test_query_uses_index[leads by phone]
+145	145	0	0.0	tests/test_index_audit.py::test_query_uses_index[leads followups]
+145	145	0	0.0	tests/test_index_audit.py::test_query_uses_index[flats grid]
+145	145	0	0.0	tests/test_index_audit.py::test_query_uses_index[flats by project status]
+145	145	0	0.0	tests/test_index_audit.py::test_query_uses_index[flats search]
+145	145	0	0.0	tests/test_index_audit.py::test_query_uses_index[visits calendar]
+145	145	0	0.0	tests/test_index_audit.py::test_query_uses_index[visits capacity]
+145	145	0	0.0	tests/test_index_audit.py::test_query_uses_index[visits by lead]
+145	145	0	0.0	tests/test_index_audit.py::test_query_uses_index[tickets list]
+145	145	0	0.0	tests/test_index_audit.py::test_query_uses_index[tickets by customer]
+145	145	0	0.0	tests/test_index_audit.py::test_query_uses_index[notifications unread]
+145	145	0	0.0	tests/test_index_audit.py::test_query_uses_index[ledger rows]
+145	145	0	0.0	tests/test_index_audit.py::test_query_uses_index[audit by entity]
+145	145	0	0.0	tests/test_index_audit.py::test_query_uses_index[audit by company]
+145	145	0	0.0	tests/test_index_audit.py::test_query_uses_index[catalogue bundle]
+145	145	0	0.0	tests/test_index_audit.py::test_query_uses_index[catalogue type]
+145	145	0	0.0	tests/test_index_audit.py::test_query_uses_index[communications by customer]
+145	145	0	0.0	tests/test_index_audit.py::test_query_uses_index[documents by entity]
+145	145	0	0.0	tests/test_index_audit.py::test_query_uses_index[brochure stats]
+145	145	0	0.0	tests/test_index_audit.py::test_query_uses_index[project summaries]
+145	145	0	0.0	tests/test_index_audit.py::test_query_uses_index[block summaries]
+145	145	0	0.0	tests/test_index_audit.py::test_query_uses_index[customer summaries]
+145	145	0	0.0	tests/test_index_audit.py::test_query_uses_index[rate limits]
+145	145	0	0.0	tests/test_index_audit.py::test_query_uses_index[idempotency]
+145	145	0	0.0	tests/test_index_audit.py::test_query_uses_index[refresh tokens]
+145	145	0	0.0	tests/test_index_audit.py::test_query_uses_index[users by email]
+145	146	0	0.3	tests/test_phase_4_full.py::test_reports_list_has_11
+146	146	0	0.3	tests/test_phase_4_full.py::test_report_formats[collections]
+146	146	0	0.2	tests/test_phase_4_full.py::test_report_formats[outstanding]
+146	146	0	0.0	tests/test_phase_4_full.py::test_report_formats[advances]
+146	146	0	0.1	tests/test_phase_4_full.py::test_report_formats[demand-vs-collection]
+146	146	0	0.1	tests/test_phase_4_full.py::test_report_formats[inventory]
+146	146	0	0.2	tests/test_phase_4_full.py::test_report_formats[cheques]
+146	146	0	0.0	tests/test_phase_4_full.py::test_report_formats[cancellations]
+146	146	0	0.1	tests/test_phase_4_full.py::test_report_formats[sales-leads]
+146	147	0	0.2	tests/test_phase_4_full.py::test_report_formats[roznamcha-range]
+147	147	0	0.1	tests/test_phase_4_full.py::test_report_formats[bank-receipts]
+147	147	0	0.6	tests/test_phase_4_full.py::test_report_formats[activity]
+147	147	0	0.5	tests/test_phase_4_full.py::test_reports_rbac
+147	149	2	0.3	tests/test_phase_4_full.py::test_collections_totals_match_payments
+149	151	1	0.1	tests/test_phase_4_full.py::test_outstanding_totals_match_bookings
+151	148	-4	0.1	tests/test_phase_4_full.py::test_statement_pdf
+148	148	0	0.1	tests/test_phase_4_full.py::test_allotment_pdf
+148	148	0	0.0	tests/test_phase_4_full.py::test_receipt_pdf
+148	149	0	0.1	tests/test_phase_4_full.py::test_demand_letter_pdf
+149	149	0	0.0	tests/test_phase_4_full.py::test_report_presets_crud
+149	149	0	0.1	tests/test_phase_4_full.py::test_dashboard_admin
+149	149	0	0.1	tests/test_phase_4_full.py::test_dashboard_accounts
+149	149	0	0.3	tests/test_phase_4_full.py::test_dashboard_sales
+149	149	0	0.3	tests/test_phase_4_full.py::test_dashboard_project_admin
+149	149	0	12.4	tests/test_phase_4_full.py::test_notifications_website_enquiry
+149	152	3	0.4	tests/test_phase_4_full.py::test_openapi_available
+152	228	76	34.5	tests/test_phase_4_full.py::test_backup_rbac_and_zip
+228	228	0	0.0	tests/test_phase_4_full.py::test_health_ready
+228	175	-54	0.1	tests/test_phase_4_full.py::test_erasure_full_flow
+175	175	0	0.2	tests/test_phase_4_full.py::test_upload_magic_bytes
+175	175	0	0.0	tests/test_phase_4_full.py::test_marketing_permissions
+175	175	0	0.0	tests/test_rule_eval.py::test_allowed_grammar[snap['requests'] == 0 and snap['uptime_s'] > 900-False]
+175	175	0	0.0	tests/test_rule_eval.py::test_allowed_grammar[snap['requests'] >= 20 and snap['rate_5xx'] > 0.02-True]
+175	175	0	0.0	tests/test_rule_eval.py::test_allowed_grammar[snap['requests'] >= 20 and (snap['p95_ms'] or 0) > 300-False]
+175	175	0	0.0	tests/test_rule_eval.py::test_allowed_grammar[len(snap['jobs_failed_24h']) > 0-True]
+175	175	0	0.0	tests/test_rule_eval.py::test_allowed_grammar[snap['backup_age_h'] is None or snap['backup_age_h'] > 26-True]
+175	175	0	0.0	tests/test_rule_eval.py::test_allowed_grammar[not snap['db_ok']-False]
+175	175	0	0.0	tests/test_rule_eval.py::test_allowed_grammar[snap.requests * 2 - 10 >= 90-True]
+175	175	0	0.0	tests/test_rule_eval.py::test_allowed_grammar[max(snap['shed_total'], 1) == 1-True]
+175	175	0	0.0	tests/test_rule_eval.py::test_allowed_grammar['x' in snap['jobs_failed_24h']-True]
+175	175	0	0.0	tests/test_rule_eval.py::test_injection_rejected_at_compile[__import__('os').system('id')]
+175	175	0	0.0	tests/test_rule_eval.py::test_injection_rejected_at_compile[().__class__.__bases__[0].__subclasses__()]
+175	175	0	0.0	tests/test_rule_eval.py::test_injection_rejected_at_compile[snap.__class__]
+175	175	0	0.0	tests/test_rule_eval.py::test_injection_rejected_at_compile[open('/etc/passwd')]
+175	175	0	0.0	tests/test_rule_eval.py::test_injection_rejected_at_compile[[x for x in snap]]
+175	175	0	0.0	tests/test_rule_eval.py::test_injection_rejected_at_compile[lambda: 1]
+175	175	0	0.0	tests/test_rule_eval.py::test_injection_rejected_at_compile[snap['a'] if True else 2]
+175	175	0	0.0	tests/test_rule_eval.py::test_injection_rejected_at_compile[f'{snap}']
+175	175	0	0.0	tests/test_rule_eval.py::test_injection_rejected_at_compile[len(snap, key=1)]
+175	175	0	0.0	tests/test_rule_eval.py::test_injection_rejected_at_compile[other['x'] > 1]
+175	175	0	0.0	tests/test_rule_eval.py::test_injection_rejected_at_compile[snap[1:2]]
+175	175	0	0.0	tests/test_rule_eval.py::test_injection_rejected_at_compile[snap['requests'] ** 10]
+175	175	0	0.0	tests/test_rule_eval.py::test_injection_rejected_at_compile[exec('1')]
+175	175	0	0.0	tests/test_rule_eval.py::test_injection_rejected_at_compile[import os]
+175	175	0	0.0	tests/test_rule_eval.py::test_injection_rejected_at_compile[]
+175	175	0	0.0	tests/test_rule_eval.py::test_real_rules_compile_and_module_has_no_eval
+175	175	0	0.0	tests/test_rule_eval.py::test_evaluate_reports_rule_error_not_crash
+175	175	0	0.0	tests/test_phase_b_hardening_review.py::test_health_fast_with_security_headers
+175	175	0	0.0	tests/test_phase_b_hardening_review.py::test_error_envelope_404_unknown_booking
+175	175	0	0.0	tests/test_phase_b_hardening_review.py::test_error_envelope_422_validation
+175	175	0	0.0	tests/test_phase_b_hardening_review.py::test_error_envelope_401_anonymous
+175	175	0	0.0	tests/test_phase_b_hardening_review.py::test_error_envelope_405_method_not_allowed
+175	175	0	0.0	tests/test_phase_b_hardening_review.py::test_error_envelope_428_idempotency_before_body_validation
+175	175	0	0.0	tests/test_phase_b_hardening_review.py::test_anonymous_rejected[/bookings]
+175	175	0	0.0	tests/test_phase_b_hardening_review.py::test_anonymous_rejected[/customers]
+175	175	0	0.0	tests/test_phase_b_hardening_review.py::test_anonymous_rejected[/payments]
+175	175	0	0.0	tests/test_phase_b_hardening_review.py::test_anonymous_rejected[/admin/integrity-report]
+175	175	0	0.2	tests/test_phase_b_hardening_review.py::test_portal_token_rejected_on_erp[/bookings]
+175	175	0	0.0	tests/test_phase_b_hardening_review.py::test_portal_token_rejected_on_erp[/customers]
+175	175	0	0.0	tests/test_phase_b_hardening_review.py::test_portal_token_rejected_on_erp[/payments]
+175	175	0	0.0	tests/test_phase_b_hardening_review.py::test_portal_token_rejected_on_erp[/admin/integrity-report]
+175	175	0	0.0	tests/test_phase_b_hardening_review.py::test_customers_idempotency_replay
+175	175	0	0.0	tests/test_phase_b_hardening_review.py::test_customers_version_conflict
+175	175	0	0.3	tests/test_phase_b_hardening_review.py::test_integrity_report_ok
+175	175	0	0.1	tests/test_phase_b_hardening_review.py::test_receipt_pdf_text_and_deterministic
+175	175	0	0.1	tests/test_phase_b_hardening_review.py::test_allotment_pdf_has_signature
+175	175	0	0.1	tests/test_phase_b_hardening_review.py::test_demand_letter_pdf_has_signature
+175	175	0	0.1	tests/effects/test_events.py::test_registry_covers_all_audit_actions_in_use
+175	175	0	0.0	tests/effects/test_events.py::test_definitions_page_lists_core_concepts
+175	175	0	1.0	tests/effects/test_events.py::test_booking_create_effects
+175	175	0	0.0	tests/effects/test_events.py::test_lead_convert_effects
+175	175	0	0.2	tests/effects/test_events.py::test_payment_post_effects
+175	175	0	0.3	tests/effects/test_events.py::test_payment_reverse_effects
+175	175	0	0.3	tests/effects/test_events.py::test_cheque_bounce_raises_charge_and_notifies
+175	175	0	0.2	tests/effects/test_events.py::test_agreement_revision_reproportions_open_demands
+175	175	0	0.3	tests/effects/test_events.py::test_transfer_effects
+175	175	0	0.1	tests/effects/test_events.py::test_customer_rename_fans_out
+175	175	0	0.7	tests/effects/test_events.py::test_cancel_creates_refund_and_payout_posts_contra
+175	175	0	0.5	tests/effects/test_events.py::test_forfeiture_when_nothing_refundable
+175	175	0	2.2	tests/effects/test_events.py::test_one_outstanding_number
+175	175	0	0.5	tests/effects/test_events.py::test_customer_events_timeline_has_mixed_kinds
+175	175	0	0.6	tests/effects/test_events.py::test_flat_hold_effects
+175	175	0	1.2	tests/effects/test_events.py::test_outbox_replay_is_idempotent
+175	175	0	1.6	tests/effects/test_events.py::test_propagation_health_clean
+175	175	0	0.5	tests/test_phase_i_reports.py::test_registry_lists_every_phase_i_report_with_purpose
+175	175	0	0.4	tests/test_phase_i_reports.py::test_report_json_csv_pdf_and_etag[collections-v2]
+175	175	0	0.6	tests/test_phase_i_reports.py::test_report_json_csv_pdf_and_etag[outstanding-v2]
+175	175	0	0.4	tests/test_phase_i_reports.py::test_report_json_csv_pdf_and_etag[cash-vs-account]
+175	175	0	0.4	tests/test_phase_i_reports.py::test_report_json_csv_pdf_and_etag[receivables-forecast]
+175	175	0	0.3	tests/test_phase_i_reports.py::test_report_json_csv_pdf_and_etag[other-charges]
+175	175	0	0.7	tests/test_phase_i_reports.py::test_report_json_csv_pdf_and_etag[roznamcha-summary]
+175	175	0	0.1	tests/test_phase_i_reports.py::test_report_json_csv_pdf_and_etag[site-visits]
+175	175	0	0.2	tests/test_phase_i_reports.py::test_report_json_csv_pdf_and_etag[sales-team]
+175	175	0	0.3	tests/test_phase_i_reports.py::test_report_json_csv_pdf_and_etag[construction-vs-plan]
+175	175	0	0.2	tests/test_phase_i_reports.py::test_report_json_csv_pdf_and_etag[data-quality]
+175	175	0	0.1	tests/test_phase_i_reports.py::test_unknown_param_rejected_and_group_invariant
+175	175	0	0.0	tests/test_phase_i_reports.py::test_registry_has_no_unregistered_codes
+175	175	0	0.3	tests/test_phase_i_reports.py::test_demands_honour_block_id_and_planned_date_roundtrip
+175	175	0	0.1	tests/test_phase_i_reports.py::test_collections_date_basis_and_csv_shape
+175	175	0	0.0	tests/test_phase_i_reports.py::test_outstanding_three_balances_law
+175	175	0	0.0	tests/test_phase_ps_pricing.py::test_generated_flats_have_no_area_or_price
+175	175	0	0.0	tests/test_phase_ps_pricing.py::test_booked_flat_is_locked_individually
+175	175	0	0.0	tests/test_phase_ps_pricing.py::test_structure_edit_previews_and_refuses_to_drop_booked_floors
+175	175	0	0.0	tests/test_phase_ps_pricing.py::test_project_pricing_setup_roundtrip
+175	175	0	0.0	tests/test_phase_ps_pricing.py::test_migration_every_flat_has_saleable_and_pricing_status
+175	175	0	0.1	tests/test_phase_ps_pricing.py::test_no_super_builtup_labels_in_frontend_or_documents
+175	175	0	0.0	tests/test_phase_ps_pricing.py::test_api_outputs_expose_saleable_only
+175	175	0	0.1	tests/test_phase_ps_pricing.py::test_type_change_marks_review_and_keep_values
+175	175	0	0.1	tests/test_phase_ps_pricing.py::test_legacy_patch_accepts_pricing_fields
+175	175	0	0.1	tests/test_phase_ps_pricing.py::test_breakdown_preview_and_migration
+175	175	0	0.5	tests/test_phase_ps_pricing.py::test_booking_with_breakdown_demands_gst_proportionally
+175	175	0	0.4	tests/test_phase_ps_pricing.py::test_booking_accepts_own_attached_slot_and_cancel_restores_attached
+175	175	0	0.4	tests/test_phase_ps_pricing.py::test_floor_and_structure_edits_never_delete_a_booked_flat
+175	176	0	1.5	tests/test_phase_ps_pricing.py::test_one_parking_slot_cannot_be_allotted_twice
+176	176	0	0.0	tests/test_phase_ps_pricing.py::test_snapshot_tolerates_legacy_lines
+176	176	0	3.6	tests/test_phase_ps_pricing.py::test_loadtest_projects_hidden_from_reports_unless_explicit
+176	176	0	0.0	tests/test_phase_q.py::test_channel_interface_and_not_configured
+176	176	0	0.0	tests/test_phase_q.py::test_pick_channel_consent_and_contact
+176	176	0	0.0	tests/test_phase_q.py::test_template_render_en_hi_and_unknown_placeholder
+176	176	0	0.0	tests/test_phase_q.py::test_send_window_and_thresholds
+176	176	0	0.8	tests/test_phase_q.py::test_reminder_settings_api_validation
+176	176	0	0.6	tests/test_phase_q.py::test_send_now_registers_document_message_and_timeline
+176	176	0	0.0	tests/test_phase_q.py::test_dedupe_unique_per_booking_threshold
+176	176	0	1.0	tests/test_phase_q.py::test_nightly_job_runs_isolated_and_defers_outside_window
+176	176	0	0.4	tests/test_phase_q.py::test_void_watermark_deterministic
+176	176	0	0.7	tests/test_phase_q.py::test_trends_tie_out_with_collections_report
+176	176	0	0.1	tests/test_phase_q.py::test_customer_consent_fields_roundtrip
+176	176	0	0.8	tests/test_phase_k_p0.py::test_poisoned_booking_does_not_stop_dues_run
+176	176	0	1.9	tests/test_phase_k_p0.py::test_sweep_marks_stuck_runs_abandoned_and_health_flags_stale
+176	176	0	0.7	tests/test_phase_k_p0.py::test_invariant_indexes_and_validators_reject_bad_docs
+176	176	0	0.0	tests/test_phase_k_p0.py::test_twenty_parallel_bookings_on_one_flat_exactly_one_wins
+176	176	-1	0.7	tests/test_phase_k_p0.py::test_app_connection_cannot_update_or_delete_audit_rows
+176	176	0	0.0	tests/test_phase_k_p0.py::test_idempotency_mismatch_and_reuse
+176	176	0	10.2	tests/test_phase_k_p0.py::test_idempotency_in_progress_and_abandoned_claim
+176	176	0	0.3	tests/test_phase_k_p0.py::test_idempotency_concurrent_duplicates_create_once
+176	176	0	0.0	tests/test_phase_k_p0.py::test_idempotency_secret_replay_rejected
+176	177	0	0.1	tests/test_phase_k_p0.py::test_pending_cheque_headroom_warning
+177	177	0	0.0	tests/test_story_behaviours.py::test_cash_bucket_cap_rejected_on_anchor
+177	177	0	0.1	tests/test_story_behaviours.py::test_cheque_pending_clear_then_reverse
+177	177	0	0.0	tests/test_story_behaviours.py::test_block_percent_matches_completed_stage_weights
+177	177	-1	0.8	tests/test_story_behaviours.py::test_kyc_masked_for_sales_revealed_for_accounts
+177	177	0	0.0	tests/test_story_behaviours.py::test_roznamcha_identity_on_story_cash_day
+177	177	0	0.3	tests/test_story_behaviours.py::test_portal_me_masked_and_own_bookings_only
+177	177	-1	4.0	tests/test_story_behaviours.py::test_portal_change_password_and_back_then_lockout
+177	177	0	0.1	tests/test_story_behaviours.py::test_rate_card_create_activate_apply_to_available
+177	177	0	0.0	tests/test_story_logic.py::test_story_chronology_zero_problems
+177	177	0	0.0	tests/test_story_logic.py::test_no_code_path_deletes_or_resets_counters
+177	177	0	0.0	tests/test_story_logic.py::test_story_sequences_have_no_gaps_inside_one_rebuild
+177	177	0	0.0	tests/test_story_logic.py::test_story_due_window_coverage_every_band_non_empty
+177	177	0	0.0	tests/test_story_logic.py::test_story_has_followups_due_on_the_as_of_day
+177	177	0	0.0	tests/test_story_logic.py::test_followup_check_fails_when_none_due_on_a_db_copy
+177	177	0	0.1	tests/test_story_logic.py::test_story_has_a_next_billing_stage
+177	177	0	0.0	tests/test_story_logic.py::test_band_check_fails_with_band_is_empty_on_a_db_copy
+177	177	0	0.0	tests/test_business_day.py::test_today_is_the_india_day_in_the_utc_lag_window[0-30]
+177	177	0	0.0	tests/test_business_day.py::test_today_is_the_india_day_in_the_utc_lag_window[5-29]
+177	177	0	0.0	tests/test_business_day.py::test_day_helpers_bounds_and_passthrough
+177	177	0	0.0	tests/test_business_day.py::test_financial_year_turns_at_india_midnight_on_1_april
+177	177	-1	1.4	tests/test_business_day.py::test_late_night_entries_land_on_the_india_day[0-30-0]
+177	177	0	1.4	tests/test_business_day.py::test_late_night_entries_land_on_the_india_day[5-29-3]
+177	177	0	0.3	tests/test_business_day.py::test_a_picked_date_is_kept
+177	177	0	0.0	tests/test_permission_matrix.py::test_every_non_public_route_is_guarded
+177	177	0	0.0	tests/test_permission_matrix.py::test_matrix_file_matches_runtime
+177	177	-1	1.6	tests/test_permission_matrix.py::test_anonymous_and_portal_tokens_rejected_everywhere[anonymous]
+177	177	0	2.3	tests/test_permission_matrix.py::test_anonymous_and_portal_tokens_rejected_everywhere[portal]
+177	177	0	0.4	tests/test_permission_matrix.py::test_roles_denied_where_permission_missing[Sales]
+177	177	0	0.3	tests/test_permission_matrix.py::test_roles_denied_where_permission_missing[Accounts]
+177	177	0	1.5	tests/test_permission_matrix.py::test_roles_denied_where_permission_missing[Employee]
+177	177	0	0.0	tests/test_format_gate.py::test_backend_ruff_format_clean
+177	177	0	0.0	tests/test_format_gate.py::test_backend_imports_sorted
+177	177	0	1.7	tests/test_format_gate.py::test_frontend_prettier_clean
+177	177	0	0.0	tests/test_format_gate.py::test_no_source_line_over_160_chars
+177	177	0	0.0	tests/test_format_gate.py::test_no_stray_file_names
+177	177	0	0.1	tests/test_format_gate.py::test_gate_fails_on_unformatted_files
+177	177	0	2.1	tests/test_phase_p2.py::test_cancelled_booking_demands_are_closed_everywhere
+177	177	0	0.0	tests/test_phase_p2.py::test_void_reports_real_ledger_delta_zero_when_ledger_never_held_it
+177	177	0	0.2	tests/test_phase_p2.py::test_register_overdue_equals_outstanding_report_overdue
+177	177	0	0.4	tests/test_phase_p2.py::test_share_link_signed_expired_and_tampered
+177	177	0	0.0	tests/test_phase_p2.py::test_customer360_live_bookings_rule_and_portal_flag
+177	179	2	0.1	tests/test_phase_p2.py::test_reports_accept_date_from_date_to
+179	179	0	0.2	tests/test_owner_bootstrap.py::test_owner_login_super_admin
+179	179	0	0.0	tests/test_owner_bootstrap.py::test_demo_login_refused_on_production_host
+179	179	0	0.2	tests/test_owner_bootstrap.py::test_demo_login_allowed_on_preview_host
+179	179	0	0.0	tests/test_owner_bootstrap.py::test_login_options_follow_host
+179	179	0	0.0	tests/test_owner_bootstrap.py::test_owner_not_in_test_credentials_file
+179	180	0	1.9	tests/test_phase_4.py::test_openapi_all_routes_require_auth
+180	180	0	82.5	tests/test_phase_4.py::test_pdfs_download
+180	180	-1	31.0	tests/test_phase_4.py::test_collections_report_matches_payments
+180	233	53	95.2	tests/test_phase_4.py::test_backup_rbac
+233	233	0	0.0	tests/test_phase_4.py::test_upload_magic_bytes
+233	233	0	0.8	tests/test_phase_j_exports.py::test_smart_count_estimates_above_threshold
+233	233	0	0.0	tests/test_phase_j_exports.py::test_list_endpoint_reports_total_estimated_flag
+233	233	0	0.0	tests/test_phase_j_exports.py::test_paginate_budget_param_exists
+233	180	-54	3.7	tests/test_phase_j_exports.py::test_async_export_job_download_and_limits
+180	180	0	0.0	tests/test_phase_j_exports.py::test_sync_csv_carries_export_headers
+180	180	0	0.0	tests/test_phase_p.py::test_customer360_composite_payload
+180	180	0	0.6	tests/test_phase_p.py::test_documents_generate_register_share_sent_and_deterministic
+180	180	0	0.4	tests/test_phase_p.py::test_bulk_merged_pdf_and_zip
+180	180	0	0.2	tests/test_phase_p.py::test_demand_register_grouping_ties_out_to_ledger_udhar
+180	180	0	0.2	tests/test_phase_p.py::test_manual_demand_ledger_effect_journey_and_void_is_final
+180	180	0	0.0	tests/test_kkt_erp.py::TestInfra::test_health
+180	180	0	0.0	tests/test_kkt_erp.py::TestInfra::test_openapi
+180	180	0	0.0	tests/test_kkt_erp.py::TestInfra::test_unauth_projects
+180	180	0	0.0	tests/test_kkt_erp.py::TestInfra::test_employee_forbidden_on_users
+180	180	0	0.3	tests/test_phase_11f.py::test_customer_create_with_every_dropdown_persists
+180	180	0	0.0	tests/test_phase_11f.py::test_profile_rejects_unknown_catalogue_id
+180	180	0	0.0	tests/test_phase_11f.py::test_project_default_cash_percent_seeded
+180	180	0	0.8	tests/test_phase_11f.py::test_cancel_booking_flow
+180	180	0	0.3	tests/test_phase_2.py::test_documents_upload_download_rbac
+180	180	0	0.2	tests/test_phase_2.py::test_leads_board_and_crud_and_convert
+180	180	0	0.1	tests/test_phase_2.py::test_perf_projects_and_blocks
+180	180	0	0.0	tests/test_phase_2.py::test_zzz_cleanup_cancel_bookings
+180	180	0	0.1	tests/test_prepublish_fixes.py::test_manual_price_override_then_revert_restores_rate_card_breakup
+180	180	0	0.1	tests/test_prepublish_fixes.py::test_audit_csv_changes_are_rupees_not_paise
+180	180	0	0.0	tests/test_prepublish_fixes.py::test_to_csv_never_emits_paise_columns
+180	180	0	0.0	tests/test_prepublish_fixes.py::test_construction_preview_states_no_dues_reason
+180	180	0	0.0	tests/test_project_statement.py::test_rows_tie_out_to_booking_summaries_and_sign_convention
+180	180	0	0.0	tests/test_project_statement.py::test_csv_totals_equal_json_totals
+180	180	0	0.0	tests/test_project_statement.py::test_unknown_query_param_is_400
+180	180	0	0.1	tests/test_project_statement.py::test_pdf_renders_and_is_logged_and_zero_access_is_403
+180	180	0	0.0	tests/test_receipt_split.py::test_receipt_parts_explodes_allocations_and_keeps_whole_receipts
+180	180	0	0.3	tests/test_receipt_split.py::test_home_month_split_equals_sum_of_allocation_parts
+180	180	0	3.0	tests/test_receipt_split.py::test_paid_parts_backfill_is_idempotent
+180	180	0	0.0	tests/test_receipt_split.py::test_hard_purge_refuses_real_data
+180	180	0	0.2	tests/test_session_cookies.py::test_login_sets_hardened_cookies
+180	180	0	0.3	tests/test_session_cookies.py::test_cookie_refresh_requires_csrf_then_rotates_and_detects_reuse
+180	180	0	0.3	tests/test_session_cookies.py::test_body_refresh_still_works_for_api_clients
+180	180	0	0.3	tests/test_session_cookies.py::test_logout_revokes_cookie_token_and_clears_cookies
+180	180	0	0.0	tests/test_structure_builder.py::test_structure_tree_counts_and_readiness
+180	180	0	0.0	tests/test_structure_builder.py::test_structure_masks_real_status_for_sales
+180	180	0	0.1	tests/test_structure_builder.py::test_floors_preview_and_single_flat_duplicate
+180	180	0	0.0	tests/test_structure_builder.py::test_structure_zero_access_employee_is_403
+180	180	0	0.0	tests/test_whole_rupee.py::test_pct_of_whole_rupee_and_telescoping
+180	180	0	0.0	tests/test_whole_rupee.py::test_no_paise_remainders_in_system_amounts[demands-fields0-extra0]
+180	180	0	0.0	tests/test_whole_rupee.py::test_no_paise_remainders_in_system_amounts[refunds-fields1-extra1]
+180	180	0	0.0	tests/test_whole_rupee.py::test_bounce_charges_whole_rupee
+180	180	0	0.0	tests/test_cors_matcher.py::test_parse_explicit_and_single_level_wildcard
+180	180	0	0.0	tests/test_cors_matcher.py::test_matcher_allows_only_intended_origins
+180	180	0	0.0	tests/test_cors_matcher.py::test_star_and_other_wildcards_are_ignored_fail_closed
+180	180	0	0.1	tests/test_graph.py::test_graph_project_booking_customer_shapes
+180	180	-1	0.1	tests/test_graph.py::test_graph_masks_for_sales_and_hides_privileged_sections
+180	180	0	0.0	tests/test_graph.py::test_graph_zero_access_403_and_unknown_entity_422
+180	180	0	0.0	tests/test_kkt_erp.py::TestUsersRoles::test_cannot_deactivate_self
+180	180	0	0.0	tests/test_kkt_erp.py::TestUsersRoles::test_delete_system_role
+180	180	0	0.0	tests/test_kkt_erp.py::TestUsersRoles::test_permissions_groups
+180	180	0	0.0	tests/test_ledger_example.py::test_owner_example_agreement_split
+180	180	0	0.0	tests/test_ledger_example.py::test_example_ledger_matches_owner_table
+180	180	0	0.0	tests/test_ledger_example.py::test_csv_export_matches
+180	180	0	0.1	tests/test_one_outstanding.py::test_home_ageing_equals_outstanding_report_per_band
+180	180	0	0.1	tests/test_one_outstanding.py::test_demand_register_reconciles_to_outstanding
+180	180	0	0.5	tests/test_one_outstanding.py::test_collections_buckets_net_of_reversals_tie_to_net_received
+180	180	0	0.0	tests/test_phase_7.py::TestHealthAndMigration::test_health
+180	180	0	0.0	tests/test_phase_7.py::TestHealthAndMigration::test_milestone_templates_gone
+180	180	0	0.2	tests/test_phase_7.py::TestHealthAndMigration::test_legacy_block_milestones_alias
+180	180	0	0.4	tests/test_phase_a_print.py::test_erp_pdfs_inline_download_and_404
+180	180	0	0.3	tests/test_phase_a_print.py::test_portal_and_erp_pdfs_identical
+180	180	0	0.1	tests/test_phase_a_print.py::test_public_verify_code
+180	180	0	44.1	tests/test_phase_k_ops.py::test_backup_manifest_and_restore_drill_records_job_run
+180	180	-1	39.6	tests/test_phase_k_ops.py::test_ops_has_backup_and_alerts_cards
+180	180	0	0.0	tests/test_phase_k_ops.py::test_each_alert_rule_fires_on_synthetic_data
+180	180	0	0.1	tests/test_kkt_erp.py::TestFlatType::test_create_flat_type_auto_area
+180	180	0	0.0	tests/test_kkt_erp.py::TestFlatType::test_create_flat_type_invalid_hierarchy
+180	180	0	0.0	tests/test_locality_pincodes.py::test_seeded_localities_have_pincode
+180	180	0	0.0	tests/test_locality_pincodes.py::test_pincode_format
+180	180	0	0.0	tests/test_no_hardcoded_credentials.py::test_demo_password_not_in_source
+180	180	0	0.0	tests/test_no_hardcoded_credentials.py::test_env_has_demo_and_test_password
+180	180	0	0.0	tests/test_notify_retract_soft.py::test_retract_is_soft_and_hidden
+180	180	0	0.0	tests/test_notify_retract_soft.py::test_module_has_no_hard_deletes
+180	180	0	0.1	tests/test_ops.py::test_ops_snapshot_shape
+180	180	0	0.0	tests/test_ops.py::test_ops_requires_settings_manage
+180	180	0	0.0	tests/test_phase_1_5.py::TestHealthHeaders::test_health_shape
+180	180	-1	0.2	tests/test_phase_1_5.py::TestHealthHeaders::test_auth_me
+180	180	-1	0.5	tests/test_phase_5.py::TestServiceRequests::test_categories_and_create_and_reply
+180	180	0	0.5	tests/test_phase_5.py::TestServiceRequests::test_internal_note_hidden_on_portal
+180	180	0	0.1	tests/test_phase_s2_api.py::TestPaymentAllocation::test_invalid_allocation_422
+180	180	0	0.3	tests/test_phase_s2_api.py::TestPaymentAllocation::test_auto_allocation_persisted
+180	180	0	0.4	tests/test_phase_z3_pace.py::test_weekly_series_ties_out_and_cancel_removes_from_week
+180	180	0	0.0	tests/test_phase_z3_pace.py::test_sales_payload_has_no_real_only_keys
+180	180	0	0.0	tests/test_prepublish_alerts_csv.py::test_csv_money_cells_are_plain_numbers
+180	180	0	0.2	tests/test_prepublish_alerts_csv.py::test_job_failed_alert_self_clears_after_ok_run_and_can_be_acknowledged
+180	180	0	0.0	tests/test_refresh_keeps_setup.py::test_every_master_and_catalogue_collection_is_setup
+180	180	0	0.6	tests/test_refresh_keeps_setup.py::test_refresh_wipe_keeps_a_custom_entry_in_every_setup_collection
+180	180	-1	182.3	tests/test_connection_matrix.py::test_connection_matrix_all_green
+180	180	0	0.0	tests/test_cors_deny.py::test_no_cors_headers_for_foreign_origin
+180	180	0	0.3	tests/test_erp_leak_scan.py::test_erp_core_routes_do_not_leak_internal_fields
+180	180	0	0.0	tests/test_index_key_recognition.py::test_existing_index_recognised_by_key
+180	180	0	1.9	tests/test_index_snapshot.py::test_index_set_matches_snapshot
+180	180	-1	1.9	tests/test_kkt_erp.py::TestLockout::test_lockout_new_user
+180	180	0	0.0	tests/test_kkt_erp.py::TestSettings::test_bank_account_masked
+180	180	0	1.7	tests/test_phase_1_5.py::TestSessions::test_list_and_revoke_other
+180	180	0	0.4	tests/test_phase_5.py::TestPortalPDFs::test_pdfs
+180	180	0	3.3	tests/test_phase_5.py::TestConstructionAndHiddenPhoto::test_construction_and_hidden
+180	180	0	0.0	tests/test_phase_5.py::TestNotices::test_portal_notices_and_mark_read
+180	180	0	0.0	tests/test_phase_5.py::TestProfileBank::test_patch_me_and_bank
+180	180	0	0.0	tests/test_phase_7.py::TestPortalLeaksSuite::test_portal_leaks_pytest_file_runs
+180	180	0	2.1	tests/test_phase_l.py::test_load_test_tagging_and_purge
+180	180	0	3.2	tests/test_phase_z2_kyc.py::test_kyc_files_linked_on_booking_idempotent_and_gated
+180	180	0	114.3	tests/test_reseed_counters.py::test_reseed_leaves_every_counter_at_or_above_previous
+180	251	70	65.0	tests/test_startup_migrations.py::test_startup_idempotent_on_pre_phase7_db

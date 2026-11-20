@@ -1,0 +1,152 @@
+bringing up nodes...
+bringing up nodes...
+
+........................................................................ [  9%]
+........................................................................ [ 18%]
+........................................................................ [ 28%]
+........................................................................ [ 37%]
+........................................................................ [ 46%]
+........................................................................ [ 56%]
+..........F....F........................................................ [ 65%]
+........................................................................ [ 74%]
+........................................................................ [ 84%]
+.......F.............sss................................................ [ 93%]
+......s.......s..................................                        [100%]
+=================================== FAILURES ===================================
+________________________ test_backend_ruff_format_clean ________________________
+[gw0] linux -- Python 3.11.18 /root/.venv/bin/python
+
+    def test_backend_ruff_format_clean():
+        r = _run([sys.executable, "-m", "ruff", "format", "--check", "."], BACKEND)
+>       assert r.returncode == 0, r.stdout[-2000:]
+E       AssertionError: unformatted: File would be reformatted
+E           --> tests/test_theme_contrast.py:15:8
+E            |
+E         14 |     + [(f, b, 4.5) for f in ("accent", "due", "advance", "warn", "info") for b in ("canvas", "surface", "surface-2")]
+E            -     + [("due", "due-soft", 4.5), ("advance", "advance-soft", 4.5), ("warn", "warn-soft", 4.5), ("info", "info-soft", 4.5)]
+E         15 +     + [
+E         16 +         ("due", "due-soft", 4.5),
+E         17 +         ("advance", "advance-soft", 4.5),
+E         18 +         ("warn", "warn-soft", 4.5),
+E         19 +         ("info", "info-soft", 4.5),
+E         20 +     ]
+E         21 |     + [("accent", "accent-soft", 4.5), ("accent-fg", "accent", 4.5), ("primary-fg", "primary-bg", 4.5)]
+E            |
+E         
+E         1 file would be reformatted, 293 files already formatted
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/root/.venv/bin/python', '-m', 'ruff', 'format', '--check', '.'], returncode=1, stdout='unform...5), ("primary-fg", "primary-bg", 4.5)]\n   |\n\n1 file would be reformatted, 293 files already formatted\n', stderr='').returncode
+
+tests/test_format_gate.py:26: AssertionError
+_________________________ test_frontend_prettier_clean _________________________
+[gw0] linux -- Python 3.11.18 /root/.venv/bin/python
+
+    def test_frontend_prettier_clean():
+        r = _run([PRETTIER, "--check", "src"], FRONTEND)
+>       assert r.returncode == 0, (r.stdout + r.stderr)[-2000:]
+E       AssertionError: Checking formatting...
+E         [warn] src/App.js
+E         [warn] src/apps/erp/ErpApp.jsx
+E         [warn] src/components/common/palette/meta.js
+E         [warn] src/components/common/palette/PaletteResults.jsx
+E         [warn] src/components/common/palette/usePaletteHooks.js
+E         [warn] src/components/common/PaymentPlanMatrix.jsx
+E         [warn] src/components/common/RoleWidgets.jsx
+E         [warn] src/components/forms/BlockForm.jsx
+E         [warn] src/components/layout/AppShell.jsx
+E         [warn] src/components/layout/ThemeSwitch.jsx
+E         [warn] src/components/project/StructureTab.jsx
+E         [warn] src/components/v2/CustomerBits.jsx
+E         [warn] src/index.css
+E         [warn] src/lib/theme.js
+E         [warn] src/pages/BookingDetail.jsx
+E         [warn] src/pages/Reports.jsx
+E         [warn] src/pages/v2/Customer360.jsx
+E         [warn] Code style issues found in 17 files. Run Prettier with --write to fix.
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/app/backend/../frontend/node_modules/.bin/prettier', '--check', 'src'], returncode=1, stdout=...n[warn] src/pages/v2/Customer360.jsx\n[warn] Code style issues found in 17 files. Run Prettier with --write to fix.\n').returncode
+
+tests/test_format_gate.py:36: AssertionError
+_____________________ test_sidebar_has_nine_primary_areas ______________________
+[gw1] linux -- Python 3.11.18 /root/.venv/bin/python
+
+    def test_sidebar_has_nine_primary_areas():
+        shell = (SRC / "components/layout/AppShell.jsx").read_text()
+        nav = shell[shell.index("const NAV = [") : shell.index("];", shell.index("const NAV = ["))]
+        labels = re.findall(r'label: "([^"]+)"', nav)
+        core = [l for l in labels if l != "Website"]
+>       assert core == [
+            "Home",
+            "Projects",
+            "Customers",
+            "Bookings",
+            "Payments",
+            "Construction",
+            "Documents",
+            "Reports",
+            "Masters",
+            "Admin",
+        ], core
+E       AssertionError: ['Home', 'Projects', 'Customers', 'Bookings', 'Payments', 'Received', ...]
+E       assert ['Home', 'Pro...eceived', ...] == ['Home', 'Pro...ruction', ...]
+E         
+E         At index 5 diff: 'Received' != 'Construction'
+E         Left contains 3 more items, first extra item: 'Reports'
+E         Use -v to get more diff
+
+tests/test_phase_s2_wording.py:48: AssertionError
+=============================== warnings summary ===============================
+../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
+../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
+  /root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12: PendingDeprecationWarning: Please use `import python_multipart` instead.
+    import multipart
+
+../../root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854
+../../root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854
+  /root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854: DeprecationWarning: 'crypt' is deprecated and slated for removal in Python 3.13
+    from crypt import crypt as _crypt
+
+tests/test_startup_s1_s3_idempotent.py:71
+tests/test_startup_s1_s3_idempotent.py:71
+  /app/backend/tests/test_startup_s1_s3_idempotent.py:71: PytestUnknownMarkWarning: Unknown pytest.mark.timeout - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.timeout(900)
+
+tests/test_phase_k_p1.py::test_loadshed_sheds_with_prebuilt_503_and_exempts_probes
+  /root/.venv/lib/python3.11/site-packages/starlette/testclient.py:41: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    [], typing.ContextManager[anyio.abc.BlockingPortal]
+
+tests/test_phase_q.py::test_void_watermark_deterministic
+tests/test_phase_q.py::test_void_watermark_deterministic
+tests/test_phase_q.py::test_void_watermark_deterministic
+tests/test_phase_q.py::test_void_watermark_deterministic
+tests/test_phase_q.py::test_void_watermark_deterministic
+tests/test_phase_q.py::test_void_watermark_deterministic
+  /root/.venv/lib/python3.11/site-packages/pypdf/_page.py:1368: DeprecationWarning: Calling `PageObject.replace_contents()` for pages not assigned to a writer is deprecated and will be removed in pypdf 7.0.0. Attach the page to the writer first or use `PdfWriter(clone_from=...)` directly. The existing approach has proved being unreliable.
+    self.replace_contents(ContentStream(new_content_array, self.pdf))
+
+tests/test_kkt_erp.py::TestBlock::test_create_block_and_generation
+tests/test_kkt_erp.py::TestFlatType::test_create_flat_type_auto_area
+tests/test_phase_7.py::TestPortalPhase7::test_portal_booking_payment_plan
+tests/test_phase_7.py::TestPortalPhase7::test_portal_booking_payment_plan
+  /root/.venv/lib/python3.11/site-packages/_pytest/fixtures.py:1313: PytestRemovedIn10Warning: Class-scoped fixture defined as instance method is deprecated.
+  Instance attributes set in this fixture will NOT be visible to test methods,
+  as each test gets a new instance while the fixture runs only once per class.
+  Use @classmethod decorator and set attributes on cls instead.
+  See https://docs.pytest.org/en/stable/deprecations.html#class-scoped-fixture-as-instance-method
+    fixturefunc = resolve_fixture_function(fixturedef, request)
+
+tests/test_phase_5.py::TestPortalData::test_booking_detail_and_subresources
+  /root/.venv/lib/python3.11/site-packages/_pytest/python.py:171: PytestReturnNotNoneWarning: Test functions should return None, but tests/test_phase_5.py::TestPortalData::test_booking_detail_and_subresources returned <class 'str'>.
+  Did you mean to use `assert` instead of `return`?
+  See https://docs.pytest.org/en/stable/how-to/assert.html#return-not-none for more information.
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_format_gate.py::test_backend_ruff_format_clean - AssertionE...
+FAILED tests/test_format_gate.py::test_frontend_prettier_clean - AssertionErr...
+FAILED tests/test_phase_s2_wording.py::test_sidebar_has_nine_primary_areas - ...
+3 failed, 761 passed, 5 skipped, 18 warnings in 780.19s (0:13:00)
+EXIT 1

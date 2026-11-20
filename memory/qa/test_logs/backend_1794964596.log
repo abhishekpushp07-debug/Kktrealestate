@@ -1,0 +1,25 @@
+(trapped) error reading bcrypt version
+Traceback (most recent call last):
+  File "/root/.venv/lib/python3.11/site-packages/passlib/handlers/bcrypt.py", line 620, in _load_backend_mixin
+    version = _bcrypt.__about__.__version__
+              ^^^^^^^^^^^^^^^^^
+AttributeError: module 'bcrypt' has no attribute '__about__'
+index audit_logs.id skipped: An existing index has the same name as the requested index. When index names are not specified, they are auto generated 
+[startup] indexes ensured in 0.09s
+UoW mode: ordered-writes+compensation
+KKT backend serving after 0.10s (uow=ordered-writes+compensation); background startup tasks running
+[startup] another replica holds the startup lease; skipping migrations here
+Object storage initialized
+{"request_id": "826162417f2b442a", "method": "GET", "path": "/api/health", "status": 200, "duration_ms": 1.9, "user_id": null}
+{"request_id": "0d87f3f53875479e", "method": "POST", "path": "/api/auth/login", "status": 200, "duration_ms": 211.9, "user_id": null}
+{"request_id": "8d4d685b2c064788", "method": "POST", "path": "/api/admin/hard-purge", "status": 200, "duration_ms": 52.5, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "199e37b5c490409e", "method": "POST", "path": "/api/auth/login", "status": 200, "duration_ms": 207.2, "user_id": null}
+{"request_id": "f9b34738bbd446e0", "method": "POST", "path": "/api/auth/login", "status": 200, "duration_ms": 204.6, "user_id": null}
+{"request_id": "3562365523ab4cae", "method": "GET", "path": "/api/flats", "status": 200, "duration_ms": 18.9, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "6d58538c8aed4d5d", "method": "POST", "path": "/api/inventory/bulk", "status": 200, "duration_ms": 17.2, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "912a5b3c17ff401a", "method": "GET", "path": "/api/flats/83d60dfc-45f3-4e7e-9b7f-9354f0e06b71", "status": 200, "duration_ms": 8.2, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "1b4ff2262086428a", "method": "GET", "path": "/api/blocks/8c8d8d49-1575-45d7-86b0-70f09cc71917/grid", "status": 200, "duration_ms": 6.2, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "bf7bda48f7ab44b3", "method": "GET", "path": "/api/flats/83d60dfc-45f3-4e7e-9b7f-9354f0e06b71", "status": 200, "duration_ms": 5.9, "user_id": "7a07f9db-5321-4f33-a132-4d753b75fcd2"}
+{"request_id": "134a15307d0f40ce", "method": "GET", "path": "/api/blocks/8c8d8d49-1575-45d7-86b0-70f09cc71917/grid", "status": 200, "duration_ms": 5.8, "user_id": "7a07f9db-5321-4f33-a132-4d753b75fcd2"}
+{"request_id": "570ac0f899574c17", "method": "GET", "path": "/api/flats", "status": 200, "duration_ms": 23.7, "user_id": "7a07f9db-5321-4f33-a132-4d753b75fcd2"}
+{"request_id": "c72f1edf36b84d32", "method": "GET", "path": "/api/flats", "status": 200, "duration_ms": 14.1, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}

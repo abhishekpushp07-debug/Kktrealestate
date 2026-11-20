@@ -1,0 +1,301 @@
+COMMIT ceeac3b files: tests/test_phase3_booking_page.py tests/test_phase3e_entry.py tests/test_phase3e_visit_hours.py tests/test_phase3e_waivers.py tests/test_phase3f_engine.py tests/test_phase3g_integrity.py tests/test_phase3h_reports.py tests/test_phase3i_fast.py tests/test_phase3i_leader_fence.py tests/test_phase3i_money_snapshot.py tests/test_phase3i_noise_surfaces.py tests/test_phase3i_queue_archive.py tests/test_phase3i_txn_money_rev.py tests/test_phase3i_txn_runner.py
+============================= test session starts ==============================
+platform linux -- Python 3.11.18, pytest-9.1.1, pluggy-1.7.0 -- /root/.venv/bin/python
+rootdir: /app/backend
+configfile: pytest.ini
+plugins: locust-2.47.0, platformdirs-4.13.5, asyncio-1.4.0, anyio-4.15.1, xdist-3.8.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+created: 2/2 workers
+2 workers [140 items]
+
+scheduling tests via LoadScopeScheduling
+
+tests/test_phase3g_integrity.py::test_db_refuses_repeated_money_keys[waivers-waiver_number] 
+tests/test_phase3f_engine.py::test_ten_owner_columns_in_order 
+[gw1] [  0%] PASSED tests/test_phase3g_integrity.py::test_db_refuses_repeated_money_keys[waivers-waiver_number] 
+tests/test_phase3g_integrity.py::test_db_refuses_repeated_money_keys[waivers-cn_number] 
+[gw0] [  1%] PASSED tests/test_phase3f_engine.py::test_ten_owner_columns_in_order 
+tests/test_phase3f_engine.py::test_hub_five_segments_ten_tiles 
+[gw1] [  2%] PASSED tests/test_phase3g_integrity.py::test_db_refuses_repeated_money_keys[waivers-cn_number] 
+tests/test_phase3g_integrity.py::test_db_refuses_repeated_money_keys[ledger_entries-None] 
+[gw0] [  2%] PASSED tests/test_phase3f_engine.py::test_hub_five_segments_ten_tiles 
+tests/test_phase3f_engine.py::test_filters_narrow_and_sentence 
+[gw1] [  3%] PASSED tests/test_phase3g_integrity.py::test_db_refuses_repeated_money_keys[ledger_entries-None] 
+tests/test_phase3g_integrity.py::test_db_refuses_repeated_money_keys[refunds-refund_number] 
+[gw0] [  4%] PASSED tests/test_phase3f_engine.py::test_filters_narrow_and_sentence 
+tests/test_phase3f_engine.py::test_unknown_filter_and_too_many_levels_422 
+[gw1] [  5%] PASSED tests/test_phase3g_integrity.py::test_db_refuses_repeated_money_keys[refunds-refund_number] 
+tests/test_phase3g_integrity.py::test_uniqueness_rule_skipped_and_reported_when_duplicates_exist 
+[gw0] [  5%] PASSED tests/test_phase3f_engine.py::test_unknown_filter_and_too_many_levels_422 
+tests/test_phase3f_engine.py::test_group_subtotals_sum_to_total 
+[gw1] [  6%] PASSED tests/test_phase3g_integrity.py::test_uniqueness_rule_skipped_and_reported_when_duplicates_exist 
+tests/test_phase3g_integrity.py::test_ledger_rebuilds_from_two_processes_never_repeat_a_sequence 
+[gw0] [  7%] PASSED tests/test_phase3f_engine.py::test_group_subtotals_sum_to_total 
+tests/test_phase3f_engine.py::test_as_of_past_reads_ledger 
+[gw0] [  7%] PASSED tests/test_phase3f_engine.py::test_as_of_past_reads_ledger 
+tests/test_phase3f_engine.py::test_sales_role_denied 
+[gw0] [  8%] PASSED tests/test_phase3f_engine.py::test_sales_role_denied 
+tests/test_phase3f_engine.py::test_exports_open 
+[gw1] [  9%] PASSED tests/test_phase3g_integrity.py::test_ledger_rebuilds_from_two_processes_never_repeat_a_sequence 
+tests/test_phase3g_integrity.py::test_waiver_double_approve_and_approve_vs_reject 
+[gw0] [ 10%] PASSED tests/test_phase3f_engine.py::test_exports_open 
+tests/test_phase3f_engine.py::test_saved_view_shared_and_pin_limit 
+[gw1] [ 10%] PASSED tests/test_phase3g_integrity.py::test_waiver_double_approve_and_approve_vs_reject 
+tests/test_phase3g_integrity.py::test_split_receipt_cap_is_enforced_by_the_write 
+[gw0] [ 11%] PASSED tests/test_phase3f_engine.py::test_saved_view_shared_and_pin_limit 
+tests/test_phase3f_engine.py::test_bad_values_422[params0] 
+[gw1] [ 12%] PASSED tests/test_phase3g_integrity.py::test_split_receipt_cap_is_enforced_by_the_write 
+tests/test_phase3g_integrity.py::test_interrupted_mixed_refund_payout_is_completed_once 
+[gw0] [ 12%] PASSED tests/test_phase3f_engine.py::test_bad_values_422[params0] 
+tests/test_phase3f_engine.py::test_bad_values_422[params1] 
+[gw1] [ 13%] PASSED tests/test_phase3g_integrity.py::test_interrupted_mixed_refund_payout_is_completed_once 
+tests/test_phase3g_integrity.py::test_read_model_marks_are_shared_and_survive_a_crash 
+[gw0] [ 14%] PASSED tests/test_phase3f_engine.py::test_bad_values_422[params1] 
+tests/test_phase3f_engine.py::test_bad_values_422[params2] 
+[gw1] [ 15%] PASSED tests/test_phase3g_integrity.py::test_read_model_marks_are_shared_and_survive_a_crash 
+tests/test_phase3g_integrity.py::test_cache_is_recomputed_after_a_write_on_another_process 
+[gw0] [ 15%] PASSED tests/test_phase3f_engine.py::test_bad_values_422[params2] 
+tests/test_phase3f_engine.py::test_bad_values_422[params3] 
+[gw1] [ 16%] PASSED tests/test_phase3g_integrity.py::test_cache_is_recomputed_after_a_write_on_another_process 
+tests/test_phase3g_integrity.py::test_interrupted_cancel_is_completed_by_retry 
+[gw0] [ 17%] PASSED tests/test_phase3f_engine.py::test_bad_values_422[params3] 
+tests/test_phase3f_engine.py::test_bad_values_422[params4] 
+[gw1] [ 17%] PASSED tests/test_phase3g_integrity.py::test_interrupted_cancel_is_completed_by_retry 
+tests/test_phase3g_integrity.py::test_receipt_waits_for_the_other_process_writing_the_booking 
+[gw0] [ 18%] PASSED tests/test_phase3f_engine.py::test_bad_values_422[params4] 
+tests/test_phase3f_engine.py::test_bad_values_422[params5] 
+[gw1] [ 19%] PASSED tests/test_phase3g_integrity.py::test_receipt_waits_for_the_other_process_writing_the_booking 
+tests/test_phase3g_integrity.py::test_receipt_retry_after_crash_returns_the_original 
+[gw0] [ 20%] PASSED tests/test_phase3f_engine.py::test_bad_values_422[params5] 
+tests/test_phase3f_engine.py::test_f2_reports_open_and_export[customer-statement] 
+[gw1] [ 20%] PASSED tests/test_phase3g_integrity.py::test_receipt_retry_after_crash_returns_the_original 
+tests/test_phase3g_integrity.py::test_stage_completed_twice_at_once_raises_bills_once 
+[gw0] [ 21%] PASSED tests/test_phase3f_engine.py::test_f2_reports_open_and_export[customer-statement] 
+tests/test_phase3f_engine.py::test_f2_reports_open_and_export[customer-ageing] 
+[gw1] [ 22%] PASSED tests/test_phase3g_integrity.py::test_stage_completed_twice_at_once_raises_bills_once 
+tests/test_phase3g_integrity.py::test_db_refuses_second_live_booking_on_a_sold_flat 
+[gw0] [ 22%] PASSED tests/test_phase3f_engine.py::test_f2_reports_open_and_export[customer-ageing] 
+tests/test_phase3f_engine.py::test_f2_reports_open_and_export[advance-holders] 
+[gw1] [ 23%] PASSED tests/test_phase3g_integrity.py::test_db_refuses_second_live_booking_on_a_sold_flat 
+tests/test_phase3g_integrity.py::test_recompute_read_models_repairs_stale_monthly_buckets 
+[gw0] [ 24%] PASSED tests/test_phase3f_engine.py::test_f2_reports_open_and_export[advance-holders] 
+tests/test_phase3f_engine.py::test_f2_reports_open_and_export[call-list] 
+[gw1] [ 25%] PASSED tests/test_phase3g_integrity.py::test_recompute_read_models_repairs_stale_monthly_buckets 
+tests/test_phase3e_entry.py::test_agreement_signed_date_rules 
+[gw0] [ 25%] PASSED tests/test_phase3f_engine.py::test_f2_reports_open_and_export[call-list] 
+tests/test_phase3f_engine.py::test_f2_reports_open_and_export[kyc-pending] 
+[gw0] [ 26%] PASSED tests/test_phase3f_engine.py::test_f2_reports_open_and_export[kyc-pending] 
+tests/test_phase3f_engine.py::test_f2_reports_open_and_export[payment-behaviour] 
+[gw0] [ 27%] PASSED tests/test_phase3f_engine.py::test_f2_reports_open_and_export[payment-behaviour] 
+tests/test_phase3f_engine.py::test_f2_reports_open_and_export[customer-directory] 
+[gw0] [ 27%] PASSED tests/test_phase3f_engine.py::test_f2_reports_open_and_export[customer-directory] 
+tests/test_phase3f_engine.py::test_f2_reports_open_and_export[cancelled-customers] 
+[gw0] [ 28%] PASSED tests/test_phase3f_engine.py::test_f2_reports_open_and_export[cancelled-customers] 
+tests/test_phase3f_engine.py::test_statement_needs_customer 
+[gw0] [ 29%] PASSED tests/test_phase3f_engine.py::test_statement_needs_customer 
+tests/test_phase3f_engine.py::test_ageing_bands_sum 
+[gw0] [ 30%] PASSED tests/test_phase3f_engine.py::test_ageing_bands_sum 
+tests/test_phase3f_engine.py::test_hub_customers_segment_live 
+[gw0] [ 30%] PASSED tests/test_phase3f_engine.py::test_hub_customers_segment_live 
+tests/test_phase3f_engine.py::test_f3_equals_existing_report[collections] 
+[gw1] [ 31%] PASSED tests/test_phase3e_entry.py::test_agreement_signed_date_rules 
+tests/test_phase3e_entry.py::test_unvoid_manual_bill_restores_with_reason_and_audit 
+[gw0] [ 32%] PASSED tests/test_phase3f_engine.py::test_f3_equals_existing_report[collections] 
+tests/test_phase3f_engine.py::test_f3_equals_existing_report[day-book] 
+[gw1] [ 32%] PASSED tests/test_phase3e_entry.py::test_unvoid_manual_bill_restores_with_reason_and_audit 
+tests/test_phase3e_entry.py::test_roznamcha_contra_undo_posts_reversal_and_nets_zero 
+[gw0] [ 33%] PASSED tests/test_phase3f_engine.py::test_f3_equals_existing_report[day-book] 
+tests/test_phase3f_engine.py::test_f3_equals_existing_report[bank-receipts] 
+[gw1] [ 34%] PASSED tests/test_phase3e_entry.py::test_roznamcha_contra_undo_posts_reversal_and_nets_zero 
+tests/test_phase3e_entry.py::test_customer_deactivate_blocked_with_live_booking_then_merge_keeps_money 
+[gw0] [ 35%] PASSED tests/test_phase3f_engine.py::test_f3_equals_existing_report[bank-receipts] 
+tests/test_phase3f_engine.py::test_f3_equals_existing_report[cheques] 
+[gw1] [ 35%] PASSED tests/test_phase3e_entry.py::test_customer_deactivate_blocked_with_live_booking_then_merge_keeps_money 
+tests/test_phase3e_entry.py::test_check_duplicate_phone 
+[gw0] [ 36%] PASSED tests/test_phase3f_engine.py::test_f3_equals_existing_report[cheques] 
+tests/test_phase3f_engine.py::test_f3_equals_existing_report[bills-vs-collection] 
+[gw1] [ 37%] PASSED tests/test_phase3e_entry.py::test_check_duplicate_phone 
+tests/test_phase3e_entry.py::test_day_cfg_overrides_and_holidays 
+[gw0] [ 37%] PASSED tests/test_phase3f_engine.py::test_f3_equals_existing_report[bills-vs-collection] 
+tests/test_phase3f_engine.py::test_f3_equals_existing_report[outstanding] 
+[gw1] [ 38%] PASSED tests/test_phase3e_entry.py::test_day_cfg_overrides_and_holidays 
+tests/test_phase3e_entry.py::test_front_desk_service_request_with_assignee 
+[gw0] [ 39%] PASSED tests/test_phase3f_engine.py::test_f3_equals_existing_report[outstanding] 
+tests/test_phase3f_engine.py::test_f3_equals_existing_report[cash-vs-account] 
+[gw1] [ 40%] PASSED tests/test_phase3e_entry.py::test_front_desk_service_request_with_assignee 
+tests/test_phase3e_entry.py::test_merge_crash_midway_rolls_back_exactly_or_resumes 
+[gw0] [ 40%] PASSED tests/test_phase3f_engine.py::test_f3_equals_existing_report[cash-vs-account] 
+tests/test_phase3f_engine.py::test_f3_equals_existing_report[other-charges] 
+[gw1] [ 41%] PASSED tests/test_phase3e_entry.py::test_merge_crash_midway_rolls_back_exactly_or_resumes 
+tests/test_phase3e_entry.py::test_merge_blocked_by_two_verified_pans 
+[gw0] [ 42%] PASSED tests/test_phase3f_engine.py::test_f3_equals_existing_report[other-charges] 
+tests/test_phase3f_engine.py::test_f3_equals_existing_report[receivables-forecast] 
+[gw1] [ 42%] PASSED tests/test_phase3e_entry.py::test_merge_blocked_by_two_verified_pans 
+tests/test_phase3e_entry.py::test_discount_snapshot_reason_rule_and_zero_money_effect 
+[gw0] [ 43%] PASSED tests/test_phase3f_engine.py::test_f3_equals_existing_report[receivables-forecast] 
+tests/test_phase3f_engine.py::test_f3_equals_existing_report[waivers] 
+[gw1] [ 44%] PASSED tests/test_phase3e_entry.py::test_discount_snapshot_reason_rule_and_zero_money_effect 
+tests/test_phase3h_reports.py::test_received_on_and_in_hand_rules 
+[gw0] [ 45%] PASSED tests/test_phase3f_engine.py::test_f3_equals_existing_report[waivers] 
+tests/test_phase3f_engine.py::test_f3_period_pushdown 
+[gw1] [ 45%] PASSED tests/test_phase3h_reports.py::test_received_on_and_in_hand_rules 
+tests/test_phase3h_reports.py::test_collections_identity_and_named_lines 
+[gw1] [ 46%] PASSED tests/test_phase3h_reports.py::test_collections_identity_and_named_lines 
+tests/test_phase3h_reports.py::test_bills_vs_collection_default_equals_customer_status 
+[gw0] [ 47%] PASSED tests/test_phase3f_engine.py::test_f3_period_pushdown 
+tests/test_phase3f_engine.py::test_registry_declares_full_filter_standard 
+[gw1] [ 47%] PASSED tests/test_phase3h_reports.py::test_bills_vs_collection_default_equals_customer_status 
+tests/test_phase3h_reports.py::test_as_of_future_refused_and_matches_customer_status 
+[gw1] [ 48%] PASSED tests/test_phase3h_reports.py::test_as_of_future_refused_and_matches_customer_status 
+tests/test_phase3h_reports.py::test_cancelled_booking_never_in_as_of 
+[gw0] [ 49%] PASSED tests/test_phase3f_engine.py::test_registry_declares_full_filter_standard 
+tests/test_phase3f_engine.py::test_dated_reports_default_this_fy_newest_first 
+[gw1] [ 50%] PASSED tests/test_phase3h_reports.py::test_cancelled_booking_never_in_as_of 
+tests/test_phase3h_reports.py::test_manual_bill_paid_beyond_agreed_share 
+[gw0] [ 50%] PASSED tests/test_phase3f_engine.py::test_dated_reports_default_this_fy_newest_first 
+tests/test_phase3f_engine.py::test_f4_reports_open_and_export[booking-register] 
+[gw0] [ 51%] PASSED tests/test_phase3f_engine.py::test_f4_reports_open_and_export[booking-register] 
+tests/test_phase3f_engine.py::test_f4_reports_open_and_export[sales-summary] 
+[gw0] [ 52%] PASSED tests/test_phase3f_engine.py::test_f4_reports_open_and_export[sales-summary] 
+tests/test_phase3f_engine.py::test_f4_reports_open_and_export[discount-register] 
+[gw0] [ 52%] PASSED tests/test_phase3f_engine.py::test_f4_reports_open_and_export[discount-register] 
+tests/test_phase3f_engine.py::test_f4_reports_open_and_export[plan-position] 
+[gw0] [ 53%] PASSED tests/test_phase3f_engine.py::test_f4_reports_open_and_export[plan-position] 
+tests/test_phase3f_engine.py::test_f4_reports_open_and_export[agreements] 
+[gw0] [ 54%] PASSED tests/test_phase3f_engine.py::test_f4_reports_open_and_export[agreements] 
+tests/test_phase3f_engine.py::test_f4_reports_open_and_export[cancellations] 
+[gw0] [ 55%] PASSED tests/test_phase3f_engine.py::test_f4_reports_open_and_export[cancellations] 
+tests/test_phase3f_engine.py::test_f4_reports_open_and_export[transfers] 
+[gw0] [ 55%] PASSED tests/test_phase3f_engine.py::test_f4_reports_open_and_export[transfers] 
+tests/test_phase3f_engine.py::test_f4_reports_open_and_export[sales-team] 
+[gw0] [ 56%] PASSED tests/test_phase3f_engine.py::test_f4_reports_open_and_export[sales-team] 
+tests/test_phase3f_engine.py::test_f4_reports_open_and_export[realised-rate] 
+[gw0] [ 57%] PASSED tests/test_phase3f_engine.py::test_f4_reports_open_and_export[realised-rate] 
+tests/test_phase3f_engine.py::test_f4_reports_open_and_export[booking-health] 
+[gw0] [ 57%] PASSED tests/test_phase3f_engine.py::test_f4_reports_open_and_export[booking-health] 
+tests/test_phase3f_engine.py::test_f4_hub_bookings_live 
+[gw1] [ 58%] PASSED tests/test_phase3h_reports.py::test_manual_bill_paid_beyond_agreed_share 
+tests/test_phase3h_reports.py::test_presentation_rules 
+[gw1] [ 59%] PASSED tests/test_phase3h_reports.py::test_presentation_rules 
+tests/test_phase3_booking_page.py::test_actions_endpoint_reasons_match_the_handlers 
+[gw0] [ 60%] PASSED tests/test_phase3f_engine.py::test_f4_hub_bookings_live 
+tests/test_phase3f_engine.py::test_f4_dated_defaults 
+[gw1] [ 60%] PASSED tests/test_phase3_booking_page.py::test_actions_endpoint_reasons_match_the_handlers 
+tests/test_phase3_booking_page.py::test_one_total_and_one_balance_header_overview_ledger 
+[gw0] [ 61%] PASSED tests/test_phase3f_engine.py::test_f4_dated_defaults 
+tests/test_phase3f_engine.py::test_f4_booking_health_buckets 
+[gw0] [ 62%] PASSED tests/test_phase3f_engine.py::test_f4_booking_health_buckets 
+tests/test_phase3f_engine.py::test_f5_reports_open_and_export[inventory-status] 
+[gw0] [ 62%] PASSED tests/test_phase3f_engine.py::test_f5_reports_open_and_export[inventory-status] 
+tests/test_phase3f_engine.py::test_f5_reports_open_and_export[stacking-plan] 
+[gw0] [ 63%] PASSED tests/test_phase3f_engine.py::test_f5_reports_open_and_export[stacking-plan] 
+tests/test_phase3f_engine.py::test_f5_reports_open_and_export[price-list] 
+[gw0] [ 64%] PASSED tests/test_phase3f_engine.py::test_f5_reports_open_and_export[price-list] 
+tests/test_phase3f_engine.py::test_f5_reports_open_and_export[hold-register] 
+[gw0] [ 65%] PASSED tests/test_phase3f_engine.py::test_f5_reports_open_and_export[hold-register] 
+tests/test_phase3f_engine.py::test_f5_reports_open_and_export[landowner] 
+[gw0] [ 65%] PASSED tests/test_phase3f_engine.py::test_f5_reports_open_and_export[landowner] 
+tests/test_phase3f_engine.py::test_f5_reports_open_and_export[parking] 
+[gw0] [ 66%] PASSED tests/test_phase3f_engine.py::test_f5_reports_open_and_export[parking] 
+tests/test_phase3f_engine.py::test_f5_reports_open_and_export[construction-vs-plan] 
+[gw0] [ 67%] PASSED tests/test_phase3f_engine.py::test_f5_reports_open_and_export[construction-vs-plan] 
+tests/test_phase3f_engine.py::test_f5_reports_open_and_export[stage-bills] 
+[gw1] [ 67%] PASSED tests/test_phase3_booking_page.py::test_one_total_and_one_balance_header_overview_ledger 
+tests/test_phase3_booking_page.py::test_customer_activity_shows_each_receipt_once 
+[gw0] [ 68%] PASSED tests/test_phase3f_engine.py::test_f5_reports_open_and_export[stage-bills] 
+tests/test_phase3f_engine.py::test_f5_reports_open_and_export[sales-velocity] 
+[gw0] [ 69%] PASSED tests/test_phase3f_engine.py::test_f5_reports_open_and_export[sales-velocity] 
+tests/test_phase3f_engine.py::test_f5_project_statement_needs_project 
+[gw0] [ 70%] PASSED tests/test_phase3f_engine.py::test_f5_project_statement_needs_project 
+tests/test_phase3f_engine.py::test_f5_display_layer_viewer_never_sees_real_inventory 
+[gw1] [ 70%] PASSED tests/test_phase3_booking_page.py::test_customer_activity_shows_each_receipt_once 
+tests/test_phase3_booking_page.py::test_typed_lead_source_and_save_to_master_offer 
+[gw0] [ 71%] PASSED tests/test_phase3f_engine.py::test_f5_display_layer_viewer_never_sees_real_inventory 
+tests/test_phase3f_engine.py::test_f5_sales_opens_display_layer_reports 
+[gw1] [ 72%] PASSED tests/test_phase3_booking_page.py::test_typed_lead_source_and_save_to_master_offer 
+tests/test_phase3e_waivers.py::test_waiver_request_pending_no_money_then_approve_credits_with_gst 
+[gw0] [ 72%] PASSED tests/test_phase3f_engine.py::test_f5_sales_opens_display_layer_reports 
+tests/test_phase3f_engine.py::test_f5_sales_role_blocked 
+[gw0] [ 73%] PASSED tests/test_phase3f_engine.py::test_f5_sales_role_blocked 
+tests/test_phase3f_engine.py::test_f5_report_access_matrix_file 
+[gw0] [ 74%] PASSED tests/test_phase3f_engine.py::test_f5_report_access_matrix_file 
+tests/test_phase3f_engine.py::test_natural_flat_order 
+[gw0] [ 75%] PASSED tests/test_phase3f_engine.py::test_natural_flat_order 
+tests/test_phase3f_engine.py::test_f6_reports_open_and_export[lead-funnel] 
+[gw0] [ 75%] PASSED tests/test_phase3f_engine.py::test_f6_reports_open_and_export[lead-funnel] 
+tests/test_phase3f_engine.py::test_f6_reports_open_and_export[lead-register] 
+[gw0] [ 76%] PASSED tests/test_phase3f_engine.py::test_f6_reports_open_and_export[lead-register] 
+tests/test_phase3f_engine.py::test_f6_reports_open_and_export[source-performance] 
+[gw0] [ 77%] PASSED tests/test_phase3f_engine.py::test_f6_reports_open_and_export[source-performance] 
+tests/test_phase3f_engine.py::test_f6_reports_open_and_export[follow-ups] 
+[gw0] [ 77%] PASSED tests/test_phase3f_engine.py::test_f6_reports_open_and_export[follow-ups] 
+tests/test_phase3f_engine.py::test_f6_reports_open_and_export[visit-register] 
+[gw0] [ 78%] PASSED tests/test_phase3f_engine.py::test_f6_reports_open_and_export[visit-register] 
+tests/test_phase3f_engine.py::test_f6_reports_open_and_export[visit-conversion] 
+[gw0] [ 79%] PASSED tests/test_phase3f_engine.py::test_f6_reports_open_and_export[visit-conversion] 
+tests/test_phase3f_engine.py::test_f6_reports_open_and_export[lost-leads] 
+[gw0] [ 80%] PASSED tests/test_phase3f_engine.py::test_f6_reports_open_and_export[lost-leads] 
+tests/test_phase3f_engine.py::test_f6_reports_open_and_export[response-time] 
+[gw0] [ 80%] PASSED tests/test_phase3f_engine.py::test_f6_reports_open_and_export[response-time] 
+tests/test_phase3f_engine.py::test_f6_reports_open_and_export[team-pipeline] 
+[gw0] [ 81%] PASSED tests/test_phase3f_engine.py::test_f6_reports_open_and_export[team-pipeline] 
+tests/test_phase3f_engine.py::test_f6_reports_open_and_export[lead-ageing] 
+[gw0] [ 82%] PASSED tests/test_phase3f_engine.py::test_f6_reports_open_and_export[lead-ageing] 
+tests/test_phase3f_engine.py::test_f6_reports_open_and_export[service-sla] 
+[gw0] [ 82%] PASSED tests/test_phase3f_engine.py::test_f6_reports_open_and_export[service-sla] 
+tests/test_phase3f_engine.py::test_hub_is_fifty_live_reports 
+[gw0] [ 83%] PASSED tests/test_phase3f_engine.py::test_hub_is_fifty_live_reports 
+tests/test_phase3f_engine.py::test_f6_aggregate_filters_push_down 
+[gw0] [ 84%] PASSED tests/test_phase3f_engine.py::test_f6_aggregate_filters_push_down 
+tests/test_phase3i_money_snapshot.py::test_receipt_keeps_snapshot_valid_and_equal_to_bills 
+[gw0] [ 85%] PASSED tests/test_phase3i_money_snapshot.py::test_receipt_keeps_snapshot_valid_and_equal_to_bills 
+tests/test_phase3i_money_snapshot.py::test_reminder_mark_keeps_snapshot_but_due_date_change_invalidates 
+[gw0] [ 85%] PASSED tests/test_phase3i_money_snapshot.py::test_reminder_mark_keeps_snapshot_but_due_date_change_invalidates 
+tests/test_phase3i_money_snapshot.py::test_home_stale_part_paid_equals_register_total 
+[gw0] [ 86%] PASSED tests/test_phase3i_money_snapshot.py::test_home_stale_part_paid_equals_register_total 
+tests/test_phase3i_money_snapshot.py::test_system_health_shows_report_figures_check 
+[gw0] [ 87%] PASSED tests/test_phase3i_money_snapshot.py::test_system_health_shows_report_figures_check 
+tests/test_phase3i_noise_surfaces.py::test_reminder_sent_shows_in_bills_raised_on_both_servers 
+[gw1] [ 87%] PASSED tests/test_phase3e_waivers.py::test_waiver_request_pending_no_money_then_approve_credits_with_gst 
+tests/test_phase3e_waivers.py::test_reject_and_owner_self_approval 
+[gw0] [ 88%] PASSED tests/test_phase3i_noise_surfaces.py::test_reminder_sent_shows_in_bills_raised_on_both_servers 
+tests/test_phase3i_noise_surfaces.py::test_generated_letter_shows_on_booking_page_and_customer_360_on_both_servers 
+[gw0] [ 89%] PASSED tests/test_phase3i_noise_surfaces.py::test_generated_letter_shows_on_booking_page_and_customer_360_on_both_servers 
+tests/test_phase3i_noise_surfaces.py::test_notification_bell_counts_on_both_servers 
+[gw1] [ 90%] PASSED tests/test_phase3e_waivers.py::test_reject_and_owner_self_approval 
+tests/test_phase3e_waivers.py::test_cancellation_refund_counts_received_money_only 
+[gw0] [ 90%] PASSED tests/test_phase3i_noise_surfaces.py::test_notification_bell_counts_on_both_servers 
+tests/test_phase3i_noise_surfaces.py::test_noise_actions_move_no_figure_but_follow_ups_still_move_the_call_list 
+[gw0] [ 91%] PASSED tests/test_phase3i_noise_surfaces.py::test_noise_actions_move_no_figure_but_follow_ups_still_move_the_call_list 
+tests/test_phase3i_txn_runner.py::test_runner_retries_conflict_and_fires_side_effects_once_after_success 
+[gw0] [ 92%] PASSED tests/test_phase3i_txn_runner.py::test_runner_retries_conflict_and_fires_side_effects_once_after_success 
+tests/test_phase3i_txn_runner.py::test_runner_gives_up_and_fires_nothing_when_every_attempt_aborts 
+[gw0] [ 92%] PASSED tests/test_phase3i_txn_runner.py::test_runner_gives_up_and_fires_nothing_when_every_attempt_aborts 
+tests/test_phase3i_txn_runner.py::test_session_discipline_and_atomic_member_numbers 
+[gw0] [ 93%] PASSED tests/test_phase3i_txn_runner.py::test_session_discipline_and_atomic_member_numbers 
+tests/test_phase3i_txn_money_rev.py::test_bill_write_in_transaction_keeps_money_rev_consistent[False] 
+[gw0] [ 94%] SKIPPED tests/test_phase3i_txn_money_rev.py::test_bill_write_in_transaction_keeps_money_rev_consistent[False] 
+tests/test_phase3i_txn_money_rev.py::test_bill_write_in_transaction_keeps_money_rev_consistent[True] 
+[gw0] [ 95%] SKIPPED tests/test_phase3i_txn_money_rev.py::test_bill_write_in_transaction_keeps_money_rev_consistent[True] 
+tests/test_phase3e_visit_hours.py::test_weekday_slots_holiday_and_closed_day_enforced_on_website_and_erp 
+[gw0] [ 95%] PASSED tests/test_phase3e_visit_hours.py::test_weekday_slots_holiday_and_closed_day_enforced_on_website_and_erp 
+tests/test_phase3i_fast.py::test_fast_default_view_equals_full_path 
+[gw0] [ 96%] PASSED tests/test_phase3i_fast.py::test_fast_default_view_equals_full_path 
+tests/test_phase3i_leader_fence.py::test_a_stalled_leader_never_runs_beside_the_new_one 
+[gw1] [ 97%] PASSED tests/test_phase3e_waivers.py::test_cancellation_refund_counts_received_money_only 
+tests/test_phase3e_waivers.py::test_other_charge_waiver_targets_its_line_and_ledger_law_holds 
+[gw1] [ 97%] PASSED tests/test_phase3e_waivers.py::test_other_charge_waiver_targets_its_line_and_ledger_law_holds 
+tests/test_phase3i_queue_archive.py::test_undone_letter_marker_is_replayed_once 
+[gw1] [ 98%] PASSED tests/test_phase3i_queue_archive.py::test_undone_letter_marker_is_replayed_once 
+tests/test_phase3i_queue_archive.py::test_old_login_records_and_read_notifications_move_to_archive 
+[gw1] [ 99%] PASSED tests/test_phase3i_queue_archive.py::test_old_login_records_and_read_notifications_move_to_archive 
+[gw0] [100%] PASSED tests/test_phase3i_leader_fence.py::test_a_stalled_leader_never_runs_beside_the_new_one 
+
+=============================== warnings summary ===============================
+tests/test_phase3e_entry.py::test_day_cfg_overrides_and_holidays
+tests/test_phase3f_engine.py::test_registry_declares_full_filter_standard
+  /root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12: PendingDeprecationWarning: Please use `import python_multipart` instead.
+    import multipart
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+============ 138 passed, 2 skipped, 2 warnings in 204.24s (0:03:24) ============

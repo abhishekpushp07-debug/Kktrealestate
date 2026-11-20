@@ -1,0 +1,132 @@
+{
+ "vus": 3,
+ "duration_s": 31,
+ "requests": 100,
+ "rps": 3.3,
+ "stopped": null,
+ "errors": {
+  "422": 22
+ },
+ "assertions": {
+  "lead_created:ok": 25,
+  "lead_converted:ok": 25,
+  "journey_exception:FAIL": 22,
+  "integrity_ok_after_stage:ok": 1
+ },
+ "failed_assertions": [
+  {
+   "assertion": "journey_exception",
+   "detail": "TypeError: unsupported operand type(s) for *: 'NoneType' and 'float'"
+  },
+  {
+   "assertion": "journey_exception",
+   "detail": "TypeError: unsupported operand type(s) for *: 'NoneType' and 'float'"
+  },
+  {
+   "assertion": "journey_exception",
+   "detail": "TypeError: unsupported operand type(s) for *: 'NoneType' and 'float'"
+  },
+  {
+   "assertion": "journey_exception",
+   "detail": "TypeError: unsupported operand type(s) for *: 'NoneType' and 'float'"
+  },
+  {
+   "assertion": "journey_exception",
+   "detail": "TypeError: unsupported operand type(s) for *: 'NoneType' and 'float'"
+  },
+  {
+   "assertion": "journey_exception",
+   "detail": "TypeError: unsupported operand type(s) for *: 'NoneType' and 'float'"
+  },
+  {
+   "assertion": "journey_exception",
+   "detail": "TypeError: unsupported operand type(s) for *: 'NoneType' and 'float'"
+  },
+  {
+   "assertion": "journey_exception",
+   "detail": "TypeError: unsupported operand type(s) for *: 'NoneType' and 'float'"
+  },
+  {
+   "assertion": "journey_exception",
+   "detail": "TypeError: unsupported operand type(s) for *: 'NoneType' and 'float'"
+  },
+  {
+   "assertion": "journey_exception",
+   "detail": "TypeError: unsupported operand type(s) for *: 'NoneType' and 'float'"
+  },
+  {
+   "assertion": "journey_exception",
+   "detail": "TypeError: unsupported operand type(s) for *: 'NoneType' and 'float'"
+  },
+  {
+   "assertion": "journey_exception",
+   "detail": "TypeError: unsupported operand type(s) for *: 'NoneType' and 'float'"
+  },
+  {
+   "assertion": "journey_exception",
+   "detail": "TypeError: unsupported operand type(s) for *: 'NoneType' and 'float'"
+  },
+  {
+   "assertion": "journey_exception",
+   "detail": "TypeError: unsupported operand type(s) for *: 'NoneType' and 'float'"
+  },
+  {
+   "assertion": "journey_exception",
+   "detail": "TypeError: unsupported operand type(s) for *: 'NoneType' and 'float'"
+  },
+  {
+   "assertion": "journey_exception",
+   "detail": "TypeError: unsupported operand type(s) for *: 'NoneType' and 'float'"
+  },
+  {
+   "assertion": "journey_exception",
+   "detail": "TypeError: unsupported operand type(s) for *: 'NoneType' and 'float'"
+  },
+  {
+   "assertion": "journey_exception",
+   "detail": "TypeError: unsupported operand type(s) for *: 'NoneType' and 'float'"
+  },
+  {
+   "assertion": "journey_exception",
+   "detail": "TypeError: unsupported operand type(s) for *: 'NoneType' and 'float'"
+  },
+  {
+   "assertion": "journey_exception",
+   "detail": "TypeError: unsupported operand type(s) for *: 'NoneType' and 'float'"
+  },
+  {
+   "assertion": "journey_exception",
+   "detail": "TypeError: unsupported operand type(s) for *: 'NoneType' and 'float'"
+  },
+  {
+   "assertion": "journey_exception",
+   "detail": "TypeError: unsupported operand type(s) for *: 'NoneType' and 'float'"
+  }
+ ],
+ "groups": {
+  "breakdown": {
+   "n": 22,
+   "p50": 9.3,
+   "p95": 12.6,
+   "p99": 13.1
+  },
+  "customers": {
+   "n": 25,
+   "p50": 19.4,
+   "p95": 23.5,
+   "p99": 23.6
+  },
+  "leads": {
+   "n": 50,
+   "p50": 28.5,
+   "p95": 37.4,
+   "p99": 37.6
+  },
+  "login": {
+   "n": 3,
+   "p50": 235.3,
+   "p95": 235.7,
+   "p99": 235.7
+  }
+ }
+}

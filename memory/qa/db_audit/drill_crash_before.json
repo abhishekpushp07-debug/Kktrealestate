@@ -1,0 +1,310 @@
+{
+ "post receipt (cash, auto)": {
+  "crash_points": 15,
+  "unrepaired": [
+   {
+    "crash_after_write": 4,
+    "writes_done": [
+     "bookings.update_one",
+     "payments.insert_one",
+     "ledger_entries.delete_many"
+    ],
+    "crashed": true,
+    "left_bad": [
+     "ledger lines missing"
+    ],
+    "retry": 500,
+    "retry_msg": "{\"detail\":\"Internal server error\",\"code\":\"INTERNAL_ERROR\",\"request_id\":\"b472db80c8b94fe3\",",
+    "after_retry_bad": [
+     "ledger lines missing"
+    ]
+   },
+   {
+    "crash_after_write": 5,
+    "writes_done": [
+     "payments.insert_one",
+     "demands.update_one",
+     "ledger_entries.delete_many"
+    ],
+    "crashed": true,
+    "left_bad": [
+     "ledger lines missing"
+    ],
+    "retry": 500,
+    "retry_msg": "{\"detail\":\"Internal server error\",\"code\":\"INTERNAL_ERROR\",\"request_id\":\"4f5abbf1ac134606\",",
+    "after_retry_bad": [
+     "ledger lines missing"
+    ]
+   }
+  ],
+  "rows": [
+   {
+    "crash_after_write": 0,
+    "writes_done": [],
+    "crashed": true,
+    "left_bad": [],
+    "retry": 201,
+    "retry_msg": "",
+    "after_retry_bad": []
+   },
+   {
+    "crash_after_write": 1,
+    "writes_done": [],
+    "crashed": true,
+    "left_bad": [],
+    "retry": 201,
+    "retry_msg": "",
+    "after_retry_bad": []
+   },
+   {
+    "crash_after_write": 2,
+    "writes_done": [],
+    "crashed": true,
+    "left_bad": [],
+    "retry": 201,
+    "retry_msg": "",
+    "after_retry_bad": []
+   },
+   {
+    "crash_after_write": 3,
+    "writes_done": [
+     "notifications.insert_many",
+     "audit_logs.update_one",
+     "audit_logs.insert_one"
+    ],
+    "crashed": true,
+    "left_bad": [],
+    "retry": 201,
+    "retry_msg": "",
+    "after_retry_bad": []
+   },
+   {
+    "crash_after_write": 4,
+    "writes_done": [
+     "bookings.update_one",
+     "payments.insert_one",
+     "ledger_entries.delete_many"
+    ],
+    "crashed": true,
+    "left_bad": [
+     "ledger lines missing"
+    ],
+    "retry": 500,
+    "retry_msg": "{\"detail\":\"Internal server error\",\"code\":\"INTERNAL_ERROR\",\"request_id\":\"b472db80c8b94fe3\",",
+    "after_retry_bad": [
+     "ledger lines missing"
+    ]
+   },
+   {
+    "crash_after_write": 5,
+    "writes_done": [
+     "payments.insert_one",
+     "demands.update_one",
+     "ledger_entries.delete_many"
+    ],
+    "crashed": true,
+    "left_bad": [
+     "ledger lines missing"
+    ],
+    "retry": 500,
+    "retry_msg": "{\"detail\":\"Internal server error\",\"code\":\"INTERNAL_ERROR\",\"request_id\":\"4f5abbf1ac134606\",",
+    "after_retry_bad": [
+     "ledger lines missing"
+    ]
+   },
+   {
+    "crash_after_write": 6,
+    "writes_done": [
+     "demands.update_one",
+     "ledger_entries.delete_many",
+     "ledger_entries.insert_many"
+    ],
+    "crashed": true,
+    "left_bad": [],
+    "retry": 500,
+    "retry_msg": "{\"detail\":\"Internal server error\",\"code\":\"INTERNAL_ERROR\",\"request_id\":\"7da0af66c7bf4569\",",
+    "after_retry_bad": []
+   },
+   {
+    "crash_after_write": 7,
+    "writes_done": [
+     "ledger_entries.insert_many",
+     "bookings.update_one",
+     "audit_logs.insert_one"
+    ],
+    "crashed": true,
+    "left_bad": [],
+    "retry": 500,
+    "retry_msg": "{\"detail\":\"Internal server error\",\"code\":\"INTERNAL_ERROR\",\"request_id\":\"baa50b767b7d4d42\",",
+    "after_retry_bad": []
+   },
+   {
+    "crash_after_write": 8,
+    "writes_done": [
+     "bookings.update_one",
+     "audit_logs.insert_one",
+     "notifications.insert_many"
+    ],
+    "crashed": true,
+    "left_bad": [],
+    "retry": 500,
+    "retry_msg": "{\"detail\":\"Internal server error\",\"code\":\"INTERNAL_ERROR\",\"request_id\":\"2ae73bc114b7466f\",",
+    "after_retry_bad": []
+   },
+   {
+    "crash_after_write": 9,
+    "writes_done": [
+     "ledger_entries.insert_many",
+     "bookings.update_one",
+     "audit_logs.insert_one"
+    ],
+    "crashed": true,
+    "left_bad": [],
+    "retry": 500,
+    "retry_msg": "{\"detail\":\"Internal server error\",\"code\":\"INTERNAL_ERROR\",\"request_id\":\"2f879d6a56844f14\",",
+    "after_retry_bad": []
+   },
+   {
+    "crash_after_write": 10,
+    "writes_done": [
+     "payments.insert_one",
+     "block_summaries.update_one",
+     "notifications.insert_many"
+    ],
+    "crashed": true,
+    "left_bad": [],
+    "retry": 500,
+    "retry_msg": "{\"detail\":\"Internal server error\",\"code\":\"INTERNAL_ERROR\",\"request_id\":\"5c4a35e290814c8c\",",
+    "after_retry_bad": []
+   },
+   {
+    "crash_after_write": 11,
+    "writes_done": [
+     "audit_logs.insert_one",
+     "notifications.insert_many",
+     "audit_logs.update_one"
+    ],
+    "crashed": true,
+    "left_bad": [],
+    "retry": 500,
+    "retry_msg": "{\"detail\":\"Internal server error\",\"code\":\"INTERNAL_ERROR\",\"request_id\":\"7d044a521a454b2f\",",
+    "after_retry_bad": []
+   },
+   {
+    "crash_after_write": 12,
+    "writes_done": [
+     "customers.update_one",
+     "audit_logs.insert_one",
+     "audit_logs.update_many"
+    ],
+    "crashed": true,
+    "left_bad": [],
+    "retry": 500,
+    "retry_msg": "{\"detail\":\"Internal server error\",\"code\":\"INTERNAL_ERROR\",\"request_id\":\"76c5866d340b4136\",",
+    "after_retry_bad": []
+   },
+   {
+    "crash_after_write": 13,
+    "writes_done": [
+     "audit_logs.insert_one",
+     "customer_summaries.update_one",
+     "customers.update_one"
+    ],
+    "crashed": true,
+    "left_bad": [],
+    "retry": 500,
+    "retry_msg": "{\"detail\":\"Internal server error\",\"code\":\"INTERNAL_ERROR\",\"request_id\":\"fe139fffb8354ba1\",",
+    "after_retry_bad": []
+   },
+   {
+    "crash_after_write": 14,
+    "writes_done": [
+     "audit_logs.insert_one",
+     "monthly_buckets.update_one",
+     "monthly_buckets.update_one"
+    ],
+    "crashed": true,
+    "left_bad": [],
+    "retry": 500,
+    "retry_msg": "{\"detail\":\"Internal server error\",\"code\":\"INTERNAL_ERROR\",\"request_id\":\"0713c559cec1472b\",",
+    "after_retry_bad": []
+   },
+   {
+    "crash_after_write": 15,
+    "writes_done": [
+     "audit_logs.update_one",
+     "audit_logs.insert_one",
+     "audit_logs.update_one"
+    ],
+    "crashed": false,
+    "left_bad": [],
+    "retry": 201,
+    "retry_msg": "",
+    "after_retry_bad": []
+   }
+  ]
+ },
+ "cheque clear": {
+  "crash_points": 0,
+  "unrepaired": [],
+  "rows": [
+   {
+    "crash_after_write": 0,
+    "writes_done": [],
+    "crashed": false,
+    "left_bad": [],
+    "retry": 409,
+    "retry_msg": "{\"detail\":\"Payment is Cleared\",\"code\":\"NOT_PENDING\",\"request_id\":\"859f8829ea194ded\",\"error",
+    "after_retry_bad": []
+   }
+  ]
+ },
+ "waiver approve": {
+  "crash_points": 0,
+  "unrepaired": [
+   {
+    "crash_after_write": 0,
+    "writes_done": [],
+    "crashed": false,
+    "left_bad": [
+     "summary paid 290001000 != \u03a3 cleared 290000000"
+    ],
+    "retry": 409,
+    "retry_msg": "{\"detail\":\"Waiver is Approved\",\"code\":\"WAIVER_STATE\",\"request_id\":\"70f8f148290c4ed0\",\"erro",
+    "after_retry_bad": [
+     "summary paid 290001000 != \u03a3 cleared 290000000"
+    ]
+   }
+  ],
+  "rows": [
+   {
+    "crash_after_write": 0,
+    "writes_done": [],
+    "crashed": false,
+    "left_bad": [
+     "summary paid 290001000 != \u03a3 cleared 290000000"
+    ],
+    "retry": 409,
+    "retry_msg": "{\"detail\":\"Waiver is Approved\",\"code\":\"WAIVER_STATE\",\"request_id\":\"70f8f148290c4ed0\",\"erro",
+    "after_retry_bad": [
+     "summary paid 290001000 != \u03a3 cleared 290000000"
+    ]
+   }
+  ]
+ },
+ "cancel booking \u2192 refund": {
+  "crash_points": 0,
+  "unrepaired": [],
+  "rows": [
+   {
+    "crash_after_write": 0,
+    "writes_done": [],
+    "crashed": false,
+    "left_bad": [],
+    "retry": 409,
+    "retry_msg": "{\"detail\":\"Clear or bounce pending cheques before cancelling\",\"code\":\"PENDING_PAYMENTS\",\"r",
+    "after_retry_bad": []
+   }
+  ]
+ }
+}

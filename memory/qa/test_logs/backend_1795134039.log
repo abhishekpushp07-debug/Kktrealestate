@@ -1,0 +1,180 @@
+(trapped) error reading bcrypt version
+Traceback (most recent call last):
+  File "/root/.venv/lib/python3.11/site-packages/passlib/handlers/bcrypt.py", line 620, in _load_backend_mixin
+    version = _bcrypt.__about__.__version__
+              ^^^^^^^^^^^^^^^^^
+AttributeError: module 'bcrypt' has no attribute '__about__'
+index audit_logs.id skipped: An existing index has the same name as the requested index. When index names are not specified, they are auto generated 
+[startup] indexes ensured in 0.11s
+UoW mode: ordered-writes+compensation
+KKT backend serving after 0.13s (uow=ordered-writes+compensation); background startup tasks running
+Object storage initialized
+[startup] system_roles ok in 0.14s
+[startup] owner_bootstrap ok in 0.00s
+{"request_id": "783c1ec648d54e0a", "method": "GET", "path": "/api/health", "status": 200, "duration_ms": 2.4, "user_id": null}
+[startup] seed_phase7 ok in 0.00s
+{"request_id": "cec3286a3af244d0", "method": "POST", "path": "/api/auth/login", "status": 200, "duration_ms": 485.1, "user_id": null}
+{"request_id": "77e5569d22854df5", "method": "POST", "path": "/api/admin/hard-purge", "status": 200, "duration_ms": 119.0, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+[phase7] integrity: ok=True bookings=79 counts={}
+[startup] integrity_report ok in 0.29s
+[startup] inventory_masters ok in 0.03s
+[startup] seed_s1_templates ok in 0.00s
+[startup] migrate_s1_templates ok in 0.00s
+[startup] pricing_ps ok in 0.02s
+[startup] schema_validators ok in 0.01s
+[startup] price_paise_backfill ok in 0.00s
+[startup] money_snapshots ok in 0.00s
+{"request_id": "30f42d331e124ee7", "method": "GET", "path": "/api/reports/demand-vs-collection", "status": 200, "duration_ms": 97.1, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://internal/api/reports/demand-vs-collection "HTTP/1.1 200 OK"
+{"request_id": "4a9c0aa6d6a84b21", "method": "GET", "path": "/api/reports/v3/customer-status", "status": 200, "duration_ms": 110.0, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://warm/api/reports/v3/customer-status?page_size=50 "HTTP/1.1 200 OK"
+{"request_id": "b6616dcb6fda400e", "method": "GET", "path": "/api/reports/v3/customer-statement", "status": 200, "duration_ms": 8.2, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://warm/api/reports/v3/customer-statement?page_size=50 "HTTP/1.1 200 OK"
+{"request_id": "c7a865b89d804d18", "method": "GET", "path": "/api/reports/v3/customer-ageing", "status": 200, "duration_ms": 6.0, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://warm/api/reports/v3/customer-ageing?page_size=50 "HTTP/1.1 200 OK"
+{"request_id": "b398c3058a504c04", "method": "GET", "path": "/api/reports/v3/advance-holders", "status": 200, "duration_ms": 4.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://warm/api/reports/v3/advance-holders?page_size=50 "HTTP/1.1 200 OK"
+{"request_id": "8fa01d6604dd4723", "method": "GET", "path": "/api/reports/v3/call-list", "status": 200, "duration_ms": 7.3, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://warm/api/reports/v3/call-list?page_size=50 "HTTP/1.1 200 OK"
+{"request_id": "d86df5939baa4c76", "method": "GET", "path": "/api/reports/v3/kyc-pending", "status": 200, "duration_ms": 10.1, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://warm/api/reports/v3/kyc-pending?page_size=50 "HTTP/1.1 200 OK"
+{"request_id": "9da73a16affa4d9d", "method": "GET", "path": "/api/reports/v3/payment-behaviour", "status": 200, "duration_ms": 27.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://warm/api/reports/v3/payment-behaviour?page_size=50 "HTTP/1.1 200 OK"
+{"request_id": "80e1553c23a54dd8", "method": "GET", "path": "/api/reports/v3/customer-directory", "status": 200, "duration_ms": 34.9, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://warm/api/reports/v3/customer-directory?page_size=50 "HTTP/1.1 200 OK"
+{"request_id": "3acea64f9e4c42d8", "method": "GET", "path": "/api/reports/v3/cancelled-customers", "status": 200, "duration_ms": 13.4, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://warm/api/reports/v3/cancelled-customers?page_size=50 "HTTP/1.1 200 OK"
+{"request_id": "47e9e8740d774f59", "method": "GET", "path": "/api/reports/v3/collections", "status": 200, "duration_ms": 52.1, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://warm/api/reports/v3/collections?page_size=50 "HTTP/1.1 200 OK"
+{"request_id": "ba55be4a2eb445f0", "method": "GET", "path": "/api/reports/roznamcha-summary", "status": 200, "duration_ms": 223.4, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://internal/api/reports/roznamcha-summary?group_by=day&from_date=2026-04-01&to_date=2026-11-20 "HTTP/1.1 200 OK"
+{"request_id": "0c3bffafa1b54c8c", "method": "POST", "path": "/api/auth/login", "status": 200, "duration_ms": 212.7, "user_id": null}
+{"request_id": "ba442aa823194d32", "method": "GET", "path": "/api/reports/v3/day-book", "status": 200, "duration_ms": 242.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://warm/api/reports/v3/day-book?page_size=50 "HTTP/1.1 200 OK"
+{"request_id": "a55b2741ea744a23", "method": "GET", "path": "/api/reports/bank-receipts", "status": 200, "duration_ms": 23.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://internal/api/reports/bank-receipts?from_date=2026-04-01&to_date=2026-11-20 "HTTP/1.1 200 OK"
+{"request_id": "23c4790e629e4339", "method": "GET", "path": "/api/reports/v3/bank-receipts", "status": 200, "duration_ms": 34.0, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://warm/api/reports/v3/bank-receipts?page_size=50 "HTTP/1.1 200 OK"
+{"request_id": "93bc8d7563344c4f", "method": "GET", "path": "/api/reports/cheques", "status": 200, "duration_ms": 13.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://internal/api/reports/cheques "HTTP/1.1 200 OK"
+{"request_id": "dbebf7f3769c4be1", "method": "GET", "path": "/api/reports/v3/cheques", "status": 200, "duration_ms": 26.7, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://warm/api/reports/v3/cheques?page_size=50 "HTTP/1.1 200 OK"
+{"request_id": "27a7f6422e6b4e2e", "method": "GET", "path": "/api/reports/demand-vs-collection", "status": 200, "duration_ms": 22.7, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://internal/api/reports/demand-vs-collection?include_cancelled=true "HTTP/1.1 200 OK"
+{"request_id": "4ca439d8705540ad", "method": "GET", "path": "/api/reports/v3/bills-vs-collection", "status": 200, "duration_ms": 33.7, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://warm/api/reports/v3/bills-vs-collection?page_size=50 "HTTP/1.1 200 OK"
+{"request_id": "a72287bcd9b3439d", "method": "GET", "path": "/api/reports/collections", "status": 200, "duration_ms": 118.4, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "3529ebddf778431a", "method": "GET", "path": "/api/reports/v3/outstanding", "status": 200, "duration_ms": 31.4, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://warm/api/reports/v3/outstanding?page_size=50 "HTTP/1.1 200 OK"
+{"request_id": "bdecdea96f4049dc", "method": "GET", "path": "/api/reports/cash-vs-account", "status": 200, "duration_ms": 11.5, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://internal/api/reports/cash-vs-account?group_by=booking "HTTP/1.1 200 OK"
+{"request_id": "df63e08006a34632", "method": "GET", "path": "/api/reports/v3/cash-vs-account", "status": 200, "duration_ms": 26.1, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://warm/api/reports/v3/cash-vs-account?page_size=50 "HTTP/1.1 200 OK"
+{"request_id": "97a35e19febb4bf2", "method": "GET", "path": "/api/reports/other-charges", "status": 200, "duration_ms": 14.7, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://internal/api/reports/other-charges?group_by=booking "HTTP/1.1 200 OK"
+{"request_id": "a4858550f1634123", "method": "GET", "path": "/api/reports/v3/other-charges", "status": 200, "duration_ms": 39.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "de115f644e914a6a", "method": "GET", "path": "/api/payments", "status": 200, "duration_ms": 84.9, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://warm/api/reports/v3/other-charges?page_size=50 "HTTP/1.1 200 OK"
+{"request_id": "dc04a0ca7f2a4d43", "method": "GET", "path": "/api/reports/receivables-forecast", "status": 200, "duration_ms": 22.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://internal/api/reports/receivables-forecast?group_by=booking "HTTP/1.1 200 OK"
+{"request_id": "7527ccc22dc24927", "method": "GET", "path": "/api/reports/v3/receivables-forecast", "status": 200, "duration_ms": 38.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://warm/api/reports/v3/receivables-forecast?page_size=50 "HTTP/1.1 200 OK"
+{"request_id": "8063b7bf30574778", "method": "GET", "path": "/api/reports/waiver-register", "status": 200, "duration_ms": 3.7, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://internal/api/reports/waiver-register?from_date=2026-04-01&to_date=2026-11-20 "HTTP/1.1 200 OK"
+{"request_id": "c4370889ec564b87", "method": "GET", "path": "/api/reports/v3/waivers", "status": 200, "duration_ms": 14.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://warm/api/reports/v3/waivers?page_size=50 "HTTP/1.1 200 OK"
+{"request_id": "cd252edf0d324926", "method": "GET", "path": "/api/reports/v3/booking-register", "status": 200, "duration_ms": 13.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://warm/api/reports/v3/booking-register?page_size=50 "HTTP/1.1 200 OK"
+{"request_id": "cb3c974527c643fb", "method": "GET", "path": "/api/reports/v3/sales-summary", "status": 200, "duration_ms": 6.1, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://warm/api/reports/v3/sales-summary?page_size=50 "HTTP/1.1 200 OK"
+{"request_id": "e1b32b509e8c4122", "method": "GET", "path": "/api/payments", "status": 200, "duration_ms": 89.1, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "00177de84e4441da", "method": "GET", "path": "/api/reports/discount-register", "status": 200, "duration_ms": 15.7, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://internal/api/reports/discount-register?group_by=booking&from_date=2026-04-01&to_date=2026-11-20 "HTTP/1.1 200 OK"
+{"request_id": "95c8d1bd73b741f2", "method": "GET", "path": "/api/reports/v3/discount-register", "status": 200, "duration_ms": 28.3, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://warm/api/reports/v3/discount-register?page_size=50 "HTTP/1.1 200 OK"
+{"request_id": "521108090fab4d90", "method": "GET", "path": "/api/reports/v3/plan-position", "status": 200, "duration_ms": 7.2, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://warm/api/reports/v3/plan-position?page_size=50 "HTTP/1.1 200 OK"
+{"request_id": "c67a5348135a4072", "method": "GET", "path": "/api/reports/v3/agreements", "status": 200, "duration_ms": 6.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://warm/api/reports/v3/agreements?page_size=50 "HTTP/1.1 200 OK"
+{"request_id": "7043af6f3e9d498b", "method": "GET", "path": "/api/reports/cancellations", "status": 200, "duration_ms": 4.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://internal/api/reports/cancellations?from_date=2026-04-01&to_date=2026-11-20 "HTTP/1.1 200 OK"
+{"request_id": "4dd9d62e5e60417c", "method": "GET", "path": "/api/reports/v3/cancellations", "status": 200, "duration_ms": 14.3, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://warm/api/reports/v3/cancellations?page_size=50 "HTTP/1.1 200 OK"
+{"request_id": "e15e63ad165d44fe", "method": "GET", "path": "/api/reports/v3/transfers", "status": 200, "duration_ms": 18.4, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://warm/api/reports/v3/transfers?page_size=50 "HTTP/1.1 200 OK"
+{"request_id": "122b00574ebb4226", "method": "GET", "path": "/api/payments", "status": 200, "duration_ms": 95.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "f7a9e615152540a1", "method": "GET", "path": "/api/payments", "status": 200, "duration_ms": 16.2, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "b203313543174115", "method": "GET", "path": "/api/payments", "status": 200, "duration_ms": 16.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "260cdf83c065497a", "method": "GET", "path": "/api/payments", "status": 200, "duration_ms": 22.7, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "e6ab00f7b5294100", "method": "GET", "path": "/api/reports/sales-team", "status": 200, "duration_ms": 92.0, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://internal/api/reports/sales-team?from_date=2026-04-01&to_date=2026-11-20 "HTTP/1.1 200 OK"
+{"request_id": "b4551c702fb742e7", "method": "GET", "path": "/api/reports/v3/sales-team", "status": 200, "duration_ms": 106.3, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://warm/api/reports/v3/sales-team?page_size=50 "HTTP/1.1 200 OK"
+{"request_id": "c7e2b252141f485f", "method": "GET", "path": "/api/payments", "status": 200, "duration_ms": 18.7, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "b800cdf2b7234f0d", "method": "GET", "path": "/api/reports/v3/realised-rate", "status": 200, "duration_ms": 15.5, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://warm/api/reports/v3/realised-rate?page_size=50 "HTTP/1.1 200 OK"
+{"request_id": "31746337870f4c9a", "method": "GET", "path": "/api/reports/v3/booking-health", "status": 200, "duration_ms": 8.1, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://warm/api/reports/v3/booking-health?page_size=50 "HTTP/1.1 200 OK"
+{"request_id": "293cdfe345f541aa", "method": "GET", "path": "/api/payments", "status": 200, "duration_ms": 22.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "4a28072c59f841e9", "method": "GET", "path": "/api/reports/v3/project-statement", "status": 200, "duration_ms": 13.4, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://warm/api/reports/v3/project-statement?page_size=50 "HTTP/1.1 200 OK"
+{"request_id": "4359cf0205a0421f", "method": "GET", "path": "/api/payments", "status": 200, "duration_ms": 21.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "bbd96a0379ad40de", "method": "GET", "path": "/api/reports/v3/inventory-status", "status": 200, "duration_ms": 30.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://warm/api/reports/v3/inventory-status?page_size=50 "HTTP/1.1 200 OK"
+{"request_id": "379623086d3d4024", "method": "GET", "path": "/api/reports/v3/stacking-plan", "status": 200, "duration_ms": 8.1, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://warm/api/reports/v3/stacking-plan?page_size=50 "HTTP/1.1 200 OK"
+{"request_id": "8f936402a7ea4e49", "method": "GET", "path": "/api/payments", "status": 200, "duration_ms": 27.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "cdf1f9d2dd574373", "method": "GET", "path": "/api/reports/v3/price-list", "status": 200, "duration_ms": 12.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://warm/api/reports/v3/price-list?page_size=50 "HTTP/1.1 200 OK"
+{"request_id": "92ee7e36b9ea4783", "method": "GET", "path": "/api/reports/v3/hold-register", "status": 200, "duration_ms": 7.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://warm/api/reports/v3/hold-register?page_size=50 "HTTP/1.1 200 OK"
+{"request_id": "29bac4ad04dd4c45", "method": "GET", "path": "/api/payments", "status": 200, "duration_ms": 22.2, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "bd4d0adf7ee946cc", "method": "GET", "path": "/api/reports/v3/landowner", "status": 200, "duration_ms": 10.2, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://warm/api/reports/v3/landowner?page_size=50 "HTTP/1.1 200 OK"
+{"request_id": "3c89f419a9274fa2", "method": "GET", "path": "/api/reports/v3/parking", "status": 200, "duration_ms": 14.3, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://warm/api/reports/v3/parking?page_size=50 "HTTP/1.1 200 OK"
+{"request_id": "b82055e2492543e4", "method": "GET", "path": "/api/payments", "status": 200, "duration_ms": 22.1, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "f00e1abd23b9452d", "method": "GET", "path": "/api/payments", "status": 200, "duration_ms": 20.0, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "4e2a89a2fb1d4627", "method": "GET", "path": "/api/payments", "status": 200, "duration_ms": 18.4, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "b6542a077bbe4d55", "method": "GET", "path": "/api/reports/construction-vs-plan", "status": 200, "duration_ms": 47.4, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://internal/api/reports/construction-vs-plan "HTTP/1.1 200 OK"
+{"request_id": "1a4fce8e83cd469f", "method": "GET", "path": "/api/reports/v3/construction-vs-plan", "status": 200, "duration_ms": 65.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://warm/api/reports/v3/construction-vs-plan?page_size=50 "HTTP/1.1 200 OK"
+{"request_id": "466ba31d3e464b27", "method": "GET", "path": "/api/payments", "status": 200, "duration_ms": 21.3, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "1ee362e44ca7467b", "method": "GET", "path": "/api/reports/v3/stage-bills", "status": 200, "duration_ms": 14.4, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://warm/api/reports/v3/stage-bills?page_size=50 "HTTP/1.1 200 OK"
+{"request_id": "afd69d66bc4c4a19", "method": "GET", "path": "/api/reports/v3/sales-velocity", "status": 200, "duration_ms": 9.1, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://warm/api/reports/v3/sales-velocity?page_size=50 "HTTP/1.1 200 OK"
+{"request_id": "3890aceac29847d2", "method": "GET", "path": "/api/payments", "status": 200, "duration_ms": 23.3, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "84c4fa9be08444db", "method": "GET", "path": "/api/payments", "status": 200, "duration_ms": 15.4, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "8af66e56c0c04db2", "method": "GET", "path": "/api/reports/v3/lead-funnel", "status": 200, "duration_ms": 48.5, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://warm/api/reports/v3/lead-funnel?page_size=50 "HTTP/1.1 200 OK"
+{"request_id": "7b166b1ee4c54ad6", "method": "GET", "path": "/api/reports/v3/lead-register", "status": 200, "duration_ms": 5.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://warm/api/reports/v3/lead-register?page_size=50 "HTTP/1.1 200 OK"
+{"request_id": "982adc3d3bfb4239", "method": "GET", "path": "/api/reports/v3/source-performance", "status": 200, "duration_ms": 5.1, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://warm/api/reports/v3/source-performance?page_size=50 "HTTP/1.1 200 OK"
+{"request_id": "50a7ee464bc6494d", "method": "GET", "path": "/api/reports/v3/follow-ups", "status": 200, "duration_ms": 3.5, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://warm/api/reports/v3/follow-ups?page_size=50 "HTTP/1.1 200 OK"
+{"request_id": "462af19fccad48df", "method": "GET", "path": "/api/reports/v3/visit-register", "status": 200, "duration_ms": 6.7, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://warm/api/reports/v3/visit-register?page_size=50 "HTTP/1.1 200 OK"
+{"request_id": "c2a9890c024f4ce2", "method": "GET", "path": "/api/reports/site-visits", "status": 200, "duration_ms": 6.1, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://internal/api/reports/site-visits?from_date=2026-04-01&to_date=2026-11-20 "HTTP/1.1 200 OK"
+{"request_id": "81f43fd672554e42", "method": "GET", "path": "/api/reports/v3/visit-conversion", "status": 200, "duration_ms": 15.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://warm/api/reports/v3/visit-conversion?page_size=50 "HTTP/1.1 200 OK"
+{"request_id": "0e8a0fcba1864bb7", "method": "GET", "path": "/api/reports/v3/lost-leads", "status": 200, "duration_ms": 3.5, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://warm/api/reports/v3/lost-leads?page_size=50 "HTTP/1.1 200 OK"
+{"request_id": "865cce618cae4713", "method": "GET", "path": "/api/reports/v3/response-time", "status": 200, "duration_ms": 4.1, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://warm/api/reports/v3/response-time?page_size=50 "HTTP/1.1 200 OK"
+{"request_id": "e8ce493eb4f44679", "method": "GET", "path": "/api/reports/v3/team-pipeline", "status": 200, "duration_ms": 5.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://warm/api/reports/v3/team-pipeline?page_size=50 "HTTP/1.1 200 OK"
+{"request_id": "40e7164cfaa84be7", "method": "GET", "path": "/api/reports/v3/lead-ageing", "status": 200, "duration_ms": 4.1, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://warm/api/reports/v3/lead-ageing?page_size=50 "HTTP/1.1 200 OK"
+{"request_id": "1fb1f467ca144268", "method": "GET", "path": "/api/reports/service-sla", "status": 200, "duration_ms": 5.5, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://internal/api/reports/service-sla?from_date=2026-04-01&to_date=2026-11-20 "HTTP/1.1 200 OK"
+{"request_id": "2c210d9bf4474f92", "method": "GET", "path": "/api/reports/v3/service-sla", "status": 200, "duration_ms": 15.9, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://warm/api/reports/v3/service-sla?page_size=50 "HTTP/1.1 200 OK"
+[startup] background tasks complete in 3.9s: {'seed_if_empty': 'skipped (watermark)', 'seed_phase15': 'skipped (watermark)', 'seed_phase3': 'skipped (watermark)', 'system_roles': 0.14, 'seed_marketing_user': 'skipped (watermark)', 'owner_bootstrap': 0.0, 'migrate_phase7': 'skipped (watermark)', 'seed_phase7': 0.0, 'backfill_demand_installments': 'skipped (watermark)', 'migrate_phase_g': 'skipped (watermark)', 'sweep_notifications': 'skipped (watermark)', 'integrity_report': 0.29, 'inventory_masters': 0.03, 'counters': 'skipped (watermark)', 'seed_s1_templates': 0.0, 'migrate_s1_templates': 0.0, 'reconcile': 'skipped (watermark)', 'startup_phase11': 'skipped (watermark)', 'pricing_ps': 0.02, 'schema_validators': 0.01, 'price_paise_backfill': 0.0, 'backfill_paid_parts': 'skipped (watermark)', 'redate_receipt_rows': 'skipped (watermark)', 'money_snapshots': 0.0, 'warm_reports': '1.4s'}
+[leader] agent-env-7e19496f-5cca-4a63-b4cd-232b17fee803:4259 took scheduler over from agent-env-7e19496f-5cca-4a63-b4cd-232b17fee803:229; waiting 25.0s
+{"request_id": "05206a9a2d1d4334", "method": "POST", "path": "/api/auth/login", "status": 200, "duration_ms": 211.8, "user_id": null}
+{"request_id": "44d55cbfbb04428b", "method": "POST", "path": "/api/admin/ops/after-commit/drain", "status": 200, "duration_ms": 2.1, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "73962980e3834589", "method": "POST", "path": "/api/admin/ops/after-commit/drain", "status": 200, "duration_ms": 2.1, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}

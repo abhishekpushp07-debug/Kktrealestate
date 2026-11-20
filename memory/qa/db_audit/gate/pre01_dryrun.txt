@@ -1,0 +1,3 @@
+test_database: manual bills 0 · bookings whose Outstanding changes 0
+kkt_medium: manual bills 0 · bookings whose Outstanding changes 0
+kkt_volume: manual bills 0 · bookings whose Outstanding changes 0

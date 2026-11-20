@@ -1,0 +1,91 @@
+bringing up nodes...
+bringing up nodes...
+
+....FF
+=================================== FAILURES ===================================
+___________________ test_no_utc_derived_dates_in_server_code ___________________
+[gw1] linux -- Python 3.11.18 /root/.venv/bin/python
+
+    def test_no_utc_derived_dates_in_server_code():
+        hits = [h for f in server_files() if f.name != "clock.py" for h in scan(f)]
+>       assert not hits, "UTC-derived dates (use services.clock):\n" + "\n".join(hits)
+E       AssertionError: UTC-derived dates (use services.clock):
+E         routers/home.py:21: timestamp sliced to a UTC date: out.append(d.isoformat()[:7])
+E         routers/visits.py:660: UTC now → date: f"DTSTAMP:{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}",
+E         seed_phase2.py:411: date.today() is the container (UTC) date: today = date.today()
+E         seed_phase2.py:849: date.today() is the container (UTC) date: await pay(bk, date.today() - timedelta(days=2), 500000, "Account", "CHEQUE", status="Pending")
+E         seed_phase3.py:384: date.today() is the container (UTC) date: today = date.today()
+E         services/trends.py:26: timestamp sliced to a UTC date: out.append(d.isoformat()[:7])
+E         tools/backup.py:165: UTC now → date: stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+E         tools/tieout.py:221: timestamp sliced to a UTC date: month = datetime.now(IST).date().isoformat()[:7]
+E         tools/tieout_reports.py:568: UTC day end appended to a date (use clock.day_end_utc / day_range): {"company_id": cid, "is_active": {"$ne": False}, "created_at": {"$gte": F0, "$lte": F1 + "T23:59:59"}}
+E         tools/tieout_reports.py:578: UTC day end appended to a date (use clock.day_end_utc / day_range): db.audit_logs.count_documents({"company_id": cid, "created_at": {"$gte": F0, "$lte": F1 + "T23:59:59"}}),
+E       assert not ['routers/home.py:21: timestamp sliced to a UTC date: out.append(d.isoformat()[:7])', 'routers/visits.py:660: UTC now ...te: today = date.today()', 'services/trends.py:26: timestamp sliced to a UTC date: out.append(d.isoformat()[:7])', ...]
+
+tests/test_business_day_guard.py:50: AssertionError
+____________ test_late_night_entries_land_on_the_india_day[0-30-0] _____________
+[gw0] linux -- Python 3.11.18 /root/.venv/bin/python
+
+H = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxODBlMTgyOC02OTBjLTRmN2ItYjdiOS1lNDI0MTNiMjB...0LCJleHAiOjE3OTQ3ODA1ODR9.SbsgYhTTACZjWRVsgj_3Prvwwlo8-Rf-vHuiefVot_k', 'X-Rate-Limit-Bypass': 'kkt-test-bypass-local'}
+ctx = {'modes': {'CASH': {'id': '838d6b1b-b163-45aa-8d06-6d3de9e95d73', 'company_id': 'ce127b4f-3997-45da-a7b0-1fe952915495'...': {'line1': '88, Kankarbagh', 'line2': None, 'city': 'Patna', 'state': 'Bihar', ...}, 'address_permanent': None, ...}}
+hh = 0, mm = 30, slot = 0
+
+    @pytest.mark.parametrize("hh,mm,slot", [(0, 30, 0), (5, 29, 3)])
+    def test_late_night_entries_land_on_the_india_day(H, ctx, hh, mm, slot):
+        D = clock.today() - timedelta(days=1)
+        T, d, prev = _at(D, hh, mm), D.isoformat(), (D - timedelta(days=1)).isoformat()
+        f1, f2 = ctx["flats"][slot], ctx["flats"][slot + 1]
+        # receipt + reversal (JRN-31): the form date = today (D); the stamps and Roznamcha land on D, not on the UTC date
+        b = _book(H, ctx, f1, d, T)
+        keep = _cash(H, ctx, b, 7000, d, T)
+        wrong = _cash(H, ctx, b, 3000, d, T)
+        assert keep["payment_date"] == d and clock.day_of(keep.get("posted_at") or keep["created_at"]) == d
+        rv = call(H, "POST", f"/payments/{wrong['id']}/reverse", {"reason": "Q-12 wrong amount"}, as_of=T)
+        assert rv["status"] == "Reversed" and clock.day_of(rv["reversal"]["at"]) == d
+        led = call(H, "GET", f"/bookings/{b['id']}/ledger")["rows"]
+        assert {x["date"] for x in led if x["type"] in ("PAYMENT", "REVERSAL")} == {d}, led
+        rz = call(H, "GET", "/roznamcha", date=d)
+        assert any(x["receipt_number"] == wrong["receipt_number"] for x in rz["reversals"])
+        assert any(x["receipt_number"] == keep["receipt_number"] for x in rz["receipts"])
+        assert not any(
+            x["receipt_number"] == wrong["receipt_number"] for x in call(H, "GET", "/roznamcha", date=prev)["reversals"]
+        )
+        groups = {
+            g["group"]
+            for g in call(H, "GET", "/reports/collections-v2", from_date=d, to_date=d, group_by="receipt")["rows"]
+        }
+        assert {keep["receipt_number"], f"{wrong['receipt_number']} (reversal)"} <= groups, groups
+        # Home tiles under the frozen clock: today's money + follow-ups due today (JRN-33 rule)
+        home = call(H, "GET", "/dashboard", as_of=T)
+        assert home["collections"]["today"]["total_paise"] >= 700000 and home["collections"]["today"]["count"] >= 1
+        lead = call(
+            H, "POST", "/leads", {"name": "Q12 Follow Up", "phone": f"9{random.randint(100000000, 999999999)}"}, as_of=T
+        )
+        due = _at(D, 11, 0).isoformat()
+        call(H, "POST", f"/leads/{lead['id']}/follow-ups", {"note": "Q-12 call back", "next_follow_up_at": due}, as_of=T)
+        due_ids = {x["id"] for x in call(H, "GET", "/leads", as_of=T, due_today="true", page_size=200)["items"]}
+        assert lead["id"] in due_ids
+        earlier = {
+            x["id"]
+            for x in call(H, "GET", "/leads", as_of=_at(D - timedelta(days=1), 12, 0), due_today="true", page_size=200)[
+                "items"
+            ]
+        }
+        assert lead["id"] not in earlier
+>       assert call(H, "GET", "/dashboard", as_of=T)["follow_ups_due"]["count"] >= 1
+E       assert 0 >= 1
+
+tests/test_business_day.py:163: AssertionError
+=============================== warnings summary ===============================
+../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
+../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
+  /root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12: PendingDeprecationWarning: Please use `import python_multipart` instead.
+    import multipart
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_business_day_guard.py::test_no_utc_derived_dates_in_server_code
+FAILED tests/test_business_day.py::test_late_night_entries_land_on_the_india_day[0-30-0]
+!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 2 failures !!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!! xdist.dsession.Interrupted: stopping after 1 failures !!!!!!!!!!!!!
+2 failed, 4 passed, 2 warnings in 3.04s

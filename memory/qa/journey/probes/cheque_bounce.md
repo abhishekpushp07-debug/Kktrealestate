@@ -1,0 +1,215 @@
+# Probe `cheque_bounce` · BK-2627-0022 · 2026-10-26
+
+Action result: `{"posted_pending": {"id": "4a64e375-a27c-4d29-851f-2eb4a9f219fb", "company_id": "61e35c1c-91c6-43c9-a732-2f790d5b57aa", "created_at": "2026-10-26T18:25:35.795675+00:00", "updated_at": "2026-10-26T18:25:35.795675+00:00", "created_by": "b63b8b19-94ac-4c8e-845b-faf8019d7a8e", "is_active": true, "deleted_at": null, "version": 1, "receipt_number": "KKT/2627/00583", "booking_id": "02d58183-0695-4b00-827`
+
+## Surfaces changed within 2.5 s (28)
+- **booking.detail+summary**
+  - .ledger_rebuilt_at: "2026-10-26T18:25:35.807199+00:00" → "2026-10-26T18:25:36.483026+00:00"
+  - .other_charges[]: len 2 → 3
+  - .payments[]: 16 items, content changed
+  - .summary.due: 3583225.0 → 3583725.0
+  - .summary.due_paise: 358322500 → 358372500
+  - .summary.other_charges_demanded: 1000.0 → 1500.0
+  - .summary.other_charges_demanded_paise: 100000 → 150000
+  - .summary.other_charges_due: 1000.0 → 1500.0
+- **booking.ledger(cash)**
+  - .booking.summary.due: 3583225.0 → 3583725.0
+  - .booking.summary.due_paise: 358322500 → 358372500
+  - .booking.summary.other_charges_demanded: 1000.0 → 1500.0
+  - .booking.summary.other_charges_demanded_paise: 100000 → 150000
+  - .booking.summary.other_charges_due: 1000.0 → 1500.0
+  - .booking.summary.other_charges_due_paise: 100000 → 150000
+  - .booking.summary.outstanding: 3583225.0 → 3583725.0
+  - .booking.summary.outstanding_paise: 358322500 → 358372500
+- **booking.ledger(account)**
+  - .booking.summary.due: 3583225.0 → 3583725.0
+  - .booking.summary.due_paise: 358322500 → 358372500
+  - .booking.summary.other_charges_demanded: 1000.0 → 1500.0
+  - .booking.summary.other_charges_demanded_paise: 100000 → 150000
+  - .booking.summary.other_charges_due: 1000.0 → 1500.0
+  - .booking.summary.other_charges_due_paise: 100000 → 150000
+  - .booking.summary.outstanding: 3583225.0 → 3583725.0
+  - .booking.summary.outstanding_paise: 358322500 → 358372500
+- **booking.ledger(other)**
+  - .booking.summary.due: 3583225.0 → 3583725.0
+  - .booking.summary.due_paise: 358322500 → 358372500
+  - .booking.summary.other_charges_demanded: 1000.0 → 1500.0
+  - .booking.summary.other_charges_demanded_paise: 100000 → 150000
+  - .booking.summary.other_charges_due: 1000.0 → 1500.0
+  - .booking.summary.other_charges_due_paise: 100000 → 150000
+  - .booking.summary.outstanding: 3583225.0 → 3583725.0
+  - .booking.summary.outstanding_paise: 358322500 → 358372500
+- **booking.ledger(combined)**
+  - .booking.summary.due: 3583225.0 → 3583725.0
+  - .booking.summary.due_paise: 358322500 → 358372500
+  - .booking.summary.other_charges_demanded: 1000.0 → 1500.0
+  - .booking.summary.other_charges_demanded_paise: 100000 → 150000
+  - .booking.summary.other_charges_due: 1000.0 → 1500.0
+  - .booking.summary.other_charges_due_paise: 100000 → 150000
+  - .booking.summary.outstanding: 3583225.0 → 3583725.0
+  - .booking.summary.outstanding_paise: 358322500 → 358372500
+- **customer.360**
+  - .bookings[]: 1 items, content changed
+- **customer.ledgers**
+  - .bookings[]: 1 items, content changed
+  - .ledgers[]: 1 items, content changed
+  - .totals.account.pending_cheques: 275350.0 → 265350.0
+  - .totals.account.pending_cheques_paise: 27535000 → 26535000
+  - .totals.combined.agreed: 6634750.0 → 6635250.0
+  - .totals.combined.agreed_paise: 663475000 → 663525000
+  - .totals.combined.due: 3584225.0 → 3585225.0
+  - .totals.combined.due_paise: 358422500 → 358522500
+- **customer.timeline**
+  - .items[]: 16 items, content changed
+- **project.summary(read-model)**
+  - .computed_at: "2026-10-26T18:25:35.856993+00:00" → "2026-10-26T18:25:37.913427+00:00"
+  - .outstanding.other_charges: 503500.0 → 504000.0
+  - .outstanding.other_charges_paise: 50350000 → 50400000
+  - .outstanding.total: 20254499.0 → 20254999.0
+  - .outstanding.total_paise: 2025449900 → 2025499900
+  - .pending_cheques: 1291100.0 → 1281100.0
+  - .pending_cheques_paise: 129110000 → 128110000
+- **block.summary(read-model)**
+  - .computed_at: "2026-10-26T18:25:35.842577+00:00" → "2026-10-26T18:25:37.899013+00:00"
+  - .outstanding.other_charges: 208000.0 → 208500.0
+  - .outstanding.other_charges_paise: 20800000 → 20850000
+  - .outstanding.total: 11723062.0 → 11723562.0
+  - .outstanding.total_paise: 1172306200 → 1172356200
+  - .pending_cheques: 537800.0 → 527800.0
+  - .pending_cheques_paise: 53780000 → 52780000
+- **dashboard.home**
+  - .attention.bounced[]: len 2 → 3
+  - .computed_at: "2026-10-26T18:25:35.873498+00:00" → "2026-10-26T18:25:37.925987+00:00"
+  - .counts.cheques_pending: 7 → 6
+  - .greeting_date: "2026-10-26T18:25:36.007515+00:00" → "2026-10-26T18:25:39.151479+00:00"
+  - .projects[]: 2 items, content changed
+  - .recent[]: 12 items, content changed
+  - .totals.outstanding: 20609499.0 → 20609999.0
+  - .totals.outstanding_paise: 2060949900 → 2060999900
+- **dashboard.legacy**
+  - .collections.outstanding_due: 20609499.0 → 20609999.0
+  - .collections.outstanding_due_paise: 2060949900 → 2060999900
+  - .collections.pending_cheques.amount: 1291100.0 → 1281100.0
+  - .collections.pending_cheques.amount_paise: 129110000 → 128110000
+  - .collections.pending_cheques.count: 7 → 6
+  - .recent_audit[]: 10 items, content changed
+- **dashboard.widgets**
+  - .ageing[]: 5 items, content changed
+  - .bounced_recent[]: len 2 → 3
+  - .pending_cheques.amount: 1291100.0 → 1281100.0
+  - .pending_cheques.amount_paise: 129110000 → 128110000
+  - .pending_cheques.count: 7 → 6
+  - .pending_cheques.items[]: len 7 → 6
+- **bootstrap.counts**
+  - .cheques_pending: 7 → 6
+  - .unread_notifications: 769 → 771
+- **payments.summary**
+  - .Bounced.amount: 411440.0 → 421440.0
+  - .Bounced.amount_paise: 41144000 → 42144000
+  - .Bounced.count: 4 → 5
+  - .Pending.amount: 1291100.0 → 1281100.0
+  - .Pending.amount_paise: 129110000 → 128110000
+  - .Pending.count: 7 → 6
+- **roznamcha(today)**
+  - .pending: 142675.0 → 132675.0
+  - .pending_paise: 14267500 → 13267500
+  - .receipts[]: len 10 → 9
+- **cheques.in_hand**
+  - .amount: 1291100.0 → 1281100.0
+  - .amount_paise: 129110000 → 128110000
+  - .items[]: len 7 → 6
+  - .total: 7 → 6
+- **report.outstanding**
+  - .ageing[]: 5 items, content changed
+  - .rows[]: 78 items, content changed
+  - .totals.due: 20609499.0 → 20609999.0
+  - .totals.due_paise: 2060949900 → 2060999900
+  - .totals.other_due: 858500.0 → 859000.0
+  - .totals.other_due_paise: 85850000 → 85900000
+- **report.inventory**
+  - .realised_rates[]: 2 items, content changed
+- **report.cheques**
+  - .by_status.Bounced.amount_paise: 41144000 → 42144000
+  - .by_status.Bounced.count: 4 → 5
+  - .by_status.Pending.amount_paise: 129110000 → 128110000
+  - .by_status.Pending.count: 7 → 6
+  - .rows[]: 134 items, content changed
+- **report.sales_leads**
+  - .bookings_per_user[]: 2 items, content changed
+- **report.bank_receipts**
+  - .rows[]: 5 items, content changed
+  - .totals.count: 639 → 638
+  - .totals.pending: 1291100.0 → 1281100.0
+  - .totals.pending_paise: 129110000 → 128110000
+  - .totals.total: 203855595.0 → 203845595.0
+  - .totals.total_paise: 20385559500 → 20384559500
+- **report.activity**
+  - .actions[]: 59 items, content changed
+  - .rows[]: 458 items, content changed
+- **report.statement**
+  - .booking.ledger_rebuilt_at: "2026-10-26T18:25:35.807199+00:00" → "2026-10-26T18:25:36.483026+00:00"
+  - .booking.other_charges[]: len 2 → 3
+  - .booking.summary.due: 3583225.0 → 3583725.0
+  - .booking.summary.due_paise: 358322500 → 358372500
+  - .booking.summary.other_charges_demanded: 1000.0 → 1500.0
+  - .booking.summary.other_charges_demanded_paise: 100000 → 150000
+  - .booking.summary.other_charges_due: 1000.0 → 1500.0
+  - .booking.summary.other_charges_due_paise: 100000 → 150000
+- **notifications(staff)**
+  - .items[]: 30 items, content changed
+  - .unread: 769 → 771
+- **audit.booking**
+  - .items[]: 5 items, content changed
+  - .next_cursor: "WyJjcmVhdGVkX2F0IiwgIjIwMjYtMTAtMjZUMTg6MjI6MzcuNjY0NTYyKzA → "WyJjcmVhdGVkX2F0IiwgIjIwMjYtMTAtMjZUMTg6MjI6MzguMTgyNTgyKzA
+  - .total: 33 → 34
+- **audit.recent**
+  - .items[]: 3 items, content changed
+  - .next_cursor: "WyJjcmVhdGVkX2F0IiwgIjIwMjYtMTAtMjZUMTg6MjU6MzUuODA5ODczKzA → "WyJjcmVhdGVkX2F0IiwgIjIwMjYtMTAtMjZUMTg6MjU6MzYuNDMwNzY5KzA
+  - .total: 3774 → 3776
+- **search(customer name)**
+  - .took_ms: 2.4 → 2.5
+
+## Changed only after caches expired (stale 2.5–9 s) (0)
+
+## Unchanged (19)
+- block.detail+grid
+- booking.schedule/demands
+- construction.milestones(block)
+- customer.panels(comms/docs)
+- flat.detail
+- inventory.flats(block)
+- leads.board
+- leads.list
+- payments.list+totals
+- pdf.statement(len)
+- project.workspace
+- report.advances
+- report.cancellations
+- report.collections(today)
+- report.construction_progress
+- report.demand_vs_collection
+- report.roznamcha_range
+- report.service_sla
+- service.list
+
+## Restore
+`n/a (no ledger effect or --keep)`
+
+## Expected (registry) vs actual
+- _propagated_complete: True
+- audit: changed
+- blocks: changed
+- bookings: changed
+- bootstrap: changed
+- cheques: changed
+- customer360: changed
+- dashboard: changed
+- demands: MISSING
+- home: changed
+- ledgers: changed
+- notifications: changed
+- payments: changed
+- projects: changed
+- reports: changed
+- roznamcha: changed
+- widgets: changed

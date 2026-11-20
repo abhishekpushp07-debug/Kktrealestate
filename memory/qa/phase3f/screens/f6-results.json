@@ -1,0 +1,314 @@
+[
+ {
+  "theme": "light",
+  "width": 1440,
+  "screen": "hub",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 1440,
+  "screen": "lead-funnel",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 1440,
+  "screen": "lead-register",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 1440,
+  "screen": "source-performance",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 1440,
+  "screen": "follow-ups",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 1440,
+  "screen": "visit-register",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 1440,
+  "screen": "visit-conversion",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 1440,
+  "screen": "lost-leads",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 1440,
+  "screen": "response-time",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 1440,
+  "screen": "team-pipeline",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 1440,
+  "screen": "lead-ageing",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 1440,
+  "screen": "service-sla",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 1440,
+  "screen": "lead-register-filters",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 390,
+  "screen": "hub",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 390,
+  "screen": "lead-funnel",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 390,
+  "screen": "lead-register",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 390,
+  "screen": "source-performance",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 390,
+  "screen": "follow-ups",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 390,
+  "screen": "visit-register",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 390,
+  "screen": "visit-conversion",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 390,
+  "screen": "lost-leads",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 390,
+  "screen": "response-time",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 390,
+  "screen": "team-pipeline",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 390,
+  "screen": "lead-ageing",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 390,
+  "screen": "service-sla",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 390,
+  "screen": "lead-register-filters",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 1440,
+  "screen": "hub",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 1440,
+  "screen": "lead-funnel",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 1440,
+  "screen": "lead-register",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 1440,
+  "screen": "source-performance",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 1440,
+  "screen": "follow-ups",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 1440,
+  "screen": "visit-register",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 1440,
+  "screen": "visit-conversion",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 1440,
+  "screen": "lost-leads",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 1440,
+  "screen": "response-time",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 1440,
+  "screen": "team-pipeline",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 1440,
+  "screen": "lead-ageing",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 1440,
+  "screen": "service-sla",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 1440,
+  "screen": "lead-register-filters",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 390,
+  "screen": "hub",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 390,
+  "screen": "lead-funnel",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 390,
+  "screen": "lead-register",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 390,
+  "screen": "source-performance",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 390,
+  "screen": "follow-ups",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 390,
+  "screen": "visit-register",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 390,
+  "screen": "visit-conversion",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 390,
+  "screen": "lost-leads",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 390,
+  "screen": "response-time",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 390,
+  "screen": "team-pipeline",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 390,
+  "screen": "lead-ageing",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 390,
+  "screen": "service-sla",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 390,
+  "screen": "lead-register-filters",
+  "h_overflow_px": 0
+ }
+]

@@ -1,0 +1,128 @@
+[build] PUBLIC_URL=/ REACT_APP_BASE_PATH=/
+(node:48722) [DEP0176] DeprecationWarning: fs.F_OK is deprecated, use fs.constants.F_OK instead
+(Use `node --trace-deprecation ...` to show where the warning was created)
+Creating an optimized production build...
+Compiled successfully.
+
+File sizes after gzip:
+
+  138.2 kB   build/static/js/8316.5d32f6b1.chunk.js
+  115.53 kB  build/static/js/main.7410e440.js
+  110.56 kB  build/static/js/8277.79881ad4.chunk.js
+  35.27 kB   build/static/js/8354.8963f90b.chunk.js
+  25.78 kB   build/static/js/9639.f1427c2e.chunk.js
+  23.18 kB   build/static/css/main.ef37d5f3.css
+  19.35 kB   build/static/js/5634.af28294d.chunk.js
+  18.81 kB   build/static/js/5327.1b2902a8.chunk.js
+  16.4 kB    build/static/js/9325.05c8fc20.chunk.js
+  16.36 kB   build/static/js/5227.8043b316.chunk.js
+  16.3 kB    build/static/js/8838.a2bc79d1.chunk.js
+  15.61 kB   build/static/js/7968.9c023fd5.chunk.js
+  14.67 kB   build/static/js/3768.183c224c.chunk.js
+  14.29 kB   build/static/js/8707.dba1f20c.chunk.js
+  13.45 kB   build/static/js/7893.3a3e319f.chunk.js
+  13.39 kB   build/static/js/1581.8562d1d0.chunk.js
+  13.38 kB   build/static/js/132.d9b8960c.chunk.js
+  13.24 kB   build/static/js/9018.6be1d6e7.chunk.js
+  12.27 kB   build/static/js/9506.d896abd0.chunk.js
+  11.96 kB   build/static/js/8965.b3ea9edf.chunk.js
+  11.7 kB    build/static/js/859.e7f2ad7f.chunk.js
+  11.7 kB    build/static/js/3814.4a3e0721.chunk.js
+  11.56 kB   build/static/js/5163.c6e40108.chunk.js
+  11.42 kB   build/static/js/7812.36c7e9ed.chunk.js
+  11.38 kB   build/static/js/4921.ee2d346b.chunk.js
+  11.08 kB   build/static/js/11.046547b9.chunk.js
+  10.37 kB   build/static/js/7268.9cbc0fd0.chunk.js
+  9.05 kB    build/static/js/7577.36fa1eb0.chunk.js
+  8.91 kB    build/static/js/4406.12a05524.chunk.js
+  8.74 kB    build/static/js/1257.2dd45b4b.chunk.js
+  8.59 kB    build/static/js/7667.89a14355.chunk.js
+  8.4 kB     build/static/js/8867.41c9f6f4.chunk.js
+  8.29 kB    build/static/js/1735.aae7c124.chunk.js
+  8.19 kB    build/static/js/1552.0ff5cf6a.chunk.js
+  8.17 kB    build/static/js/1062.77274056.chunk.js
+  8.12 kB    build/static/js/4116.1f6ef322.chunk.js
+  7.9 kB     build/static/js/3760.346c18cb.chunk.js
+  7.83 kB    build/static/js/5573.399561a3.chunk.js
+  7.82 kB    build/static/js/6068.b300e59f.chunk.js
+  7.4 kB     build/static/js/3077.12172ab2.chunk.js
+  7.33 kB    build/static/js/2937.62057097.chunk.js
+  7.22 kB    build/static/js/8884.9e9e5e46.chunk.js
+  7.17 kB    build/static/js/8375.c7b63d54.chunk.js
+  7.17 kB    build/static/js/756.97afe8fe.chunk.js
+  7.09 kB    build/static/js/7458.b1b2ec38.chunk.js
+  6.98 kB    build/static/js/846.f5c03513.chunk.js
+  6.82 kB    build/static/js/5603.d1a3be4a.chunk.js
+  6.78 kB    build/static/js/7866.7664d925.chunk.js
+  6.74 kB    build/static/js/4532.7dddb868.chunk.js
+  6.68 kB    build/static/js/5186.bd924ecb.chunk.js
+  6.59 kB    build/static/js/6209.2f16b9ac.chunk.js
+  6.52 kB    build/static/js/5346.2fc628f3.chunk.js
+  6.48 kB    build/static/js/7277.b9230f71.chunk.js
+  6.22 kB    build/static/js/7071.5c59e94f.chunk.js
+  6.08 kB    build/static/js/935.dc965c7c.chunk.js
+  6.05 kB    build/static/js/3666.c2e6b4bb.chunk.js
+  5.97 kB    build/static/js/7115.50b6da6e.chunk.js
+  5.92 kB    build/static/js/2369.b080d941.chunk.js
+  5.75 kB    build/static/js/5878.c4068c5e.chunk.js
+  5.75 kB    build/static/js/1965.71c3c82b.chunk.js
+  5.72 kB    build/static/js/371.bf164fc2.chunk.js
+  5.6 kB     build/static/js/1240.a0cde50f.chunk.js
+  5.52 kB    build/static/js/3788.5e1d4e97.chunk.js
+  5.23 kB    build/static/js/6059.55362691.chunk.js
+  5.2 kB     build/static/js/200.1c162b63.chunk.js
+  5.12 kB    build/static/js/5640.e49afb54.chunk.js
+  5 kB       build/static/js/995.72dc21fa.chunk.js
+  4.97 kB    build/static/js/4768.6814bbf2.chunk.js
+  4.85 kB    build/static/js/8173.ae41f3f1.chunk.js
+  4.77 kB    build/static/js/1069.c6bede35.chunk.js
+  4.25 kB    build/static/js/6277.39e791a4.chunk.js
+  4.1 kB     build/static/js/8382.14ea26eb.chunk.js
+  3.85 kB    build/static/js/2333.f5ff6fa8.chunk.js
+  3.45 kB    build/static/js/382.ddb05554.chunk.js
+  3.42 kB    build/static/js/6150.84e60485.chunk.js
+  3.34 kB    build/static/js/6110.b2203a9e.chunk.js
+  3.11 kB    build/static/js/8381.c3fa874b.chunk.js
+  2.99 kB    build/static/js/4637.4b6858fb.chunk.js
+  2.96 kB    build/static/js/3689.f36db49f.chunk.js
+  2.94 kB    build/static/js/8306.842b882f.chunk.js
+  2.74 kB    build/static/js/6724.981a6be4.chunk.js
+  2.46 kB    build/static/js/6937.77be91e9.chunk.js
+  2.14 kB    build/static/js/6196.1cf46bb9.chunk.js
+  1.97 kB    build/static/js/610.e223b83f.chunk.js
+  1.78 kB    build/static/js/8229.c6da21dc.chunk.js
+  1.71 kB    build/static/js/9131.91023e67.chunk.js
+  1.65 kB    build/static/js/7817.89fde025.chunk.js
+  1.62 kB    build/static/js/2519.93c98f66.chunk.js
+  1.53 kB    build/static/js/1675.2ae2c15f.chunk.js
+  1.49 kB    build/static/js/1706.5ea5a483.chunk.js
+  1.47 kB    build/static/js/6620.01c31476.chunk.js
+  1.34 kB    build/static/js/5317.44b0648d.chunk.js
+  1.31 kB    build/static/js/1539.b5bc4404.chunk.js
+  1.27 kB    build/static/js/279.6a81c0f8.chunk.js
+  1.16 kB    build/static/js/9590.8ff68b58.chunk.js
+  922 B      build/static/js/2452.1c90167d.chunk.js
+  921 B      build/static/js/71.2026be01.chunk.js
+  708 B      build/static/js/7617.69aa5665.chunk.js
+  644 B      build/static/js/1568.f5fc548a.chunk.js
+  589 B      build/static/js/5079.9f35adb2.chunk.js
+  589 B      build/static/js/317.4fe445f2.chunk.js
+  588 B      build/static/js/7460.81e2d9b3.chunk.js
+  481 B      build/static/js/3772.e4376bc9.chunk.js
+  448 B      build/static/js/9219.780fc4e6.chunk.js
+
+The project was built assuming it is hosted at /.
+You can control this with the homepage field in your package.json.
+
+The build folder is ready to be deployed.
+You may serve it with a static server:
+
+  yarn global add serve
+  serve -s build
+
+Find out more about deployment here:
+
+  https://cra.link/deployment
+
+[build] ok: build/index.html + static/
+BUILD 0

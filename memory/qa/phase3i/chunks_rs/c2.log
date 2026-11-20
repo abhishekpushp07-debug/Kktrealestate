@@ -1,0 +1,272 @@
+COMMIT ceeac3b files: tests/test_locality_pincodes.py tests/test_master_links_resolve.py tests/test_memory_scale.py tests/test_no_dynamic_exec.py tests/test_no_hardcoded_credentials.py tests/test_notify_retract_soft.py tests/test_oc_parts_ageing.py tests/test_one_outstanding.py tests/test_openapi_snapshot.py tests/test_ops.py tests/test_owner_bootstrap.py tests/test_pagination_lossless.py tests/test_permission_matrix.py tests/test_phase3_booking_page.py
+============================= test session starts ==============================
+platform linux -- Python 3.11.18, pytest-9.1.1, pluggy-1.7.0 -- /root/.venv/bin/python
+rootdir: /app/backend
+configfile: pytest.ini
+plugins: locust-2.47.0, platformdirs-4.13.5, asyncio-1.4.0, anyio-4.15.1, xdist-3.8.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+created: 2/2 workers
+2 workers [123 items]
+
+scheduling tests via LoadScopeScheduling
+
+tests/test_oc_parts_ageing.py::test_days_to_pay_is_the_instalment_rule 
+tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[1-/bookings] 
+[gw1] [  0%] PASSED tests/test_oc_parts_ageing.py::test_days_to_pay_is_the_instalment_rule 
+tests/test_oc_parts_ageing.py::test_each_part_ages_from_its_own_due_date_late_booking_back_billed 
+[gw1] [  1%] PASSED tests/test_oc_parts_ageing.py::test_each_part_ages_from_its_own_due_date_late_booking_back_billed 
+tests/test_oc_parts_ageing.py::test_not_due_through_due_on_then_overdue_next_india_day 
+[gw1] [  2%] PASSED tests/test_oc_parts_ageing.py::test_not_due_through_due_on_then_overdue_next_india_day 
+tests/test_oc_parts_ageing.py::test_india_day_boundary_0030_and_2359_ist 
+[gw1] [  3%] PASSED tests/test_oc_parts_ageing.py::test_india_day_boundary_0030_and_2359_ist 
+tests/test_oc_parts_ageing.py::test_partial_payment_settles_oldest_part_first 
+[gw1] [  4%] PASSED tests/test_oc_parts_ageing.py::test_partial_payment_settles_oldest_part_first 
+tests/test_oc_parts_ageing.py::test_bounce_charge_is_its_own_part 
+[gw1] [  4%] PASSED tests/test_oc_parts_ageing.py::test_bounce_charge_is_its_own_part 
+tests/test_oc_parts_ageing.py::test_setting_change_never_moves_an_old_due_date 
+[gw1] [  5%] PASSED tests/test_oc_parts_ageing.py::test_setting_change_never_moves_an_old_due_date 
+tests/test_oc_parts_ageing.py::test_unmigrated_line_ages_from_first_billed_date 
+[gw1] [  6%] PASSED tests/test_oc_parts_ageing.py::test_unmigrated_line_ages_from_first_billed_date 
+tests/test_oc_parts_ageing.py::test_stage_part_due_equals_its_stage_bill_due 
+[gw1] [  7%] PASSED tests/test_oc_parts_ageing.py::test_stage_part_due_equals_its_stage_bill_due 
+tests/test_oc_parts_ageing.py::test_back_billed_stage_part_keeps_its_bill_day_apart_from_posting_time 
+[gw1] [  8%] PASSED tests/test_oc_parts_ageing.py::test_back_billed_stage_part_keeps_its_bill_day_apart_from_posting_time 
+tests/test_oc_parts_ageing.py::test_bill_part_defaults_bill_day_to_the_india_posting_day 
+[gw1] [  8%] PASSED tests/test_oc_parts_ageing.py::test_bill_part_defaults_bill_day_to_the_india_posting_day 
+tests/test_oc_parts_ageing.py::test_part_rows_for_display_pay_oldest_first_and_age_from_own_due 
+[gw1] [  9%] PASSED tests/test_oc_parts_ageing.py::test_part_rows_for_display_pay_oldest_first_and_age_from_own_due 
+tests/test_permission_matrix.py::test_every_non_public_route_is_guarded 
+[gw1] [ 10%] PASSED tests/test_permission_matrix.py::test_every_non_public_route_is_guarded 
+tests/test_permission_matrix.py::test_matrix_file_matches_runtime 
+[gw1] [ 11%] PASSED tests/test_permission_matrix.py::test_matrix_file_matches_runtime 
+tests/test_permission_matrix.py::test_anonymous_and_portal_tokens_rejected_everywhere[anonymous] 
+[gw1] [ 12%] PASSED tests/test_permission_matrix.py::test_anonymous_and_portal_tokens_rejected_everywhere[anonymous] 
+tests/test_permission_matrix.py::test_anonymous_and_portal_tokens_rejected_everywhere[portal] 
+[gw0] [ 13%] PASSED tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[1-/bookings] 
+tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[1-/customers] 
+[gw1] [ 13%] PASSED tests/test_permission_matrix.py::test_anonymous_and_portal_tokens_rejected_everywhere[portal] 
+tests/test_permission_matrix.py::test_roles_denied_where_permission_missing[Sales] 
+[gw1] [ 14%] PASSED tests/test_permission_matrix.py::test_roles_denied_where_permission_missing[Sales] 
+tests/test_permission_matrix.py::test_roles_denied_where_permission_missing[Accounts] 
+[gw1] [ 15%] PASSED tests/test_permission_matrix.py::test_roles_denied_where_permission_missing[Accounts] 
+tests/test_permission_matrix.py::test_roles_denied_where_permission_missing[Employee] 
+[gw0] [ 16%] PASSED tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[1-/customers] 
+tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[1-/payments] 
+[gw1] [ 17%] PASSED tests/test_permission_matrix.py::test_roles_denied_where_permission_missing[Employee] 
+tests/test_master_links_resolve.py::test_master_page_has_no_fallback_config 
+[gw1] [ 17%] PASSED tests/test_master_links_resolve.py::test_master_page_has_no_fallback_config 
+tests/test_master_links_resolve.py::test_every_config_kind_is_a_backend_master_and_unique 
+[gw1] [ 18%] PASSED tests/test_master_links_resolve.py::test_every_config_kind_is_a_backend_master_and_unique 
+tests/test_master_links_resolve.py::test_every_hub_and_advanced_link_resolves_to_its_own_page 
+[gw1] [ 19%] PASSED tests/test_master_links_resolve.py::test_every_hub_and_advanced_link_resolves_to_its_own_page 
+tests/test_master_links_resolve.py::test_hold_reasons_and_allocation_categories_have_their_own_config 
+[gw1] [ 20%] PASSED tests/test_master_links_resolve.py::test_hold_reasons_and_allocation_categories_have_their_own_config 
+tests/test_master_links_resolve.py::test_every_literal_masters_m_link_in_the_app_has_a_config 
+[gw1] [ 21%] PASSED tests/test_master_links_resolve.py::test_every_literal_masters_m_link_in_the_app_has_a_config 
+tests/test_owner_bootstrap.py::test_owner_login_super_admin 
+[gw1] [ 21%] PASSED tests/test_owner_bootstrap.py::test_owner_login_super_admin 
+tests/test_owner_bootstrap.py::test_demo_login_refused_on_production_host 
+[gw1] [ 22%] PASSED tests/test_owner_bootstrap.py::test_demo_login_refused_on_production_host 
+tests/test_owner_bootstrap.py::test_demo_login_allowed_on_preview_host 
+[gw1] [ 23%] PASSED tests/test_owner_bootstrap.py::test_demo_login_allowed_on_preview_host 
+tests/test_owner_bootstrap.py::test_login_options_follow_host 
+[gw1] [ 24%] PASSED tests/test_owner_bootstrap.py::test_login_options_follow_host 
+tests/test_owner_bootstrap.py::test_owner_not_in_test_credentials_file 
+[gw1] [ 25%] PASSED tests/test_owner_bootstrap.py::test_owner_not_in_test_credentials_file 
+tests/test_phase3_booking_page.py::test_actions_endpoint_reasons_match_the_handlers 
+[gw1] [ 26%] PASSED tests/test_phase3_booking_page.py::test_actions_endpoint_reasons_match_the_handlers 
+tests/test_phase3_booking_page.py::test_one_total_and_one_balance_header_overview_ledger 
+[gw1] [ 26%] PASSED tests/test_phase3_booking_page.py::test_one_total_and_one_balance_header_overview_ledger 
+tests/test_phase3_booking_page.py::test_customer_activity_shows_each_receipt_once 
+[gw1] [ 27%] PASSED tests/test_phase3_booking_page.py::test_customer_activity_shows_each_receipt_once 
+tests/test_phase3_booking_page.py::test_typed_lead_source_and_save_to_master_offer 
+[gw1] [ 28%] PASSED tests/test_phase3_booking_page.py::test_typed_lead_source_and_save_to_master_offer 
+tests/test_one_outstanding.py::test_home_ageing_equals_outstanding_report_per_band 
+[gw0] [ 29%] PASSED tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[1-/payments] 
+tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[1-/payments/demands] 
+[gw1] [ 30%] PASSED tests/test_one_outstanding.py::test_home_ageing_equals_outstanding_report_per_band 
+tests/test_one_outstanding.py::test_demand_register_reconciles_to_outstanding 
+[gw0] [ 30%] PASSED tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[1-/payments/demands] 
+tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[1-/flats] 
+[gw1] [ 31%] PASSED tests/test_one_outstanding.py::test_demand_register_reconciles_to_outstanding 
+tests/test_one_outstanding.py::test_collections_buckets_net_of_reversals_tie_to_net_received 
+[gw1] [ 32%] PASSED tests/test_one_outstanding.py::test_collections_buckets_net_of_reversals_tie_to_net_received 
+tests/test_locality_pincodes.py::test_seeded_localities_have_pincode 
+[gw1] [ 33%] PASSED tests/test_locality_pincodes.py::test_seeded_localities_have_pincode 
+tests/test_locality_pincodes.py::test_pincode_format 
+[gw1] [ 34%] PASSED tests/test_locality_pincodes.py::test_pincode_format 
+tests/test_no_hardcoded_credentials.py::test_demo_password_not_in_source 
+[gw1] [ 34%] PASSED tests/test_no_hardcoded_credentials.py::test_demo_password_not_in_source 
+tests/test_no_hardcoded_credentials.py::test_env_has_demo_and_test_password 
+[gw1] [ 35%] PASSED tests/test_no_hardcoded_credentials.py::test_env_has_demo_and_test_password 
+tests/test_notify_retract_soft.py::test_retract_is_soft_and_hidden 
+[gw1] [ 36%] PASSED tests/test_notify_retract_soft.py::test_retract_is_soft_and_hidden 
+tests/test_notify_retract_soft.py::test_module_has_no_hard_deletes 
+[gw1] [ 37%] PASSED tests/test_notify_retract_soft.py::test_module_has_no_hard_deletes 
+tests/test_openapi_snapshot.py::test_snapshot_exists_and_not_stale 
+[gw1] [ 38%] PASSED tests/test_openapi_snapshot.py::test_snapshot_exists_and_not_stale 
+tests/test_openapi_snapshot.py::test_breaking_diff_detects_removed_path_and_type_change 
+[gw1] [ 39%] PASSED tests/test_openapi_snapshot.py::test_breaking_diff_detects_removed_path_and_type_change 
+tests/test_ops.py::test_ops_snapshot_shape 
+[gw1] [ 39%] PASSED tests/test_ops.py::test_ops_snapshot_shape 
+tests/test_ops.py::test_ops_requires_settings_manage 
+[gw1] [ 40%] PASSED tests/test_ops.py::test_ops_requires_settings_manage 
+tests/test_memory_scale.py::test_idle_rss_on_kkt_scale_under_limit 
+[gw1] [ 41%] SKIPPED tests/test_memory_scale.py::test_idle_rss_on_kkt_scale_under_limit 
+tests/test_no_dynamic_exec.py::test_no_eval_exec_in_backend 
+[gw1] [ 42%] PASSED tests/test_no_dynamic_exec.py::test_no_eval_exec_in_backend 
+[gw0] [ 43%] PASSED tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[1-/flats] 
+tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[1-/leads] 
+[gw0] [ 43%] PASSED tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[1-/leads] 
+tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[1-/site-visits] 
+[gw0] [ 44%] PASSED tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[1-/site-visits] 
+tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[1-/service-requests] 
+[gw0] [ 45%] PASSED tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[1-/service-requests] 
+tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[1-/users] 
+[gw0] [ 46%] PASSED tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[1-/users] 
+tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[1-/audit-logs] 
+[gw0] [ 47%] PASSED tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[1-/audit-logs] 
+tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[1-/refunds] 
+[gw0] [ 47%] PASSED tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[1-/refunds] 
+tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[1-/blocks] 
+[gw0] [ 48%] PASSED tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[1-/blocks] 
+tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[1-/projects] 
+[gw0] [ 49%] PASSED tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[1-/projects] 
+tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[1-/parking] 
+[gw0] [ 50%] PASSED tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[1-/parking] 
+tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[7-/bookings] 
+[gw0] [ 51%] PASSED tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[7-/bookings] 
+tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[7-/customers] 
+[gw0] [ 52%] PASSED tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[7-/customers] 
+tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[7-/payments] 
+[gw0] [ 52%] PASSED tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[7-/payments] 
+tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[7-/payments/demands] 
+[gw0] [ 53%] PASSED tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[7-/payments/demands] 
+tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[7-/flats] 
+[gw0] [ 54%] PASSED tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[7-/flats] 
+tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[7-/leads] 
+[gw0] [ 55%] PASSED tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[7-/leads] 
+tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[7-/site-visits] 
+[gw0] [ 56%] PASSED tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[7-/site-visits] 
+tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[7-/service-requests] 
+[gw0] [ 56%] PASSED tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[7-/service-requests] 
+tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[7-/users] 
+[gw0] [ 57%] PASSED tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[7-/users] 
+tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[7-/audit-logs] 
+[gw0] [ 58%] PASSED tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[7-/audit-logs] 
+tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[7-/refunds] 
+[gw0] [ 59%] PASSED tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[7-/refunds] 
+tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[7-/blocks] 
+[gw0] [ 60%] PASSED tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[7-/blocks] 
+tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[7-/projects] 
+[gw0] [ 60%] PASSED tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[7-/projects] 
+tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[7-/parking] 
+[gw0] [ 61%] PASSED tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[7-/parking] 
+tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[20-/bookings] 
+[gw0] [ 62%] PASSED tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[20-/bookings] 
+tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[20-/customers] 
+[gw0] [ 63%] PASSED tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[20-/customers] 
+tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[20-/payments] 
+[gw0] [ 64%] PASSED tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[20-/payments] 
+tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[20-/payments/demands] 
+[gw0] [ 65%] PASSED tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[20-/payments/demands] 
+tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[20-/flats] 
+[gw0] [ 65%] PASSED tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[20-/flats] 
+tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[20-/leads] 
+[gw0] [ 66%] PASSED tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[20-/leads] 
+tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[20-/site-visits] 
+[gw0] [ 67%] PASSED tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[20-/site-visits] 
+tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[20-/service-requests] 
+[gw0] [ 68%] PASSED tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[20-/service-requests] 
+tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[20-/users] 
+[gw0] [ 69%] PASSED tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[20-/users] 
+tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[20-/audit-logs] 
+[gw0] [ 69%] PASSED tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[20-/audit-logs] 
+tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[20-/refunds] 
+[gw0] [ 70%] PASSED tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[20-/refunds] 
+tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[20-/blocks] 
+[gw0] [ 71%] PASSED tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[20-/blocks] 
+tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[20-/projects] 
+[gw0] [ 72%] PASSED tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[20-/projects] 
+tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[20-/parking] 
+[gw0] [ 73%] PASSED tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[20-/parking] 
+tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[100-/bookings] 
+[gw0] [ 73%] PASSED tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[100-/bookings] 
+tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[100-/customers] 
+[gw0] [ 74%] PASSED tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[100-/customers] 
+tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[100-/payments] 
+[gw0] [ 75%] PASSED tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[100-/payments] 
+tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[100-/payments/demands] 
+[gw0] [ 76%] PASSED tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[100-/payments/demands] 
+tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[100-/flats] 
+[gw0] [ 77%] PASSED tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[100-/flats] 
+tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[100-/leads] 
+[gw0] [ 78%] PASSED tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[100-/leads] 
+tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[100-/site-visits] 
+[gw0] [ 78%] PASSED tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[100-/site-visits] 
+tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[100-/service-requests] 
+[gw0] [ 79%] PASSED tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[100-/service-requests] 
+tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[100-/users] 
+[gw0] [ 80%] PASSED tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[100-/users] 
+tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[100-/audit-logs] 
+[gw0] [ 81%] PASSED tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[100-/audit-logs] 
+tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[100-/refunds] 
+[gw0] [ 82%] PASSED tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[100-/refunds] 
+tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[100-/blocks] 
+[gw0] [ 82%] PASSED tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[100-/blocks] 
+tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[100-/projects] 
+[gw0] [ 83%] PASSED tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[100-/projects] 
+tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[100-/parking] 
+[gw0] [ 84%] PASSED tests/test_pagination_lossless.py::test_cursor_walk_is_lossless[100-/parking] 
+tests/test_pagination_lossless.py::test_bookings_sorted_walk_is_lossless[1-created_at] 
+[gw0] [ 85%] PASSED tests/test_pagination_lossless.py::test_bookings_sorted_walk_is_lossless[1-created_at] 
+tests/test_pagination_lossless.py::test_bookings_sorted_walk_is_lossless[1--created_at] 
+[gw0] [ 86%] PASSED tests/test_pagination_lossless.py::test_bookings_sorted_walk_is_lossless[1--created_at] 
+tests/test_pagination_lossless.py::test_bookings_sorted_walk_is_lossless[1-name] 
+[gw0] [ 86%] PASSED tests/test_pagination_lossless.py::test_bookings_sorted_walk_is_lossless[1-name] 
+tests/test_pagination_lossless.py::test_bookings_sorted_walk_is_lossless[1--booking_date] 
+[gw0] [ 87%] PASSED tests/test_pagination_lossless.py::test_bookings_sorted_walk_is_lossless[1--booking_date] 
+tests/test_pagination_lossless.py::test_bookings_sorted_walk_is_lossless[1-booking_date] 
+[gw0] [ 88%] PASSED tests/test_pagination_lossless.py::test_bookings_sorted_walk_is_lossless[1-booking_date] 
+tests/test_pagination_lossless.py::test_bookings_sorted_walk_is_lossless[7-created_at] 
+[gw0] [ 89%] PASSED tests/test_pagination_lossless.py::test_bookings_sorted_walk_is_lossless[7-created_at] 
+tests/test_pagination_lossless.py::test_bookings_sorted_walk_is_lossless[7--created_at] 
+[gw0] [ 90%] PASSED tests/test_pagination_lossless.py::test_bookings_sorted_walk_is_lossless[7--created_at] 
+tests/test_pagination_lossless.py::test_bookings_sorted_walk_is_lossless[7-name] 
+[gw0] [ 91%] PASSED tests/test_pagination_lossless.py::test_bookings_sorted_walk_is_lossless[7-name] 
+tests/test_pagination_lossless.py::test_bookings_sorted_walk_is_lossless[7--booking_date] 
+[gw0] [ 91%] PASSED tests/test_pagination_lossless.py::test_bookings_sorted_walk_is_lossless[7--booking_date] 
+tests/test_pagination_lossless.py::test_bookings_sorted_walk_is_lossless[7-booking_date] 
+[gw0] [ 92%] PASSED tests/test_pagination_lossless.py::test_bookings_sorted_walk_is_lossless[7-booking_date] 
+tests/test_pagination_lossless.py::test_bookings_sorted_walk_is_lossless[20-created_at] 
+[gw0] [ 93%] PASSED tests/test_pagination_lossless.py::test_bookings_sorted_walk_is_lossless[20-created_at] 
+tests/test_pagination_lossless.py::test_bookings_sorted_walk_is_lossless[20--created_at] 
+[gw0] [ 94%] PASSED tests/test_pagination_lossless.py::test_bookings_sorted_walk_is_lossless[20--created_at] 
+tests/test_pagination_lossless.py::test_bookings_sorted_walk_is_lossless[20-name] 
+[gw0] [ 95%] PASSED tests/test_pagination_lossless.py::test_bookings_sorted_walk_is_lossless[20-name] 
+tests/test_pagination_lossless.py::test_bookings_sorted_walk_is_lossless[20--booking_date] 
+[gw0] [ 95%] PASSED tests/test_pagination_lossless.py::test_bookings_sorted_walk_is_lossless[20--booking_date] 
+tests/test_pagination_lossless.py::test_bookings_sorted_walk_is_lossless[20-booking_date] 
+[gw0] [ 96%] PASSED tests/test_pagination_lossless.py::test_bookings_sorted_walk_is_lossless[20-booking_date] 
+tests/test_pagination_lossless.py::test_filtered_walk_is_lossless[1] 
+[gw0] [ 97%] PASSED tests/test_pagination_lossless.py::test_filtered_walk_is_lossless[1] 
+tests/test_pagination_lossless.py::test_filtered_walk_is_lossless[7] 
+[gw0] [ 98%] PASSED tests/test_pagination_lossless.py::test_filtered_walk_is_lossless[7] 
+tests/test_pagination_lossless.py::test_page_mode_cursor_hands_off_to_keyset 
+[gw0] [ 99%] PASSED tests/test_pagination_lossless.py::test_page_mode_cursor_hands_off_to_keyset 
+tests/test_pagination_lossless.py::test_max_cursor_page_size_is_documented 
+[gw0] [100%] PASSED tests/test_pagination_lossless.py::test_max_cursor_page_size_is_documented 
+
+=============================== warnings summary ===============================
+../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
+../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
+  /root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12: PendingDeprecationWarning: Please use `import python_multipart` instead.
+    import multipart
+
+../../root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854
+../../root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854
+  /root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854: DeprecationWarning: 'crypt' is deprecated and slated for removal in Python 3.13
+    from crypt import crypt as _crypt
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================= 122 passed, 1 skipped, 4 warnings in 47.27s ==================

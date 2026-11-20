@@ -1,0 +1,220 @@
+PASS [collections-v2] net Jama (receipt basis, all time) == Σ cleared receipts               report=37944905100 raw=37944905100
+PASS [collections-v2] net Jama == Σ ledger Jama rows (receipts + reversals)                  report=37944905100 raw=37944905100
+PASS [collections-v2] FY total (cleared basis) == raw payments by cleared date               report=17507743500 raw=17507743500
+PASS [collections-v2] basis label present (cleared)                                          report=Date basis: cleared raw=Date basis: cleared
+PASS [collections-v2] FY total (receipt basis) == raw payments by receipt date               report=17507743500 raw=17507743500
+PASS [collections-v2] basis label present (receipt)                                          report=Date basis: receipt raw=Date basis: receipt
+PASS [collections-v2] FY total (clearance basis) == raw payments by clearance date           report=17507743500 raw=17507743500
+PASS [collections-v2] basis label present (clearance)                                        report=Date basis: clearance raw=Date basis: clearance
+PASS [collections-v2] cleared basis == legacy collections (both: cheque on its clearing day) report=17507743500 raw=17507743500
+PASS [collections-v2] Σ by project == total (total_paise)                                    report=37944905100 raw=37944905100
+PASS [collections-v2] Σ by block == total (total_paise)                                      report=37944905100 raw=37944905100
+PASS [collections-v2] Σ by bucket == total (total_paise)                                     report=37944905100 raw=37944905100
+PASS [collections-v2] Σ by mode == total (total_paise)                                       report=37944905100 raw=37944905100
+PASS [collections-v2] Σ by bank == total (total_paise)                                       report=37944905100 raw=37944905100
+PASS [collections-v2] Σ by rm == total (total_paise)                                         report=37944905100 raw=37944905100
+PASS [collections-v2] Σ by day == total (total_paise)                                        report=37944905100 raw=37944905100
+PASS [outstanding-v2] outstanding == Σ definitions.outstanding(summary)                      report=4500981200 raw=4500981200
+PASS [outstanding-v2] advance held == Σ definitions.advance                                  report=73622600 raw=73622600
+PASS [outstanding-v2] net == outstanding − advance == Σ Udhar − Σ Jama (received + waived)   report=(4427358600, 4427358600) raw=(4427358600, 4427358600)
+PASS [outstanding-v2] per booking: report net == ledger net == summary net; report outstanding == summary outstanding report=[] raw=[]
+PASS [outstanding-v2] outstanding == Home outstanding tile                                   report=4500981200 raw=4500981200
+PASS [outstanding-v2] bands Σ == outstanding                                                 report=4500981200 raw=4500981200
+PASS [outstanding-v2] report bands == Σ definitions.ageing_bands                             report={'Not due': 2385916200, '0-30' raw={'Not due': 2385916200, '0-30'
+PASS [outstanding-v2] Σ by customer == total (outstanding_paise)                             report=4500981200 raw=4500981200
+PASS [outstanding-v2] Σ by customer == total (net_balance_paise)                             report=4427358600 raw=4427358600
+PASS [outstanding-v2] Σ by project == total (outstanding_paise)                              report=4500981200 raw=4500981200
+PASS [outstanding-v2] Σ by project == total (net_balance_paise)                              report=4427358600 raw=4427358600
+PASS [outstanding-v2] Σ by block == total (outstanding_paise)                                report=4500981200 raw=4500981200
+PASS [outstanding-v2] Σ by block == total (net_balance_paise)                                report=4427358600 raw=4427358600
+PASS [demand-vs-collection] demanded == Σ non-void demands on live bookings + transfer / revision adjustments report=38016979500 raw=38016979500
+PASS [demand-vs-collection] collected == Σ demand.paid (live bookings)                             report=34043750300 raw=34043750300
+PASS [demand-vs-collection] Include cancelled − default == bridge line Cancelled bookings          report=232840000 raw=232840000
+PASS [cash-vs-account] cash raised == Σ summary.cash_order_raised                             report=16358874700 raw=16358874700
+PASS [cash-vs-account] account received == Σ summary.account_paid                             report=19761301500 raw=19761301500
+PASS [cash-vs-account] cash agreed == Σ booking.cash_agreed                                   report=23689818500 raw=23689818500
+PASS [cash-vs-account] Σ by project == total (cash_balance_paise)                             report=2063084700 raw=2063084700
+PASS [cash-vs-account] Σ by block == total (cash_balance_paise)                               report=2063084700 raw=2063084700
+PASS [cheques] rows == cheque/DD payments                                             report=144 raw=144
+PASS [cheques] amount == Σ instrument amounts                                         report=5329442800 raw=5329442800
+PASS [receivables-forecast] Σ forecast + Σ raised == Σ agreement (live bookings)                   report=50630770000 raw=50630770000
+PASS [receivables-forecast] per booking: forecast == agreement − raised                            report=0 raw=0
+PASS [receivables-forecast] Σ by project == total (expected_paise)                                 report=12613790500 raw=12613790500
+PASS [receivables-forecast] Σ by block == total (expected_paise)                                   report=12613790500 raw=12613790500
+PASS [receivables-forecast] Σ by booking == total (expected_paise)                                 report=12613790500 raw=12613790500
+PASS [receivables-forecast] Σ by stage == total (expected_paise)                                   report=12613790500 raw=12613790500
+PASS [receivables-forecast] Σ by month == total (expected_paise)                                   report=12613790500 raw=12613790500
+PASS [receivables-forecast] default grouping is tower → stage when no planned dates                report=True raw=True
+PASS [receivables-forecast] stage grouping: one row per tower·stage, Σ == total                    report=12613790500 raw=12613790500
+PASS [cancellations] rows == Cancelled bookings                                             report=2 raw=2
+PASS [cancellations] refund paid == Σ paid refunds                                          report=42289200 raw=42289200
+PASS [cancellations] ledger REFUND rows == Σ paid refunds                                   report=42289200 raw=42289200
+PASS [bank-receipts] cleared == Σ non-cash receipts received (cleared day) in range         report=28915419300 raw=28915419300
+PASS [bank-receipts] cheques in hand == Σ receipts in hand at range end                     report=4000000 raw=4000000
+PASS [bank-receipts] Bank-wise + Cash == Collections (one identity, to the paisa)           report=37944905100 raw=37944905100
+PASS [other-charges] demanded == Σ other_charges.demanded                                   report=4266533200 raw=4266533200
+PASS [other-charges] collected == Σ other_charges.(paid − waived)                           report=3753885800 raw=3753885800
+PASS [other-charges] collected == Σ Other ledger Jama (OTHER_CHARGE_PAYMENT + Other reversals/refunds) report=3753885800 raw=3753885800
+PASS [other-charges] Σ by project == total (demanded_paise)                                 report=4266533200 raw=4266533200
+PASS [other-charges] Σ by booking == total (demanded_paise)                                 report=4266533200 raw=4266533200
+PASS [roznamcha-summary] cash received == Σ cleared CASH receipts                               report=9029485800 raw=9029485800
+PASS [roznamcha-summary] deposits == Σ contra DEPOSIT                                           report=9095500000 raw=9095500000
+PASS [roznamcha-summary] closing == opening + cash in − deposits + withdrawals − cash refunds   report=-66014200 raw=-66014200
+PASS [roznamcha-summary] Σ by month == range total (cash in)                                    report=9029485800 raw=9029485800
+PASS [roznamcha-summary] monthly closing == daily closing                                       report=-66014200 raw=-66014200
+PASS [inventory] units by status == flats                                               report={'Available': 102, 'Blocked':  raw={'Available': 102, 'Blocked': 
+PASS [inventory] sold value == Σ price of booked/sold flats                             report=50655770000 raw=50655770000
+PASS [sales-leads] leads == leads collection                                              report=123 raw=123
+PASS [sales-leads] converted == Converted leads                                           report=80 raw=80
+PASS [site-visits] visits == site_visits                                                  report=87 raw=87
+PASS [site-visits] completed == Completed visits                                          report=83 raw=83
+PASS [site-visits] Σ by project == total (scheduled)                                      report=87 raw=87
+PASS [site-visits] Σ by month == total (scheduled)                                        report=87 raw=87
+PASS [sales-team] sold value == Σ live agreement values                                  report=50630770000 raw=50630770000
+PASS [sales-team] collections == Σ cleared receipts of live bookings                     report=37853029100 raw=37853029100
+PASS [sales-team] overdue == outstanding report overdue                                  report=2115065000 raw=2115065000
+PASS [construction-vs-plan] stage rows == Σ stages of active towers                                report=46 raw=46
+PASS [construction-vs-plan] stage demands == Σ ON_STAGE/ON_POSSESSION demands                      report=31627242400 raw=31627242400
+PASS [construction-vs-plan] subtotals == Σ their stage rows (demanded)                             report=31627242400 raw=31627242400
+PASS [construction-vs-plan] no tower name with leading/trailing space                              report=[] raw=[]
+PASS [construction-vs-plan] GET /payments/demands honours block_id                                 report=[] raw=[]
+PASS [service-sla] tickets == service_requests                                            report=14 raw=14
+PASS [activity] audit actions == audit_logs (live log)                                 report=189499 raw=189499
+PASS [data-quality] open demands on cancelled bookings == 0 (integrity)                    report=0 raw=0
+PASS [data-quality] towers without stage plan excludes inactive towers                     report=0 raw=0
+PASS [data-quality] payment plans not summing 100 == 0                                     report=0 raw=0
+PASS [data-quality] integrity report ok                                                    report=True raw=True
+PASS [customer-status] Σ Account dues + Σ Cash dues == instalment outstanding                 report=3988958800 raw=3988958800
+PASS [customer-status] rows == live bookings                                                  report=80 raw=80
+PASS [customer-status] Σ bills raised == Σ Cash + Account order raised                        report=38016979500 raw=38016979500
+PASS [customer-status] formula: raised − received − waived + advance == dues                  report=3988958800 raw=3988958800
+PASS [customer-status] final status kind == customer card, every booking                      report=0 raw=0
+PASS [customer-status] overdue days == customer card, every booking                           report=0 raw=0
+PASS [customer-status] ledger share state today == booking summary (as-of path)               report=0 raw=0
+PASS [customer-status] as of 2026-03-31: instalment net dues == ledger rows dated on / before that day report=1592227100 raw=1592227100
+PASS [customer-status] as of 2026-03-31 instalment net + other-charge net == carried from before at 2026-04-01 report=1940065700 raw=1940065700
+PASS [customer-status] Σ project subtotals == total dues                                      report=3988958800 raw=3988958800
+PASS [customer-status] Σ tower subtotals == project subtotal                                  report=2 raw=2
+PASS [customer-ageing] Σ bands == Σ total due                                                 report=4500981200 raw=4500981200
+PASS [customer-ageing] Σ total due == Σ outstanding (definitions) of live bookings            report=4500981200 raw=4500981200
+PASS [customer-ageing] rows == live bookings with dues                                        report=42 raw=42
+PASS [customer-ageing] Σ total due == Outstanding & ageing report total                       report=4500981200 raw=4500981200
+PASS [customer-status] formula bridge: total due == Overdue & ageing total due                report=4500981200 raw=4500981200
+PASS [advance-holders] Σ advance == Σ booking advance (definitions)                           report=73622600 raw=73622600
+PASS [call-list] Σ due == ageing Σ total due                                            report=4500981200 raw=4500981200
+PASS [call-list] Σ overdue == ageing Σ overdue                                          report=2115065000 raw=2115065000
+PASS [call-list] sorted oldest first                                                    report=True raw=True
+PASS [kyc-pending] agreement pending == live bookings without signed agreement            report=0 raw=0
+PASS [payment-behaviour] customers == customers with live bookings                              report=80 raw=80
+PASS [payment-behaviour] on time ≤ bills due on every row                                       report=True raw=True
+PASS [customer-directory] rows == customers (not deleted)                                        report=82 raw=82
+PASS [cancelled-customers] Σ refund payable == Σ cancellation refund                              report=42289200 raw=42289200
+PASS [cancelled-customers] Σ refund paid == Σ refunds paid on cancelled bookings                  report=42289200 raw=42289200
+PASS [customer-statement] bills − received − waived == Σ last running balance                    report=423135400 raw=423135400
+PASS [customer-statement] Σ bills == Σ booking Udhar                                             report=425760400 raw=425760400
+PASS [collections] new sheet == collections-v2 (group_by=month): 7 money totals           report={'cash_paise': 9438250900, 'ac raw={'cash_paise': 9438250900, 'ac
+PASS [collections] new sheet == collections-v2 (group_by=receipt): 7 money totals         report={'cash_paise': 9438250900, 'ac raw={'cash_paise': 9438250900, 'ac
+PASS [day-book] new sheet == roznamcha-summary (group_by=month): 5 money totals        report={'cash_in_paise': 5834082700,  raw={'cash_in_paise': 5834082700, 
+PASS [day-book] new sheet == roznamcha-summary (group_by=day): 5 money totals          report={'cash_in_paise': 5834082700,  raw={'cash_in_paise': 5834082700, 
+PASS [bank-receipts] new sheet == bank-receipts: 3 money totals                             report={'cleared_paise': 14603078900, raw={'cleared_paise': 14603078900,
+PASS [cheques] new sheet == cheques: 1 money totals                                   report={'amount_paise': 5329442800} raw={'amount_paise': 5329442800}
+PASS [bills-vs-collection] new sheet == demand-vs-collection: 5 money totals                      report={'cash_demand_paise': 16364054 raw={'cash_demand_paise': 16364054
+PASS [outstanding] new sheet == outstanding-v2 (group_by=project): 7 money totals         report={'udhar_paise': 42283512700, ' raw={'udhar_paise': 42283512700, '
+PASS [outstanding] new sheet == outstanding-v2 (group_by=booking): 7 money totals         report={'udhar_paise': 42283512700, ' raw={'udhar_paise': 42283512700, '
+PASS [cash-vs-account] new sheet == cash-vs-account (group_by=project): 8 money totals        report={'cash_agreed_paise': 23689818 raw={'cash_agreed_paise': 23689818
+PASS [cash-vs-account] new sheet == cash-vs-account (group_by=booking): 8 money totals        report={'cash_agreed_paise': 23689818 raw={'cash_agreed_paise': 23689818
+PASS [other-charges] new sheet == other-charges (group_by=charge): 4 money totals           report={'agreed_paise': 5663441200, ' raw={'agreed_paise': 5663441200, '
+PASS [other-charges] new sheet == other-charges (group_by=booking): 4 money totals          report={'agreed_paise': 5663441200, ' raw={'agreed_paise': 5663441200, '
+PASS [receivables-forecast] new sheet == receivables-forecast (group_by=stage): 3 money totals     report={'cash_paise': 7330943775, 'ac raw={'cash_paise': 7330943775, 'ac
+PASS [receivables-forecast] new sheet == receivables-forecast (group_by=booking): 3 money totals   report={'cash_paise': 7330943775, 'ac raw={'cash_paise': 7330943775, 'ac
+PASS [waivers] new sheet == waiver-register: 2 money totals                           report={'amount_paise': 4700000, 'gst raw={'amount_paise': 4700000, 'gst
+PASS [outstanding] filtered by one project == existing report filtered the same way       report=158437200 raw=158437200
+PASS [collections] period 2026-04-01…2026-09-30 == existing report same period            report=15334884400 raw=15334884400
+PASS [booking-register] Σ agreement value (Active + Completed) == bookings collection          report=50630770000 raw=50630770000
+PASS [sales-summary] Σ bookings this FY == booking register (not cancelled) this FY         report=26 raw=26
+PASS [sales-summary] Σ agreement value this FY == booking register this FY                  report=15485610000 raw=15485610000
+PASS [discount-register] Σ discount (all dates) == existing Discount register                   report=28630000 raw=28630000
+PASS [discount-register] Σ discount (all dates) == booking register discount (Active + Completed) report=28630000 raw=28630000
+PASS [plan-position] Σ bills raised == Customer status                                      report=38016979500 raw=38016979500
+PASS [plan-position] Σ received == Customer status Account + Cash received                  report=34099143300 raw=34099143300
+PASS [agreements] signed + pending == live bookings                                      report=80 raw=80
+PASS [agreements] signed == live bookings with an accepted plan                          report=80 raw=80
+PASS [cancellations] Σ refund payable == existing Cancellations report                      report=42289200 raw=42289200
+PASS [cancellations] Σ refund paid == existing Cancellations report                         report=42289200 raw=42289200
+PASS [transfers] changes == transfers + revisions + price events on bookings + plan changes in audit log (bookings that exist) report=7 raw=7
+PASS [sales-team] Σ sold (all dates) == existing Sales team report                       report=50630770000 raw=50630770000
+PASS [sales-team] Σ bookings (all dates) == existing Sales team report                   report=80 raw=80
+PASS [realised-rate] Σ agreement value == Plan & stage position                             report=50630770000 raw=50630770000
+PASS [realised-rate] Σ list − Σ agreement == Σ discount                                     report=28630000 raw=28630000
+PASS [booking-health] Σ overdue == Customer status overdue                                   report=2115065000 raw=2115065000
+PASS [booking-health] Σ total due == Customer status total due                               report=4500981200 raw=4500981200
+PASS [booking-health] healthy + watch + at risk == live bookings                             report=80 raw=80
+PASS [project-statement] SGH Σ bill raised == existing Project statement                        report=29169133100 raw=29169133100
+PASS [project-statement] SGH Σ received == existing Project statement                           report=24897086700 raw=24897086700
+PASS [project-statement] SGH Σ balance signed == existing Project statement                     report=-4268921400 raw=-4268921400
+PASS [inventory-status] Available flats (real layer) == existing Inventory control             report=102 raw=102
+PASS [inventory-status] Hold flats (real layer) == existing Inventory control                  report=3 raw=3
+PASS [inventory-status] Blocked flats (real layer) == existing Inventory control               report=1 raw=1
+PASS [inventory-status] Booked flats (real layer) == existing Inventory control                report=79 raw=79
+PASS [inventory-status] Sold flats (real layer) == existing Inventory control                  report=1 raw=1
+PASS [inventory-status] Available flats for a display-layer viewer == shown-as available in Inventory control report=102 raw=102
+PASS [inventory-status] Hold flats for a display-layer viewer == shown-as hold in Inventory control report=3 raw=3
+PASS [inventory-status] Sold flats for a display-layer viewer == shown-as sold in Inventory control report=81 raw=81
+PASS [inventory-status] display-layer viewer sees no Booked / Blocked                          report=0 raw=0
+PASS [stacking-plan] cells == flats in Inventory status                                     report=186 raw=186
+PASS [price-list] Σ list price of available flats == existing Inventory available value  report=58403910000 raw=58403910000
+PASS [price-list] unsold == available + hold in Inventory status                         report=105 raw=105
+PASS [hold-register] active holds == flats on Hold in the flats master                      report=3 raw=3
+PASS [hold-register] holds == existing Hold register active holds                           report=3 raw=3
+PASS [hold-register] lapsing within 48 h == existing Hold register expiring                 report=1 raw=1
+PASS [inventory-status] Available flats for Sales (display layer) == shown-as available in Inventory control report=102 raw=102
+PASS [inventory-status] Hold flats for Sales (display layer) == shown-as hold in Inventory control report=3 raw=3
+PASS [inventory-status] Sold flats for Sales (display layer) == shown-as sold in Inventory control report=81 raw=81
+PASS [landowner] landowner units == existing Landowner share                            report=0 raw=0
+PASS [landowner] masked units == existing Masked inventory                              report=0 raw=0
+PASS [parking] Allotted slots == parking slots master                                 report=37 raw=37
+PASS [parking] Attached slots == parking slots master                                 report=2 raw=2
+PASS [parking] Available slots == parking slots master                                report=93 raw=93
+PASS [construction-vs-plan] Σ demanded == existing Construction vs plan                            report=31627242400 raw=31627242400
+PASS [construction-vs-plan] Σ collected == existing Construction vs plan                           report=27693829300 raw=27693829300
+PASS [construction-vs-plan] Σ balance == existing Construction vs plan                             report=3933413100 raw=3933413100
+PASS [stage-bills] Σ bills raised == Customer status                                      report=38016979500 raw=38016979500
+PASS [stage-bills] Σ received == Customer status Account + Cash                           report=34099143300 raw=34099143300
+PASS [stage-bills] Σ instalment dues == Customer status                                   report=3988958800 raw=3988958800
+PASS [sales-velocity] Σ unsold == Inventory status available + hold                          report=105 raw=105
+PASS [sales-velocity] Σ booked in the last 12 months == booking register same window         report=44 raw=44
+PASS [lead-funnel] New (this FY) == existing Sales & leads funnel                         report=7 raw=7
+PASS [lead-funnel] Contacted (this FY) == existing Sales & leads funnel                   report=6 raw=6
+PASS [lead-funnel] Site Visit Scheduled (this FY) == existing Sales & leads funnel        report=6 raw=6
+PASS [lead-funnel] Site Visit Done (this FY) == existing Sales & leads funnel             report=1 raw=1
+PASS [lead-funnel] Negotiation (this FY) == existing Sales & leads funnel                 report=4 raw=4
+PASS [lead-funnel] Converted (this FY) == existing Sales & leads funnel                   report=23 raw=23
+PASS [lead-funnel] Lost (this FY) == existing Sales & leads funnel                        report=5 raw=5
+PASS [lead-funnel] Σ leads (this FY) == existing Sales & leads                            report=52 raw=52
+PASS [source-performance] Website leads / converted == existing Sales & leads                    report=(13, 4) raw=(13, 4)
+PASS [source-performance] Walk-in leads / converted == existing Sales & leads                    report=(9, 5) raw=(9, 5)
+PASS [source-performance] Brochure leads / converted == existing Sales & leads                   report=(7, 3) raw=(7, 3)
+PASS [source-performance] Referral leads / converted == existing Sales & leads                   report=(10, 5) raw=(10, 5)
+PASS [source-performance] Broker leads / converted == existing Sales & leads                     report=(10, 6) raw=(10, 6)
+PASS [source-performance] Campaign leads / converted == existing Sales & leads                   report=(3, 0) raw=(3, 0)
+PASS [lead-register] leads == leads master (live)                                           report=123 raw=123
+PASS [follow-ups] overdue == existing Sales & leads follow-ups overdue (all dates)       report=0 raw=0
+PASS [visit-register] completed / no-show / cancelled (this FY) == existing Site visit conversion report=(24, 1, 1) raw=(24, 1, 1)
+PASS [visit-register] visits (this FY) == existing scheduled                                 report=27 raw=27
+PASS [visit-register] booked after visit (this FY) == existing converted                     report=23 raw=23
+PASS [visit-conversion] scheduled / completed / booked == existing Site visit conversion       report=(27, 24, 23) raw=(27, 24, 23)
+PASS [lost-leads] lost == leads master status Lost                                       report=9 raw=9
+PASS [response-time] responded + not yet == leads this FY (Lead funnel)                     report=52 raw=52
+PASS [lead-ageing] open leads == leads master open stages                                 report=34 raw=34
+PASS [team-pipeline] Σ open == Lead ageing open leads                                       report=34 raw=34
+PASS [team-pipeline] Σ follow-ups overdue == Follow-ups overdue                             report=0 raw=0
+PASS [response-time] average first response (this FY) == existing Sales & leads avg_response_hours report=158.1 raw=158.1
+PASS [service-sla] requests / open / resolved == existing Service requests & SLA          report=(14, 8, 6) raw=(14, 8, 6)
+PASS [bank-receipts] Collections == Bank-wise + Cash (this FY, to the paisa)                report=20437161600 raw=20437161600
+PASS [bank-receipts] identity has no unnamed remainder                                      report=0 raw=0
+PASS [collections] identity: bank modes + cash mode == Collections                        report=20437161600 raw=20437161600
+PASS [collections] cheques in hand line == Bank-wise cheques in hand                      report=4000000 raw=4000000
+PASS [bills-vs-collection] default bill raised == Customer status bills raised                    report=38016979500 raw=38016979500
+PASS [bills-vs-collection] default view has no cancelled bookings                                 report=0 raw=0
+PASS [customer-status] Customer status bridge line == Bills vs Collection                     report=38016979500 raw=38016979500
+219/219 PASS

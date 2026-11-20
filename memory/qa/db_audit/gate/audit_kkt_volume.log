@@ -1,0 +1,7 @@
+kkt_volume: 94 collections, 7.5 s, findings {'Medium': 5}
+  [Medium] UNIQ-OTHER: 35 other keys not DB-enforced (0 duplicates today)
+  [Medium] STATE-Hold-without-expiry: 4 × Hold without expiry
+  [Medium] TIME-bill-dated-before-its-booking: 22 × bill dated before its booking
+  [Medium] IDX-COLLSCAN-generated_documents-Generated documents : COLLSCAN: Generated documents of a booking (1966 docs examined)
+  [Medium] IDX-COLLSCAN-doc_verifications-Doc verification by : COLLSCAN: Doc verification by code (1667 docs examined)
+read-only: verified

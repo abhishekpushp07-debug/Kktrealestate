@@ -1,0 +1,11 @@
+start 17:06:06
+{"outcome":"running","trigger":"manual","as_of":"2026-11-15"}
+17:07:13 True None None
+17:07:44 True None None
+17:08:15 True None None
+17:08:45 True None None
+17:09:16 True None None
+17:09:47 True None None
+17:10:17 True None None
+17:10:48 True None None
+17:11:19 False failed: tieout: FAIL home overdue tile == Σ bookings overdue (definitions.ageing_bands) report=6158197100 raw=6219121500  None

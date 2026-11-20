@@ -1,0 +1,46 @@
+{
+  "summary": "Frontend-only retest of the iteration-39 findings on the preview (admin, sales, accounts; 1920 px and 390 px; Light and Night). Items 1-7 pass. Item 8 partly fails: the Booking Bills & Receipts cards now show labels and no screen scrolls sideways, but the Ledger tables (booking Ledger tab and C360 Money) and the C360 Bills/Receipts tables still show bare values at 390 px. The booking Ledger tab at 390 px is also broken: the stacked rows overlap each other.",
+  "retest_results": {
+    "1_inventory_chip_contrast": "PASS. Light: Available 5.43, Booked 6.88, Hold 5.50, Blocked 13.59. Night: Available 9.17, Booked 9.05, Hold 9.66, Blocked 11.64. All are AA.",
+    "2_next_bill_due": "PASS. BK-2526-2366 (cancelled) shows only the VOID banner, with no next-due card. BK-2526-2331 shows Brickwork ₹6.5 L plus 'Also unpaid: ₹3 L other charges (Club Membership, GST…)'. BK-2526-2357 shows 'Maintenance (advance) · unpaid ₹1.4 L · GST… · unpaid ₹5.3 L'; the 'part-paid ₹0' text is gone.",
+    "3_change_plan_current_name": "PASS. BK-2627-2456 dialog shows 'Current plan: Standard CLP'. The dialog was closed without saving.",
+    "4_no_permission_reason": "PASS. Sales on BK-2526-2331 sees a visible post-payment-reason 'Record payment · You don't have permission for this' and no disabled button. C360 for sales shows New booking.",
+    "5_more_menu_disabled_reason": "PASS. The Change plan reason is at effective opacity 1, colour about rgb(79,84,93).",
+    "6_ye_overview": "PASS. project-collections-empty reads 'No bookings yet — collections start with the first booking.' There are no ₹0 tiles and the chip reads '1 tower'.",
+    "7_wording": "PASS. The booking ledger and C360 Money show Bill raised / Charge billed, with no Demand raised / Charge demanded / Due raised. C360 says Record payment, not Post payment.",
+    "8_mobile_390": "PARTIAL. No horizontal page scroll on any of the 7 views (booking overview/bills/ledger, C360 overview/money, project overview/inventory) in Light or Night. Booking demands-table, payments-table and charges-table cards show labels. The ledger tables (LedgerTable, CustomerBits ledger-rows), C360 demands-tab and C360 receipts-list have no labels. The booking Ledger rows overlap."
+  },
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "CustomerBits.jsx ledger rows (shown on Booking › Ledger and C360 › Money) at <768 px", "issue": "The stacked ledger cards overlap each other: dates, amounts and labels from different rows are drawn on top of each other. RCA: each <tr> has className 'h-11' (fixed 44 px height). Under the stack-table media query the tr becomes display:block, so the fixed height clips the much taller stacked card and its content spills into the next row. Fix: use 'md:h-11' (or min-h).", "selector": "[data-testid=ledger-rows] tbody tr", "priority": "HIGH"},
+      {"component": "Stacked-card column labels at 390 px", "issue": "Only BookingDetail's local Table uses useStackLabels. LedgerTable.jsx, CustomerBits ledger-rows, C360Tabs demands-tab (line ~341) and C360Tabs receipts-list (line ~448) never set td[data-label], so their cards show bare values: 0 of 135 / 56 / 70 cells are labelled. In the ledger this makes Bill raised vs Received vs Balance impossible to tell apart. Fix: apply useStackLabels (or static data-label) to these tables and to DataTable.", "selector": "table.stack-table", "priority": "MEDIUM"},
+      {"component": "C360 › Money › receipts-list at 390 px", "issue": "The card is 402 px wide in a 390 px viewport. The page does not scroll, but the card's right border and edge are cut off (visible in the screenshot).", "selector": "[data-testid=receipts-list]", "priority": "LOW"},
+      {"component": "BookingDetail hero plan pill", "issue": "BookingDetail.jsx:213 still reads b.payment_plan_name, which the API never returns, so the plan pill never appears. Only the dialog was switched to payment_plan_snapshot.name.", "selector": "pages/BookingDetail.jsx:213", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "C360 key strip at 390 px", "issues": ["'₹41.8 L' and '₹32.4 L' still wrap onto two lines next to the sparkline (left over from iteration 39)."]},
+      {"screen": "Booking › Bills & Receipts wording", "issues": ["The column header 'Demand', the button 'Raise manual demand' and the other-charge button 'Demand now' still use the word 'demand' (JRN-70 bans it)."]}
+    ]
+  },
+  "test_report_links": ["/app/memory/qa/phase3/agent_smokes/ui_3_1_retest_it39.py"],
+  "action_items": [
+    "CustomerBits ledger rows: change tr 'h-11' to 'md:h-11' so stacked cards do not overlap on phones (HIGH).",
+    "Add stack labels (useStackLabels or data-label) to LedgerTable, CustomerBits ledger-rows, C360 demands-tab and receipts-list (and DataTable).",
+    "Fix the C360 receipts-list card overflowing the 390 px viewport (402 px).",
+    "BookingDetail hero plan pill: use b.payment_plan_snapshot?.name.",
+    "Optional: remove the remaining 'demand' wording on the Bills tab; stop the C360 key-strip amounts wrapping on phones."
+  ],
+  "critical_code_review_comments": [
+    "MainAction: `if (rules && !r.pay_refund)` relies on pay_refund being null when allowed. This is fine if the server returns a reason string when the refund is blocked, but it was not verifiable (no cancelled booking has a pending refund).",
+    "useStackLabels is local to BookingDetail's Table. Make it shared behaviour of every stack-table so new tables do not regress."
+  ],
+  "updated_files": ["/app/memory/qa/phase3/agent_smokes/ui_3_1_retest_it39.py (constants only; the scripts were run inline via browser_automation)"],
+  "success_rate": {"backend": "not tested (frontend only)", "frontend": "7.5/8 retest items (item 8 partial)"},
+  "seed_data_creation": "None. No data mutated: themes were switched only via document.documentElement.dataset (not saved to the profile), and the Change plan dialog was opened and closed without saving. Project 'Ye' was viewed only.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Same ids as iteration 39: BK-2526-2331 696d665b-1086-4e56-8442-b765a4fef405, BK-2526-2357 2b9beee8-6b65-4fab-9659-c2c102106e4b, BK-2526-2366 (cancelled) c033f2c1-84f4-43c4-9329-ebd7fce07441, BK-2627-2456 (Change plan allowed) 342d4edd-4d68-4449-9fce-7600a738558c, Priya 643f0d5a-a942-480b-b8fa-082351472dfc, SGH 8e4ef80c-0ce8-4fe6-8c46-7b552afe0d8a, Ye 414ae789-e1cb-446b-ae5f-68ea8d373a4b. Next retest: the 390 px booking Ledger tab overlap and the stacked labels on ledger/C360 tables. Count td[data-label] inside visible table.stack-table.",
+  "rca of the issue": "Ledger overlap at 390 px: CustomerBits.jsx tr className 'h-11' plus the index.css @media(max-width:767px) rule that makes tr display:block. The fixed 44 px height clips the stacked card. Missing labels: data-label is only set by useStackLabels, which is used by BookingDetail's Table and not by the other stack-table tables."
+}

@@ -1,0 +1,184 @@
+{
+ "erp_login_1440": {
+  "ms": 1214,
+  "scrollWidth": 1440,
+  "innerWidth": 1440,
+  "overflow": false
+ },
+ "erp_dashboard_1440": {
+  "ms": 1677,
+  "scrollWidth": 1440,
+  "innerWidth": 1440,
+  "overflow": false
+ },
+ "erp_projects_1440": {
+  "ms": 1440,
+  "scrollWidth": 1440,
+  "innerWidth": 1440,
+  "overflow": false
+ },
+ "erp_project_SGH_detail_1440": {
+  "ms": 1532,
+  "scrollWidth": 1440,
+  "innerWidth": 1440,
+  "overflow": false
+ },
+ "erp_towerA_inventory_1440": {
+  "ms": 1525,
+  "scrollWidth": 1440,
+  "innerWidth": 1440,
+  "overflow": false
+ },
+ "erp_bookings_list_1440": {
+  "ms": 1440,
+  "scrollWidth": 1440,
+  "innerWidth": 1440,
+  "overflow": false
+ },
+ "erp_payments_list_1440": {
+  "ms": 1477,
+  "scrollWidth": 1440,
+  "innerWidth": 1440,
+  "overflow": false
+ },
+ "erp_reports_1440": {
+  "ms": 1557,
+  "scrollWidth": 1440,
+  "innerWidth": 1440,
+  "overflow": false
+ },
+ "erp_report_outstanding_1440": {
+  "ms": 1495,
+  "scrollWidth": 1440,
+  "innerWidth": 1440,
+  "overflow": false
+ },
+ "erp_master_payment_plans_1440": {
+  "ms": 1451,
+  "scrollWidth": 1440,
+  "innerWidth": 1440,
+  "overflow": false
+ },
+ "erp_customers_1440": {
+  "ms": 1607,
+  "scrollWidth": 1440,
+  "innerWidth": 1440,
+  "overflow": false
+ },
+ "erp_customer360_1440": {
+  "ms": 1662,
+  "scrollWidth": 1440,
+  "innerWidth": 1440,
+  "overflow": false
+ },
+ "erp_booking_BK0001_ledger_1440": {
+  "ms": 2152,
+  "scrollWidth": 1440,
+  "innerWidth": 1440,
+  "overflow": false
+ },
+ "erp_wizard_step1_1440": {
+  "ms": 1444,
+  "scrollWidth": 1440,
+  "innerWidth": 1440,
+  "overflow": false
+ },
+ "erp_wizard_step2_grid_1440": {
+  "ms": 11591,
+  "scrollWidth": 1440,
+  "innerWidth": 1440,
+  "overflow": false
+ },
+ "console_errors_1440": [],
+ "erp_login_390": {
+  "ms": 1124,
+  "scrollWidth": 390,
+  "innerWidth": 390,
+  "overflow": false
+ },
+ "erp_dashboard_390": {
+  "ms": 1545,
+  "scrollWidth": 390,
+  "innerWidth": 390,
+  "overflow": false
+ },
+ "erp_projects_390": {
+  "ms": 1438,
+  "scrollWidth": 390,
+  "innerWidth": 390,
+  "overflow": false
+ },
+ "erp_project_SGH_detail_390": {
+  "ms": 1497,
+  "scrollWidth": 390,
+  "innerWidth": 390,
+  "overflow": false
+ },
+ "erp_towerA_inventory_390": {
+  "ms": 1555,
+  "scrollWidth": 390,
+  "innerWidth": 390,
+  "overflow": false
+ },
+ "erp_bookings_list_390": {
+  "ms": 1982,
+  "scrollWidth": 390,
+  "innerWidth": 390,
+  "overflow": false
+ },
+ "erp_payments_list_390": {
+  "ms": 1444,
+  "scrollWidth": 390,
+  "innerWidth": 390,
+  "overflow": false
+ },
+ "erp_reports_390": {
+  "ms": 1437,
+  "scrollWidth": 390,
+  "innerWidth": 390,
+  "overflow": false
+ },
+ "erp_report_outstanding_390": {
+  "ms": 1430,
+  "scrollWidth": 390,
+  "innerWidth": 390,
+  "overflow": false
+ },
+ "erp_master_payment_plans_390": {
+  "ms": 2370,
+  "scrollWidth": 390,
+  "innerWidth": 390,
+  "overflow": false
+ },
+ "erp_customers_390": {
+  "ms": 1448,
+  "scrollWidth": 390,
+  "innerWidth": 390,
+  "overflow": false
+ },
+ "erp_customer360_390": {
+  "ms": 1893,
+  "scrollWidth": 390,
+  "innerWidth": 390,
+  "overflow": false
+ },
+ "erp_booking_BK0001_ledger_390": {
+  "ms": 2084,
+  "scrollWidth": 390,
+  "innerWidth": 390,
+  "overflow": false
+ },
+ "erp_wizard_step1_390": {
+  "ms": 1428,
+  "scrollWidth": 390,
+  "innerWidth": 390,
+  "overflow": false
+ },
+ "erp_wizard_step2_grid_390": {
+  "ms": 11284,
+  "scrollWidth": 390,
+  "innerWidth": 390,
+  "overflow": false
+ },
+ "console_errors_390": []
+}

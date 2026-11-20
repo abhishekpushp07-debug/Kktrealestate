@@ -1,0 +1,50 @@
+{
+  "summary": "Phase 3H Reports close-out (F-57) retest, read-only (GET API calls + UI navigation only; theme switched with a DOM attribute so the profile was not written). 15 of 16 checks pass. Both iteration_52 HIGH issues are fixed: the Booking register live/cancelled links and the in-hand links now open v3 reports with the right filters. One new bug: the 'Refunds paid out' line on Collections for Feb 2026 opens an EMPTY Cancellations list. Outstanding and Customer status totals match, the PDF meets the spec, and the 390px mobile views have no overflow.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "GET /api/reports/v3/collections?period_from=2026-02-01&period_to=2026-02-28 (refunds line link, registry.py _received_lines)", "issue": "The line 'Refunds paid out −₹4,22,892' links to /reports/v3/cancellations?period_from=2026-02-01&period_to=2026-02-28. The Cancellations period filter uses cancelled_on, but BK-2526-3428 was cancelled 27 Jan 2026 and its refunds were paid 26 Feb 2026. The drill therefore shows '0 cancellations · period 01 Feb 2026 – 28 Feb 2026' and does not list the refund that was tapped. The same thing happens whenever a refund is paid in a later period than the cancellation.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "GET /api/reports/v3/cheques?in_hand_on=2026-10-31", "issue": "Rows show the cheque's current State 'Cleared' and Days in hand 0. On 31 Oct those cheques were in hand for 1–2 days. The status and days do not describe the date chosen, which is confusing next to the headline 'in hand on 31 Oct 2026'."},
+      {"endpoint": "/reports/v3/cancellations?period_from=2000-01-01 (Cash vs Account other-income link)", "issue": "The 'all time' value shows up in the UI as the chip 'PERIOD 01 Jan 2000 – —' and the headline '2 cancellations · period 01 Jan 2000 – -'. It would read better as 'All time' or without a period."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Collections (Feb 2026) → Refunds paid out line → Cancellations", "issue": "The drill opens an empty list (see backend critical)", "affected_selectors": ["[data-testid=report-line-refunds]"]}
+    ],
+    "design_issues": [
+      {"screen": "Outstanding PDF", "issues": ["The Customer column clips long names ('Amit Kumar Si…'). The Customer header wraps to 'Customer / name' (at a word boundary, which is acceptable)."]},
+      {"screen": "Cancellations & refunds table", "issue_note": "The Flat column shows 'SGH C-403', while the other reports show 'SGH · Tower C · C-403'. This is inconsistent.", "issues": ["Flat label format differs from the other v3 reports"]}
+    ]
+  },
+  "passed_checks": [
+    "Booking register: report-line-live '80 live' → /reports/v3/booking-register?booking_status=Active,Completed, headline '80 bookings · Active, Completed', no cancelled rows (API rows 80)",
+    "Booking register: report-line-cancelled '2 cancelled' → booking_status=Cancelled, 2 rows (BK-2526-3438, BK-2526-3428)",
+    "On Collections, Bank-wise and Outstanding (today), report-line-in-hand 'Cheques in hand ₹40,000 (1 cheque)' → /reports/v3/cheques?in_hand_on=2026-11-19, 1 row KKT/2627/42976 on BK-2526-3401",
+    "Outstanding as_of=2026-10-31: 'Cheques in hand ₹3,43,288 (2 cheques)' → cheques?in_hand_on=2026-10-31, exactly KKT/2627/42726 and KKT/2627/42875, total ₹3,43,288",
+    "rf-in_hand_on is a shadcn Popover calendar (button trigger, not the native picker). Days after 19 Nov are greyed and clicking 25 Nov does not change the URL. Picking 10 Nov sets in_hand_on=2026-11-10 (9 rows).",
+    "Cash vs Account other-income line '₹4,95,868' → /reports/v3/cancellations?period_from=2000-01-01, which shows BK-2526-3428 and BK-2526-3438 with deduction kept ₹4,95,868",
+    "Collections and Bank-wise both show the line 'Bank-wise ₹14,60,30,789 + Cash ₹5,83,40,827 = Collections ₹20,43,71,616'",
+    "Outstanding today ₹4,50,09,812 (80 bookings). As of 31 Oct: ₹3,50,43,498 (78), which equals Customer status As of 31 Oct total_due ₹3,50,43,498 (78)",
+    "PDF export.pdf 200 application/pdf, 4 pages, mediabox 841.89x595.28 (A4 landscape). The Flat column shows full labels such as 'SGH · Tower C · C-402' and 'GGV · Villa Block V · V12'. The 'Waived' header is on one line. 'Cheques in hand ₹40,000 (1 cheque)' is printed under the formula.",
+    "At 390px, Collections and Outstanding in Night and Day: scrollWidth = clientWidth = 390, nothing overflows"
+  ],
+  "test_report_links": ["/app/backend/tests/spot_phase3h_closeout.py"],
+  "action_items": [
+    "Fix the Refunds paid out line link (registry.py _received_lines): the cancellations it opens must be those whose refund was PAID in the period. Either add a refund-paid-on/period filter to the cancellations report and link with it, or link to period_from=2000-01-01&refund=Paid (all time). Today Collections Feb 2026 → 0 cancellations; expected BK-2526-3428.",
+    "Optional: on cheques?in_hand_on=<past date>, show the state as of that date ('In hand') and the days in hand on that date, not the current Cleared/0",
+    "Optional: show 'All time' instead of '01 Jan 2000 – —' when the cancellations link uses the period_from=2000-01-01 sentinel"
+  ],
+  "critical_code_review_comments": [
+    "registry.py:801 reuses _period(p) from the Collections context for a cancellations report whose period means cancelled_on. The two date meanings do not match."
+  ],
+  "updated_files": ["/app/backend/tests/spot_phase3h_closeout.py (new, read-only GET spot script; run: DEMO_PASSWORD=... python tests/spot_phase3h_closeout.py)"],
+  "success_rate": {"backend": "93% (13/14 API checks)", "frontend": "94% (15/16 UI checks)"},
+  "seed_data_creation": "None. The run was read-only: no payments, bookings, waivers or preference writes.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Preview data as of 19 Nov 2026 IST (refresh 2026-11-18 21:30 UTC). Backend pytest was not run on purpose (953 passed per E1). Retest only the Collections Feb 2026 refunds drill. Change themes with document.documentElement.dataset.theme so that PATCH /auth/me/preferences is not called.",
+  "rca of the issue": "Collections totals count refunds by refund-paid date (26 Feb 2026 for BK-2526-3428). _received_lines builds the drill link as '/reports/v3/cancellations?' + _period(p), which forwards period_from/period_to. The Cancellations v3 report applies its 'period' date_range filter to cancelled_on (27 Jan 2026), so the booking is filtered out. Reproduce: open /reports/v3/collections?period_from=2026-02-01&period_to=2026-02-28 and tap [data-testid=report-line-refunds] → '0 cancellations'. Fix: filter by refund paid date, or drop the period from the link."
+}

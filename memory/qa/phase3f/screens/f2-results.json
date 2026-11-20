@@ -1,0 +1,228 @@
+[
+ {
+  "theme": "light",
+  "width": 1440,
+  "screen": "hub-customers",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 1440,
+  "screen": "customer-statement",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 1440,
+  "screen": "customer-ageing",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 1440,
+  "screen": "advance-holders",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 1440,
+  "screen": "call-list",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 1440,
+  "screen": "kyc-pending",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 1440,
+  "screen": "payment-behaviour",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 1440,
+  "screen": "customer-directory",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 1440,
+  "screen": "cancelled-customers",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 390,
+  "screen": "hub-customers",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 390,
+  "screen": "customer-statement",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 390,
+  "screen": "customer-ageing",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 390,
+  "screen": "advance-holders",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 390,
+  "screen": "call-list",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 390,
+  "screen": "kyc-pending",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 390,
+  "screen": "payment-behaviour",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 390,
+  "screen": "customer-directory",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 390,
+  "screen": "cancelled-customers",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 1440,
+  "screen": "hub-customers",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 1440,
+  "screen": "customer-statement",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 1440,
+  "screen": "customer-ageing",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 1440,
+  "screen": "advance-holders",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 1440,
+  "screen": "call-list",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 1440,
+  "screen": "kyc-pending",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 1440,
+  "screen": "payment-behaviour",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 1440,
+  "screen": "customer-directory",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 1440,
+  "screen": "cancelled-customers",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 390,
+  "screen": "hub-customers",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 390,
+  "screen": "customer-statement",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 390,
+  "screen": "customer-ageing",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 390,
+  "screen": "advance-holders",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 390,
+  "screen": "call-list",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 390,
+  "screen": "kyc-pending",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 390,
+  "screen": "payment-behaviour",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 390,
+  "screen": "customer-directory",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 390,
+  "screen": "cancelled-customers",
+  "h_overflow_px": 0
+ },
+ {
+  "export": "customer-ageing",
+  "pdf_pages": 4,
+  "xlsx_rows": 50
+ },
+ {
+  "export": "customer-statement",
+  "pdf_pages": 4,
+  "xlsx_rows": 45
+ }
+]

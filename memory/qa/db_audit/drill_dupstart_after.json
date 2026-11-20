@@ -1,0 +1,23 @@
+{
+ "health": "ok",
+ "bookings_list_status": 200,
+ "home_status": 200,
+ "system_health_rule": {
+  "key": "ledger line (booking + sequence)",
+  "collection": "ledger_entries",
+  "index": "uniq_ledger_seq",
+  "status": "not_applied",
+  "message": "Uniqueness rule not applied \u2014 duplicates found",
+  "examples": [
+   "{'booking_id': '61ea7305-0006-4923-8258-b43b941616cf', 'seq': 1}"
+  ]
+ },
+ "log_names_rule": true,
+ "other_rules": {
+  "uniq_waiver_number": "applied",
+  "uniq_cn_number": "applied",
+  "uniq_refund_number_bucket": "applied",
+  "uniq_live_booking_per_flat": "applied"
+ },
+ "pass": true
+}

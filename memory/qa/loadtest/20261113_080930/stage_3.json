@@ -1,0 +1,147 @@
+{
+ "vus": 3,
+ "duration_s": 31,
+ "requests": 142,
+ "rps": 4.6,
+ "stopped": null,
+ "errors": {},
+ "assertions": {
+  "lead_created:ok": 12,
+  "lead_converted:ok": 12,
+  "booking_created:ok": 11,
+  "booking_total_matches_preview:ok": 11,
+  "payment_posted:ok": 11,
+  "c360_shows_booking:FAIL": 10,
+  "ledger_received_equals_payment:ok": 10,
+  "ledger_bill_raised_positive:ok": 10,
+  "inventory_flat_booked:ok": 10,
+  "receipt_pdf:ok": 10,
+  "demand_register:ok": 9,
+  "project_statement:ok": 9,
+  "stage_demands_equal_active_bookings:ok": 3,
+  "documents_register:ok": 3,
+  "integrity_ok_after_stage:ok": 1
+ },
+ "failed_assertions": [
+  {
+   "assertion": "c360_shows_booking",
+   "detail": "booking missing in Customer 360 ledgers (0 ledgers)"
+  },
+  {
+   "assertion": "c360_shows_booking",
+   "detail": "booking missing in Customer 360 ledgers (0 ledgers)"
+  },
+  {
+   "assertion": "c360_shows_booking",
+   "detail": "booking missing in Customer 360 ledgers (0 ledgers)"
+  },
+  {
+   "assertion": "c360_shows_booking",
+   "detail": "booking missing in Customer 360 ledgers (0 ledgers)"
+  },
+  {
+   "assertion": "c360_shows_booking",
+   "detail": "booking missing in Customer 360 ledgers (0 ledgers)"
+  },
+  {
+   "assertion": "c360_shows_booking",
+   "detail": "booking missing in Customer 360 ledgers (0 ledgers)"
+  },
+  {
+   "assertion": "c360_shows_booking",
+   "detail": "booking missing in Customer 360 ledgers (0 ledgers)"
+  },
+  {
+   "assertion": "c360_shows_booking",
+   "detail": "booking missing in Customer 360 ledgers (0 ledgers)"
+  },
+  {
+   "assertion": "c360_shows_booking",
+   "detail": "booking missing in Customer 360 ledgers (0 ledgers)"
+  },
+  {
+   "assertion": "c360_shows_booking",
+   "detail": "booking missing in Customer 360 ledgers (0 ledgers)"
+  }
+ ],
+ "groups": {
+  "bookings": {
+   "n": 14,
+   "p50": 197.6,
+   "p95": 265.4,
+   "p99": 265.4
+  },
+  "breakdown": {
+   "n": 11,
+   "p50": 15.9,
+   "p95": 19.3,
+   "p99": 19.3
+  },
+  "construction": {
+   "n": 6,
+   "p50": 131.3,
+   "p95": 293.5,
+   "p99": 293.5
+  },
+  "customers": {
+   "n": 22,
+   "p50": 18.5,
+   "p95": 23.9,
+   "p99": 27.1
+  },
+  "demand_register": {
+   "n": 9,
+   "p50": 5.3,
+   "p95": 6.8,
+   "p99": 6.8
+  },
+  "documents": {
+   "n": 3,
+   "p50": 5.4,
+   "p95": 5.8,
+   "p99": 5.8
+  },
+  "flats": {
+   "n": 10,
+   "p50": 8.2,
+   "p95": 8.9,
+   "p99": 8.9
+  },
+  "leads": {
+   "n": 24,
+   "p50": 29.9,
+   "p95": 44.6,
+   "p99": 49.4
+  },
+  "ledger": {
+   "n": 10,
+   "p50": 4.8,
+   "p95": 5.8,
+   "p99": 5.8
+  },
+  "login": {
+   "n": 3,
+   "p50": 233.4,
+   "p95": 236.2,
+   "p99": 236.2
+  },
+  "payments": {
+   "n": 11,
+   "p50": 117.2,
+   "p95": 135.9,
+   "p99": 135.9
+  },
+  "project_statement": {
+   "n": 9,
+   "p50": 10.6,
+   "p95": 11.3,
+   "p99": 11.3
+  },
+  "receipt_pdf": {
+   "n": 10,
+   "p50": 5.7,
+   "p95": 6.7,
+   "p99": 6.7
+  }
+ }
+}

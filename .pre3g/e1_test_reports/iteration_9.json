@@ -1,0 +1,33 @@
+{
+  "iteration": 9,
+  "phase": "3",
+  "batch": "Phase 3 batch (a): JRN-62..68 + JRN-70 + Q-27 (8 criteria)",
+  "passed": 9,
+  "failed": 0,
+  "retest_needed": false,
+  "bugs": [],
+  "notes": [
+    {"type": "note", "criterion": "JRN-65", "detail": "After posting, the success panel says 'Print / download receipt'. The journey says 'Print / share receipt'. The print action is there, but the word 'share' is missing."},
+    {"type": "note", "criterion": "JRN-66", "detail": "Customer 360 More menu has Edit customer, Co-applicants and Statements, plus extra items: New booking, Generate document, Add note, New ticket, Schedule visit. This matches action_inventory (C1/C4/C6), but it is a longer list than the 3 items the criterion names."},
+    {"type": "note", "criterion": "JRN-70", "detail": "On one early run, the Customer 360 Activity tab text (main.innerText) ended with a bare UUID '339d6c4e-ea55-4f63-b4cf-1b9578080796' (admin user id) after 'No notes yet.'. A later scan of the same tab, after waiting for the timeline, was clean. Not reproduced, so not filed as a bug. Worth a look: an element that can show a raw user id."},
+    {"type": "note", "criterion": "JRN-70", "detail": "'Demand Draft' (DD, the payment mode) shows in Bills & Receipts, Ledger and the Customer Money tab. It is a real banking instrument name, not the internal 'demand' word, so the scan allows it."},
+    {"type": "note", "criterion": "JRN-63", "detail": "On the story:cancel booking, the ledger law holds (46,988 - 46,988 = 0 - 0). The API summary still shows other_udhar_paise 9,397,600 with other_received 0, and this is not in total_bill_raised. It is probably other charges waived on cancel, but this was not confirmed."},
+    {"type": "note", "criterion": "JRN-62", "detail": "The ledger of BK-2526-2331 has a leftover row 'Reversal · TEST_ qa reversal' (KKT/2627/26974) from an earlier tester's run. It is net zero, but the purge may not recognise the name."}
+  ],
+  "action_items": [],
+  "fixtures_created": [
+    "Customer 'QA test Buyer' CUST-2627-7073 (id fde2a0ea-778e-42e6-a567-3b5716dda060), phone 9000099917, test PAN ABCDE1234F / Aadhaar 234567890124, no booking. Left for the purge (name has the whole words QA/test).",
+    "Receipts KKT/2627/26978 and KKT/2627/26979 (₹10,000 Cash on BK-2526-2331), both REVERSED. Booking outstanding is back to ₹9,41,825. 26978 was reversed by API after an assertion stopped the first run; 26979 was reversed in the UI with reason 'QA test reversal'."
+  ],
+  "checks": [
+    {"criterion": "JRN-63 Ledger law (API)", "name": "test_tscheck_ledger_law.py", "lane": "backend", "status": "passed", "evidence": "GET /api/bookings/{id}/ledger 200 for ontime/transfer/cancel: bill_raised - received == outstanding - advance == balance (941825; 399922 = 499437-99515; 0). Unauthenticated -> 401/403. 4 passed."},
+    {"criterion": "JRN-62 Booking page is calm", "name": "jrn62-booking-page-calm", "lane": "browser", "status": "passed", "evidence": "BK-2526-2331 tabs [Overview, Bills & Receipts, Ledger, Documents, Activity]. Main 'Record payment'. More = Mark agreement signed, Revise agreement, Change plan, Transfer, Cancel booking, Print / Share (Statement, Allotment letter, Cost sheet). Header Due ₹9.4 L = Overview Due ₹9.4 L = Ledger outstanding ₹9,41,825. Next bill ₹6.5 L by 25 Nov 2026. Also unpaid ₹3 L other charges. No '100% paid'."},
+    {"criterion": "JRN-63 Ledger law visible", "name": "jrn63-ledger-law-visible", "lane": "browser", "status": "passed", "evidence": "Ledger foot: ontime Σ Billed 41,83,075 − Σ Received 32,41,250 = 9,41,825 = outstanding 9,41,825 − advance 0. Transfer 60,38,625 − 56,38,703 = 3,99,922 = 4,99,437 − 99,515. Cancel 46,988 − 46,988 = 0. Columns BILL RAISED / RECEIVED / BALANCE."},
+    {"criterion": "JRN-64 Not-allowed actions explain themselves", "name": "jrn64-blocked-actions-explain", "lane": "browser", "status": "passed", "evidence": "BK-2331 More: Change plan aria-disabled with 'A bill on this booking is already paid — plan cannot be changed'. BK-2526-2366 Cancelled: 'VOID · cancelled 27 Jan 2026', no main action (refund settled). Mark signed / Revise / Change plan / Transfer / Cancel all disabled with 'Booking is Cancelled'. Print items enabled."},
+    {"criterion": "JRN-65 Record payment from the booking page", "name": "jrn65-record-payment-booking", "lane": "browser", "status": "passed", "evidence": "Sheet opens with BK-2526-2331 pre-selected. POST /api/payments 201 KKT/2627/26979 ₹10,000 Cash. Success panel 'Print / download receipt'. Ledger Received +10,000, Due 9,41,825 -> 9,31,825. Receipt shown in Bills & Receipts. Reversed (200) -> Due 9,41,825, Billed unchanged."},
+    {"criterion": "JRN-66 + JRN-67 Customer 360", "name": "jrn66-customer-360", "lane": "browser", "status": "passed", "evidence": "Priya Verma tabs [Overview, Bookings, Money, Documents & KYC, Activity]. Main 'Record payment'. More has Edit customer, Co-applicants, Statements (+extras). Activity shows KKT/2627/26972 exactly once. 'QA test Buyer' main = New booking, no Record payment. As sales@kkt.in: PAN XXXXX1234F, Aadhaar XXXX XXXX 0124, raw values absent."},
+    {"criterion": "JRN-68 Project page ≤ 5 tabs + flat grid", "name": "jrn68-project-page-grid", "lane": "browser", "status": "passed", "evidence": "SGH tabs [Overview, Structure, Inventory, Plans & Pricing, Construction]. The Inventory grid legend matches Home inventory for every tower (A 12/20, B 13/2/16/1, C 25/1/30). C-1601 drawer: Status Available, Price ₹71.4 L. Ye project: COLLECTED '— No bookings yet', OUTSTANDING '— Nothing billed yet', no bare ₹0 tiles."},
+    {"criterion": "Action reachability (Q-27)", "name": "q27-action-reachability", "lane": "browser", "status": "passed", "evidence": "20 items reachable: B1, B3, B4, B7, B8, B10, B13 'Raise manual bill', B14 Generate, B15 'Send reminder now', B16 'Where this entry went', B17, B18, B25 reverse-*, B33, P1, P6 'Open construction update', P8. Role-gated as sales: no Record payment button; Revise / Change plan / Transfer disabled with 'You don't have permission for this'; audit link shown (sales has admin.audit.view)."},
+    {"criterion": "JRN-70 No internal words + phone", "name": "jrn70-no-internal-words-phone", "lane": "browser", "status": "passed", "evidence": "Booking (all 5 tabs), Customer 360 (Money / KYC / Activity), SGH project, /demands, /roznamcha, /reports, /masters: no UUID, snake_case, 'paise' or 'demand' (Demand Draft allowed). At 390×844, Light and Night, booking / customer / project: scrollX 0, main action visible, 0 visible <table>."}
+  ]
+}

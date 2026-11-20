@@ -1,0 +1,183 @@
+{
+ "reps": 3,
+ "redis": false,
+ "per_surface_seconds": {
+  "Home": [
+   "0.0"
+  ],
+  "Home legacy": [
+   "0.0",
+   ">40"
+  ],
+  "Booking page": [
+   "0.0"
+  ],
+  "Customer 360": [
+   "0.0"
+  ],
+  "Bills raised": [
+   "0.0",
+   "16.1",
+   "19.8",
+   "20.2",
+   "22.8",
+   "23.1",
+   "23.7",
+   "8.2"
+  ],
+  "Outstanding": [
+   "0.0"
+  ],
+  "Collections": [
+   "0.0"
+  ],
+  "Customer status": [
+   "0.0"
+  ],
+  "Bills vs Collection": [
+   "0.0"
+  ],
+  "Payments list": [
+   "0.0"
+  ],
+  "Dashboard": [
+   "0.0"
+  ]
+ },
+ "rows": [
+  {
+   "action": "receipt",
+   "Home": 0.0,
+   "Booking page": 0.0,
+   "Customer 360": 0.0,
+   "Outstanding": 0.0,
+   "Collections": 0.0,
+   "Customer status": 0.0,
+   "Bills vs Collection": 0.0,
+   "Payments list": 0.0,
+   "Dashboard": 0.0,
+   "Bills raised": 22.8,
+   "Home legacy": ">40",
+   "Home legacy diff": ".projects[1].collections_mtd: B=19746042.0 A=19745042.0"
+  },
+  {
+   "action": "waiver approve",
+   "Home": 0.0,
+   "Booking page": 0.0,
+   "Customer 360": 0.0,
+   "Bills raised": 0.0,
+   "Outstanding": 0.0,
+   "Collections": 0.0,
+   "Customer status": 0.0,
+   "Bills vs Collection": 0.0,
+   "Payments list": 0.0,
+   "Dashboard": 0.0,
+   "Home legacy": ">40",
+   "Home legacy diff": ".projects[1].outstanding.account: B=132647596.0 A=132647607.0"
+  },
+  {
+   "action": "stage complete",
+   "Home": 0.0,
+   "Booking page": 0.0,
+   "Customer 360": 0.0,
+   "Outstanding": 0.0,
+   "Collections": 0.0,
+   "Customer status": 0.0,
+   "Bills vs Collection": 0.0,
+   "Payments list": 0.0,
+   "Dashboard": 0.0,
+   "Bills raised": 23.1,
+   "Home legacy": ">40",
+   "Home legacy diff": ".projects[1].blocks[2].progress.completed: B=9 A=8"
+  },
+  {
+   "action": "receipt",
+   "Home": 0.0,
+   "Booking page": 0.0,
+   "Customer 360": 0.0,
+   "Outstanding": 0.0,
+   "Collections": 0.0,
+   "Customer status": 0.0,
+   "Bills vs Collection": 0.0,
+   "Payments list": 0.0,
+   "Dashboard": 0.0,
+   "Bills raised": 19.8,
+   "Home legacy": ">40",
+   "Home legacy diff": ".projects[1].collections_mtd: B=19747045.0 A=19746042.0"
+  },
+  {
+   "action": "waiver approve",
+   "Home": 0.0,
+   "Booking page": 0.0,
+   "Customer 360": 0.0,
+   "Outstanding": 0.0,
+   "Collections": 0.0,
+   "Customer status": 0.0,
+   "Bills vs Collection": 0.0,
+   "Payments list": 0.0,
+   "Dashboard": 0.0,
+   "Bills raised": 8.2,
+   "Home legacy": ">40",
+   "Home legacy diff": ".projects[1].outstanding.account: B=135447182.0 A=135447196.0"
+  },
+  {
+   "action": "stage complete",
+   "Home": 0.0,
+   "Booking page": 0.0,
+   "Customer 360": 0.0,
+   "Outstanding": 0.0,
+   "Collections": 0.0,
+   "Customer status": 0.0,
+   "Bills vs Collection": 0.0,
+   "Payments list": 0.0,
+   "Dashboard": 0.0,
+   "Bills raised": 16.1,
+   "Home legacy": ">40",
+   "Home legacy diff": ".projects[1].blocks[2].progress.completed: B=10 A=9"
+  },
+  {
+   "action": "receipt",
+   "Home": 0.0,
+   "Booking page": 0.0,
+   "Customer 360": 0.0,
+   "Bills raised": 0.0,
+   "Outstanding": 0.0,
+   "Collections": 0.0,
+   "Customer status": 0.0,
+   "Bills vs Collection": 0.0,
+   "Payments list": 0.0,
+   "Dashboard": 0.0,
+   "Home legacy": ">40",
+   "Home legacy diff": ".projects[1].collections_mtd: B=19748051.0 A=19747045.0"
+  },
+  {
+   "action": "waiver approve",
+   "Home": 0.0,
+   "Home legacy": 0.0,
+   "Booking page": 0.0,
+   "Customer 360": 0.0,
+   "Outstanding": 0.0,
+   "Collections": 0.0,
+   "Customer status": 0.0,
+   "Bills vs Collection": 0.0,
+   "Payments list": 0.0,
+   "Dashboard": 0.0,
+   "Bills raised": 23.7
+  },
+  {
+   "action": "stage complete",
+   "Home": 0.0,
+   "Booking page": 0.0,
+   "Customer 360": 0.0,
+   "Outstanding": 0.0,
+   "Collections": 0.0,
+   "Customer status": 0.0,
+   "Bills vs Collection": 0.0,
+   "Payments list": 0.0,
+   "Dashboard": 0.0,
+   "Bills raised": 20.2,
+   "Home legacy": ">40",
+   "Home legacy diff": ".projects[1].blocks[2].progress.completed: B=11 A=10"
+  }
+ ]
+}

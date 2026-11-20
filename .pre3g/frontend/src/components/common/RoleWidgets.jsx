@@ -1,0 +1,532 @@
+import { Link } from "react-router-dom";
+import { AlertTriangle, Banknote, Globe, HardHat, TrendingUp } from "lucide-react";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip as RTooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
+  LineChart,
+  Line,
+} from "recharts";
+import { useFetch } from "@/hooks/useList";
+import { useAuth } from "@/context/AuthContext";
+import { inr, inrShort, fmtDate } from "@/lib/format";
+import { StatTile } from "@/components/v2";
+
+const AGE_COLORS = {
+  "Not due": "var(--advance)",
+  "0-30": "var(--accent)",
+  "31-60": "var(--warn)",
+  "61-90": "var(--due)",
+  "90+": "var(--due)",
+};
+const Card = ({ title, children, testId, action }) => (
+  <div className="card min-w-0 overflow-hidden p-5" data-testid={testId}>
+    <div className="mb-3 flex items-center justify-between">
+      <h2 className="text-base font-bold text-ink-950">{title}</h2>
+      {action}
+    </div>
+    {children}
+  </div>
+);
+const Empty = ({ text }) => <p className="py-6 text-center text-sm text-txt-secondary">{text}</p>;
+
+function RoleStats({ role, w, money }) {
+  return (
+    <>
+      {role === "Accounts" && w.collections_today && (
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <StatTile
+            label="Collected today"
+            value={money(w.collections_today.amount_paise)}
+            hint={`${w.collections_today.count} receipts`}
+            icon={Banknote}
+            iconTone="sage"
+            testId="acc-today"
+          />
+          <StatTile
+            label="This month"
+            value={money(w.collections_month.amount_paise)}
+            hint={`${w.collections_month.count} receipts`}
+            icon={TrendingUp}
+            iconTone="gold"
+            testId="acc-month"
+          />
+          <StatTile
+            label="Cheques to clear"
+            value={money(w.pending_cheques.amount_paise)}
+            hint={`${w.pending_cheques.count} instruments`}
+            icon={Banknote}
+            iconTone="amber"
+            testId="acc-cheques"
+          />
+          <Link
+            to="/payments"
+            className="card flex items-center justify-center rounded-xl bg-ink-950 p-5 text-center text-sm font-bold text-white hover:bg-ink-950/90"
+            data-testid="acc-quick-post"
+          >
+            + Record payment
+          </Link>
+        </div>
+      )}
+      {role === "Sales" && (
+        <div className="grid gap-4 sm:grid-cols-3">
+          <StatTile
+            label="My bookings this month"
+            value={w.my_bookings_month?.count ?? 0}
+            hint={inrShort((w.my_bookings_month?.value_paise || 0) / 100)}
+            icon={TrendingUp}
+            iconTone="gold"
+            testId="sales-my-bookings"
+          />
+          <StatTile
+            label="New website enquiries"
+            value={w.new_enquiries?.length ?? 0}
+            hint={`${w.website_enquiries_week ?? 0} this week`}
+            icon={Globe}
+            iconTone="sage"
+            testId="sales-enquiries"
+          />
+          <StatTile
+            label="Follow-ups due"
+            value={w.follow_ups_due?.length ?? 0}
+            hint="today or overdue"
+            icon={AlertTriangle}
+            iconTone="amber"
+            testId="sales-followups"
+          />
+        </div>
+      )}
+      {role === "Project Admin" && (
+        <div className="grid gap-4 sm:grid-cols-3">
+          <StatTile
+            label="Bills raised this month"
+            value={w.demands_raised_month ?? 0}
+            icon={Banknote}
+            iconTone="gold"
+            testId="pa-demands"
+          />
+          <StatTile
+            label="Blocks in scope"
+            value={w.construction?.length ?? 0}
+            hint={`${w.construction?.filter((c) => c.percent < 100).length ?? 0} under construction`}
+            icon={HardHat}
+            testId="pa-blocks"
+          />
+          <StatTile
+            label="Available units"
+            value={w.construction?.reduce((a, c) => a + c.available, 0) ?? 0}
+            hint={`of ${w.construction?.reduce((a, c) => a + c.total, 0) ?? 0}`}
+            icon={TrendingUp}
+            iconTone="sage"
+            testId="pa-available"
+          />
+        </div>
+      )}
+    </>
+  );
+}
+
+function ChartWidgets({ role, w, money }) {
+  return (
+    <>
+      {w.collections_trend && role !== "Sales" && (
+        <Card title="Collections — last 12 months" testId="w-collections-trend">
+          <div className="h-60 min-w-0 overflow-hidden">
+            <ResponsiveContainer
+              width="100%"
+              height="100%"
+              initialDimension={{ width: 320, height: 240 }}
+            >
+              <BarChart
+                data={w.collections_trend.map((r) => ({
+                  name: r.month.slice(2),
+                  Cash: r.Cash_paise / 100,
+                  Account: r.Account_paise / 100,
+                  Other: r.Other_paise / 100,
+                }))}
+                margin={{ left: 8, right: 8, top: 8 }}
+                barSize={14}
+                barGap={2}
+              >
+                <XAxis
+                  dataKey="name"
+                  tick={{ fontSize: 11, fill: "var(--text-3)" }}
+                  tickLine={false}
+                />
+                <YAxis
+                  tick={{ fontSize: 11, fill: "var(--text-3)" }}
+                  tickFormatter={inrShort}
+                  width={64}
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <RTooltip formatter={(v) => inr(v)} cursor={{ fill: "var(--canvas)" }} />
+                <Legend
+                  verticalAlign="top"
+                  align="right"
+                  iconType="circle"
+                  wrapperStyle={{ fontSize: 12, paddingBottom: 8 }}
+                />
+                <Bar dataKey="Cash" fill="var(--text-1)" radius={[3, 3, 0, 0]} />
+                <Bar dataKey="Account" fill="var(--accent)" radius={[3, 3, 0, 0]} />
+                <Bar dataKey="Other" fill="var(--text-3)" radius={[3, 3, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+      )}
+      {w.ageing && role !== "Sales" && (
+        <Card title="Due ageing" testId="w-ageing">
+          {w.ageing.every((a) => !a.amount_paise) ? (
+            <Empty text="No overdue dues — every raised installment is within its due date." />
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-[180px_1fr] items-center">
+              <div className="relative h-44">
+                <ResponsiveContainer
+                  width="100%"
+                  height="100%"
+                  initialDimension={{ width: 180, height: 176 }}
+                >
+                  <PieChart>
+                    <Pie
+                      data={w.ageing
+                        .filter((a) => a.amount_paise)
+                        .map((a) => ({ name: a.bucket, value: a.amount_paise / 100 }))}
+                      dataKey="value"
+                      nameKey="name"
+                      innerRadius={52}
+                      outerRadius={78}
+                      paddingAngle={2}
+                      stroke="var(--surface)"
+                    >
+                      {w.ageing
+                        .filter((a) => a.amount_paise)
+                        .map((a) => (
+                          <Cell key={a.bucket} fill={AGE_COLORS[a.bucket]} />
+                        ))}
+                    </Pie>
+                    <RTooltip formatter={(v) => inr(v)} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="text-sm font-bold tabular text-ink-950">
+                    {money(w.ageing.reduce((s, a) => s + a.amount_paise, 0))}
+                  </span>
+                  <span className="label-xs !text-[10px]">total due</span>
+                </div>
+              </div>
+              <ul className="space-y-2 text-sm" data-testid="w-ageing-buckets">
+                {w.ageing.map((a) => (
+                  <li key={a.bucket} className="flex items-center justify-between gap-3">
+                    <span className="flex items-center gap-2 text-txt-secondary">
+                      <span
+                        className="h-2.5 w-2.5 rounded-full"
+                        style={{ background: AGE_COLORS[a.bucket] }}
+                      />
+                      {/^\d/.test(a.bucket) ? `${a.bucket} days` : a.bucket}
+                    </span>
+                    <span className="font-semibold tabular text-ink-950">
+                      {money(a.amount_paise)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </Card>
+      )}
+      {w.sales_velocity && (role === "Super Admin" || role === "Sales") && (
+        <Card title="Sales velocity (bookings / month)" testId="w-velocity">
+          <div className="h-56 min-w-0">
+            <ResponsiveContainer
+              width="100%"
+              height="100%"
+              initialDimension={{ width: 320, height: 220 }}
+            >
+              <LineChart
+                data={w.sales_velocity.map((v) => ({
+                  name: v.month.slice(2),
+                  Bookings: v.bookings,
+                }))}
+              >
+                <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                <YAxis allowDecimals={false} tick={{ fontSize: 10 }} />
+                <RTooltip />
+                <Line
+                  type="monotone"
+                  dataKey="Bookings"
+                  stroke="var(--accent)"
+                  strokeWidth={2.5}
+                  dot={{ fill: "var(--text-1)" }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+      )}
+      {w.funnel && (
+        <Card title={role === "Sales" ? "My pipeline" : "Lead funnel"} testId="w-funnel">
+          <div className="h-56 min-w-0">
+            <ResponsiveContainer
+              width="100%"
+              height="100%"
+              initialDimension={{ width: 320, height: 220 }}
+            >
+              <BarChart data={w.funnel} layout="vertical">
+                <XAxis type="number" allowDecimals={false} tick={{ fontSize: 10 }} />
+                <YAxis type="category" dataKey="stage" width={120} tick={{ fontSize: 10 }} />
+                <RTooltip />
+                <Bar dataKey="count" fill="var(--text-1)" radius={[0, 3, 3, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+      )}
+    </>
+  );
+}
+
+function DueWidgets({ role, w, money }) {
+  return (
+    <>
+      {w.top_overdue && role !== "Sales" && (
+        <Card title="Top overdue customers" testId="w-top-overdue">
+          {w.top_overdue.length === 0 ? (
+            <Empty text="No overdue demands." />
+          ) : (
+            <ul className="divide-y text-sm">
+              {w.top_overdue.map((t) => (
+                <li key={t.booking_id} className="flex items-center justify-between py-2">
+                  <Link
+                    to={`/bookings/${t.booking_id}`}
+                    className="font-medium text-ink-950 hover:underline"
+                  >
+                    {t.customer_name}
+                    <span className="ml-2 font-mono text-xs text-txt-secondary">
+                      {t.booking_number}
+                    </span>
+                  </Link>
+                  <span className="font-bold text-brick">{money(t.overdue_paise)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      )}
+      {w.overdue_demands && role === "Accounts" && (
+        <Card title="Overdue bills" testId="w-overdue-demands">
+          {w.overdue_demands.length === 0 ? (
+            <Empty text="Nothing overdue." />
+          ) : (
+            <ul className="divide-y text-sm">
+              {w.overdue_demands.map((d) => (
+                <li key={d.id} className="flex items-center justify-between py-2">
+                  <Link to={`/bookings/${d.booking_id}`} className="text-ink-950 hover:underline">
+                    {d.demand_number} · {d.customer_name}
+                    <span className="block text-xs text-txt-secondary">
+                      {d.milestone_name} · due {fmtDate(d.due_date)}
+                    </span>
+                  </Link>
+                  <span className="font-bold text-brick">{money(d.balance_paise)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      )}
+      {w.pending_cheques && role !== "Sales" && (
+        <Card
+          title="Cheques in hand"
+          testId="w-pending-cheques"
+          action={
+            <span className="text-sm font-bold text-ink-950">
+              {money(w.pending_cheques.amount_paise)}
+            </span>
+          }
+        >
+          {w.pending_cheques.items.length === 0 ? (
+            <Empty text="No pending instruments." />
+          ) : (
+            <ul className="divide-y text-sm">
+              {w.pending_cheques.items.slice(0, 8).map((p) => (
+                <li key={p.id} className="flex items-center justify-between py-2">
+                  <span>
+                    {p.customer_name}
+                    <span className="block text-xs text-txt-secondary">
+                      {p.instrument?.number} · {fmtDate(p.instrument?.date)}
+                    </span>
+                  </span>
+                  <span className="font-semibold">{money(p.amount_paise)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      )}
+      {w.bounced_recent?.length > 0 && (
+        <Card title="Bounced (last 30 days)" testId="w-bounced">
+          <ul className="divide-y text-sm">
+            {w.bounced_recent.map((p) => (
+              <li key={p.id} className="flex items-center justify-between py-2 text-brick">
+                <span>
+                  {p.receipt_number} · {p.customer_name}
+                </span>
+                <span className="font-bold">{money(p.amount_paise)}</span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
+    </>
+  );
+}
+
+function ActivityWidgets({ role, w, money }) {
+  return (
+    <>
+      {w.new_enquiries && (role === "Sales" || role === "Super Admin" || role === "Marketing") && (
+        <Card
+          title="New website enquiries"
+          testId="w-enquiries"
+          action={
+            <Link
+              to="/leads?source=Website"
+              className="text-xs font-semibold text-gold-hover hover:underline"
+            >
+              Inbox
+            </Link>
+          }
+        >
+          {w.new_enquiries.length === 0 ? (
+            <Empty text="No unread enquiries." />
+          ) : (
+            <ul className="divide-y text-sm">
+              {w.new_enquiries.map((l) => (
+                <li key={l.id} className="py-2">
+                  <span className="font-medium text-ink-950">{l.name}</span>{" "}
+                  <span className="text-txt-secondary">
+                    · {l.phone} · {l.project_name || "General"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      )}
+      {w.follow_ups_due && role === "Sales" && (
+        <Card title="My follow-ups due" testId="w-followups">
+          {w.follow_ups_due.length === 0 ? (
+            <Empty text="Nothing due." />
+          ) : (
+            <ul className="divide-y text-sm">
+              {w.follow_ups_due.map((l) => (
+                <li key={l.id} className="flex items-center justify-between py-2">
+                  <Link to="/leads" className="text-ink-950 hover:underline">
+                    {l.name} <span className="text-xs text-txt-secondary">{l.status}</span>
+                  </Link>
+                  <span className="text-xs text-amber2">{fmtDate(l.next_follow_up_at)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      )}
+      {w.construction && (
+        <Card
+          title={role === "Sales" ? "Availability snapshot" : "Construction progress"}
+          testId="w-construction"
+        >
+          <ul className="space-y-3 text-sm">
+            {w.construction.map((c) => (
+              <li key={c.id}>
+                <div className="flex justify-between">
+                  <Link to={`/blocks/${c.id}`} className="font-medium text-ink-950 hover:underline">
+                    {c.block}
+                  </Link>
+                  <span className="text-xs text-txt-secondary">
+                    {c.available}/{c.total} available
+                    {c.next_milestone ? ` · next: ${c.next_milestone}` : ""}
+                  </span>
+                </div>
+                <div className="mt-1 h-2 overflow-hidden rounded-full bg-warm-50">
+                  <div className="h-full bg-gold" style={{ width: `${c.percent}%` }} />
+                </div>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
+      {w.inventory_by_project && role === "Super Admin" && (
+        <Card title="Inventory by project" testId="w-inventory">
+          <div className="scroll-x -mx-5 px-5" style={{ maxWidth: "calc(100% + 2.5rem)" }}>
+            <table className="w-full min-w-[420px] text-sm">
+              <thead className="label-xs">
+                <tr>
+                  <th className="pb-2 text-left">Project</th>
+                  <th className="pb-2 text-right">Available</th>
+                  <th className="pb-2 text-right">Booked</th>
+                  <th className="pb-2 text-right">Sold</th>
+                  <th className="min-w-[110px] pb-2 text-right">Value</th>
+                </tr>
+              </thead>
+              <tbody>
+                {w.inventory_by_project.map((p) => (
+                  <tr key={p.project} className="border-t">
+                    <td className="py-2 font-medium text-ink-950">{p.name}</td>
+                    <td className="py-2 text-right tabular">{p.available}</td>
+                    <td className="py-2 text-right tabular">{p.booked}</td>
+                    <td className="py-2 text-right tabular">{p.sold}</td>
+                    <td
+                      className="py-2 text-right tabular font-semibold text-ink-950 whitespace-nowrap"
+                      title={inr(p.inventory_value || 0)}
+                    >
+                      {inrShort(p.inventory_value || 0)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
+    </>
+  );
+}
+
+export function RoleWidgets() {
+  const { can } = useAuth();
+  const { data: w } = useFetch("/dashboard/widgets");
+  if (!w) return null;
+  const role = w.role;
+  const money = (v) => inr((v || 0) / 100);
+  const p = { role, w, money };
+  return (
+    <div
+      className="mt-6 space-y-6"
+      data-testid={`role-dashboard-${(role || "").toLowerCase().replace(" ", "-")}`}
+    >
+      <RoleStats {...p} />
+      <div className="grid min-w-0 gap-6 xl:grid-cols-2 [&>*]:min-w-0">
+        <ChartWidgets {...p} />
+        <DueWidgets {...p} />
+        <ActivityWidgets {...p} />
+      </div>
+      {can("reports.collections.view") && (
+        <Link
+          to="/reports"
+          className="inline-block text-sm font-semibold text-ink-950 underline-offset-4 hover:underline"
+          data-testid="dashboard-reports-link"
+        >
+          Open reports →
+        </Link>
+      )}
+    </div>
+  );
+}

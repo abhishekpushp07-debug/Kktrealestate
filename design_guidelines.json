@@ -1,0 +1,149 @@
+{
+  "project_name": "KKT Real Estate ERP",
+  "theme": "Royal Deep Navy Blue Theme",
+  "tech_stack": {
+    "frontend": "React js (.js / .jsx files)",
+    "styling": "Tailwind CSS + Lucide Icons / Phosphor Icons + Shadcn/UI primitives",
+    "backend": "FastAPI + MongoDB"
+  },
+  "typography": {
+    "primary_font": "Manrope, sans-serif",
+    "secondary_font": "Inter, sans-serif",
+    "mono_font": "JetBrains Mono, monospace",
+    "google_fonts_import": "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Manrope:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap",
+    "rules": {
+      "headings": "font-family: 'Manrope', sans-serif; font-weight: 700 or 800; tracking-tight;",
+      "body": "font-family: 'Inter', sans-serif; font-weight: 400 or 500;",
+      "numbers_and_currency": "font-family: 'JetBrains Mono', monospace or 'Manrope', sans-serif with font-variant-numeric: tabular-nums;",
+      "h1_max": "text-3xl sm:text-4xl lg:text-5xl (Never exceed text-5xl on desktop for ERP interface)",
+      "h2": "text-xl sm:text-2xl font-bold tracking-tight",
+      "h3": "text-lg font-semibold",
+      "labels": "text-xs font-semibold uppercase tracking-wider text-slate-500"
+    }
+  },
+  "colors": {
+    "brand_tokens": {
+      "primary_navy": "#0B1F3A",
+      "navy_800": "#10294D",
+      "navy_700": "#163866",
+      "navy_600": "#1C4882",
+      "navy_50": "#F0F4FA",
+      "gold_accent": "#C9A227",
+      "gold_hover": "#B38F1F",
+      "gold_light": "#FFF9E6",
+      "gold_border": "#E2C35D",
+      "surface_bg": "#F5F7FB",
+      "card_white": "#FFFFFF",
+      "border_light": "#E2E8F0"
+    },
+    "status_chip_colors": {
+      "available": {
+        "bg": "#ECFDF5",
+        "text": "#047857",
+        "border": "#A7F3D0",
+        "hex_badge": "#10B981",
+        "label": "Available"
+      },
+      "hold": {
+        "bg": "#FFFBEB",
+        "text": "#B45309",
+        "border": "#FDE68A",
+        "hex_badge": "#F59E0B",
+        "label": "Hold"
+      },
+      "booked": {
+        "bg": "#10294D",
+        "text": "#FFFFFF",
+        "border": "#163866",
+        "hex_badge": "#0B1F3A",
+        "label": "Booked"
+      },
+      "sold": {
+        "bg": "#FFF9E6",
+        "text": "#855D00",
+        "border": "#C9A227",
+        "hex_badge": "#C9A227",
+        "label": "Sold"
+      },
+      "blocked": {
+        "bg": "#F3F4F6",
+        "text": "#4B5563",
+        "border": "#D1D5DB",
+        "hex_badge": "#6B7280",
+        "label": "Blocked"
+      }
+    },
+    "semantic": {
+      "success": "#10B981",
+      "danger": "#EF4444",
+      "warning": "#F59E0B",
+      "info": "#3B82F6"
+    }
+  },
+  "layout_and_structure": {
+    "app_shell": {
+      "sidebar": "Collapsible left sidebar in deep navy (#0B1F3A). Expanded width 260px, collapsed width 72px. Active nav item has gold indicator border-l-4 border-[#C9A227] with soft gold tinted background (#10294D). Nav items use clean Lucide React icons.",
+      "header": "Top bar height 64px, surface background white (#FFFFFF) or navy accent with border-b border-slate-200. Features company logo/name 'KKT', search bar placeholder ('Search projects, flats, buyers...'), global notification bell, role tag, and user profile dropdown.",
+      "main_content": "Background #F5F7FB, padded with p-6 or p-8. High density and clean breathing room."
+    },
+    "grid_modes": {
+      "inventory_grid": "Matrix style (Floor x Flat Position). Sticky floor row headers on left, scrollable matrix. Each blockflat tile displays flat number, BHK configuration, area in sqft, and color-coded status chip. Interactive hover lift effect.",
+      "dashboard_bento": "4-column responsive grid (col-span-1 for inventory metric cards, col-span-2 row-span-2 for project pipeline chart, col-span-2 for block progress bars, col-span-1 for recent audit activity feed)."
+    }
+  },
+  "component_specifications": {
+    "login_page": {
+      "type": "Split Screen",
+      "left_panel": "Deep Navy (#0B1F3A) background with subtle metallic geometric grain texture, massive high-end KKT Real Estate ERP branding, royalty luxury tag line, key metric counter badges, and highrise background photo overlay at opacity 0.25.",
+      "right_panel": "Clean white background with centered form, high-contrast inputs, gold active focus ring, password toggle, tenant/employee login options, and quick demo credentials populator."
+    },
+    "inventory_grid_drawer": {
+      "behavior": "Clicking any flat in the Block Inventory Grid slides in a right-side Sheet/Drawer.",
+      "drawer_content": "Flat details (Flat No, BHK, Super Area, Carpet Area, Facing, Floor, Base Price in Indian Lakhs/Crores, Total Cost breakdown, Buyer Details if Booked/Sold, Status change dropdown, Payment schedule preview, Action CTA buttons: 'Hold Flat', 'Book Flat', 'Generate Cost Sheet')."
+    },
+    "master_data_section": {
+      "structure": "Dense table view with expandable side sheet / slide-over modal for creating or editing Master Data entities (Flat Types, Wings, Payment Plans, Amenities, Extra Charges).",
+      "flat_type_form": "Dynamic multi-row input builder for room dimensions, carpet area calculation, and surcharge matrices."
+    },
+    "users_and_roles": {
+      "role_editor": "Grouped permission matrix table with accordions (Projects, Inventory, Financials, Reports, Admin). Checkboxes for Read, Create, Edit, Delete, Export, Approve per module."
+    },
+    "tables": {
+      "style": "Dense sticky header tables, subtle hover rows (bg-slate-50), compact padding (py-3 px-4), column search inputs in table headers, sorting indicators, skeleton row loaders during fetching, pagination footer with page size selection."
+    }
+  },
+  "formatting_rules": {
+    "indian_currency": "Format all monetary values using Indian numbering system (e.g. ₹1.2 Cr, ₹45.5 L, ₹8,50,000). Use dedicated formatting utility helper `formatIndianCurrency(val)`.",
+    "area_format": "Append sq.ft. (e.g. 1,450 sq.ft.)."
+  },
+  "image_urls": [
+    {
+      "category": "login_background",
+      "url": "https://images.unsplash.com/photo-1635506232643-6c526f97e519?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA3MDR8MHwxfHNlYXJjaHwxfHxsdXh1cnklMjByZWFsJTIwZXN0YXRlJTIwYXJjaGl0ZWN0dXJlJTIwaGlnaHJpc2UlMjBtb2Rlcm58ZW58MHx8fHwxNzkyNzkzNDY0fDA&ixlib=rb-4.1.0&q=85",
+      "description": "Luxury high-rise modern architecture photo for Login left banner overlay."
+    },
+    {
+      "category": "project_showcase",
+      "url": "https://images.pexels.com/photos/14175804/pexels-photo-14175804.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "description": "Modern residential luxury high-rise tower photo for Project Detail header banner."
+    },
+    {
+      "category": "commercial_tower",
+      "url": "https://images.unsplash.com/photo-1625201212921-1c5e5557d451?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA3MDR8MHwxfHNlYXJjaHwyfHxsdXh1cnklMjByZWFsJTIwZXN0YXRlJTIwYXJjaGl0ZWN0dXJlJTIwaGlnaHJpc2UlMjBtb2Rlcm58ZW58MHx8fHwxNzkyNzkzNDY0fDA&ixlib=rb-4.1.0&q=85",
+      "description": "Architectural residential building preview photo for Block overview card."
+    }
+  ],
+  "testing_and_accessibility": {
+    "data_testid_requirement": "ALL interactive elements, navigation links, buttons, form inputs, status chips, table headers, drawer controls, modals, and metric cards MUST have explicit `data-testid` attributes in kebab-case format (e.g. data-testid='sidebar-projects-link', data-testid='flat-chip-101', data-testid='hold-flat-btn').",
+    "contrast_rule": "Header dropdowns and overlays MUST NOT use transparent backgrounds. Always use solid white bg-white or bg-[#10294D] dark popovers with shadow-lg and border border-slate-200.",
+    "hover_state_rule": "Always explicitly define hover text colors alongside background changes (e.g. hover:bg-[#0B1F3A] hover:text-white)."
+  },
+  "instructions_to_main_agent": [
+    "Build the application using standard React JavaScript (.js and .jsx files). Do not use TypeScript .tsx syntax.",
+    "Implement the theme tokens in tailwind.config.js and src/index.css so that bg-navy-900, bg-navy-800, text-gold-500, etc. work seamlessly across components.",
+    "Create reusable UI components in src/components/ui/ including Button, Input, Select, Table, Badge, Dialog, Sheet, Tabs, DropdownMenu, Skeleton, and Toaster (Sonner).",
+    "Include mock state and complete CRUD workflows for Phase 1: Authentication, Projects -> Blocks -> Flat grid generation, Flat drawer details, Master Data dynamic forms, Role permissions checkbox matrix, and Audit Log filterable list.",
+    "Ensure Indian currency formatting function is used everywhere numbers represent prices (Lakhs 'L' and Crores 'Cr').",
+    "Ensure every clickable button, input, tab, table row, flat grid cell, and modal trigger includes a data-testid attribute."
+  ]
+}

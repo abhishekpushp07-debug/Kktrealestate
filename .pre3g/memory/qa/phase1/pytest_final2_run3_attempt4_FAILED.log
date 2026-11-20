@@ -1,0 +1,155 @@
+bringing up nodes...
+bringing up nodes...
+
+........................................................................ [  9%]
+........................................................................ [ 19%]
+........................................................................ [ 28%]
+...........................................................s............ [ 38%]
+........................................................................ [ 47%]
+............................................F........................... [ 57%]
+........................................................................ [ 66%]
+........................................................................ [ 76%]
+........................................................................ [ 86%]
+.........sss............................................................ [ 95%]
+.............ss..................                                        [100%]
+=================================== FAILURES ===================================
+____________ test_late_night_entries_land_on_the_india_day[0-30-0] _____________
+[gw0] linux -- Python 3.11.18 /root/.venv/bin/python
+
+H = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzMzlkNmM0ZS1lYTU1LTRmNjMtYjRjZi0xYjk1NzgwODA...yLCJleHAiOjE3OTQ3OTcxNjJ9.xB7vVJSIoBzGKmTogKmrSiIXnj4hyLEDuj8hhCs1vpU', 'X-Rate-Limit-Bypass': 'kkt-test-bypass-local'}
+ctx = {'modes': {'CASH': {'id': 'b6a7dde1-e9f2-4826-983f-1c38b7f4279a', 'company_id': '182de9cf-682c-4b2b-9ded-57c88e7d418f'...ne1': '82, Patliputra Colony', 'line2': None, 'city': 'Patna', 'state': 'Bihar', ...}, 'address_permanent': None, ...}}
+hh = 0, mm = 30, slot = 0
+
+    @pytest.mark.parametrize("hh,mm,slot", [(0, 30, 0), (5, 29, 3)])
+    def test_late_night_entries_land_on_the_india_day(H, ctx, hh, mm, slot):
+        D = clock.today() - timedelta(days=1)
+        T, d, prev = _at(D, hh, mm), D.isoformat(), (D - timedelta(days=1)).isoformat()
+        f1, f2 = ctx["flats"][slot], ctx["flats"][slot + 1]
+        # receipt + reversal (JRN-31): the form date = today (D); the stamps and Roznamcha land on D, not on the UTC date
+        b = _book(H, ctx, f1, d, T)
+        keep = _cash(H, ctx, b, 7000, d, T)
+        wrong = _cash(H, ctx, b, 3000, d, T)
+        assert keep["payment_date"] == d and clock.day_of(keep.get("posted_at") or keep["created_at"]) == d
+        rv = call(H, "POST", f"/payments/{wrong['id']}/reverse", {"reason": "Q-12 wrong amount"}, as_of=T)
+        assert rv["status"] == "Reversed" and clock.day_of(rv["reversal"]["at"]) == d
+        led = call(H, "GET", f"/bookings/{b['id']}/ledger")["rows"]
+        assert {x["date"] for x in led if x["type"] in ("PAYMENT", "REVERSAL")} == {d}, led
+        rz = call(H, "GET", "/roznamcha", date=d)
+        assert any(x["receipt_number"] == wrong["receipt_number"] for x in rz["reversals"])
+        assert any(x["receipt_number"] == keep["receipt_number"] for x in rz["receipts"])
+        assert not any(
+            x["receipt_number"] == wrong["receipt_number"] for x in call(H, "GET", "/roznamcha", date=prev)["reversals"]
+        )
+        groups = {
+            g["group"]
+            for g in call(H, "GET", "/reports/collections-v2", from_date=d, to_date=d, group_by="receipt")["rows"]
+        }
+        assert {keep["receipt_number"], f"{wrong['receipt_number']} (reversal)"} <= groups, groups
+        # Home tiles under the frozen clock: today's money + follow-ups due today (JRN-33 rule)
+        lead = call(
+            H, "POST", "/leads", {"name": "Q12 Follow Up", "phone": f"9{random.randint(100000000, 999999999)}"}, as_of=T
+        )
+        due = _at(D, 11, 0).isoformat()
+        call(H, "POST", f"/leads/{lead['id']}/follow-ups", {"note": "Q-12 call back", "next_follow_up_at": due}, as_of=T)
+        due_ids = {x["id"] for x in call(H, "GET", "/leads", as_of=T, due_today="true", page_size=200)["items"]}
+        assert lead["id"] in due_ids
+        earlier = {
+            x["id"]
+            for x in call(H, "GET", "/leads", as_of=_at(D - timedelta(days=1), 12, 0), due_today="true", page_size=200)[
+                "items"
+            ]
+        }
+        assert lead["id"] not in earlier
+        home = call(H, "GET", "/dashboard", as_of=T)
+        assert home["collections"]["today"]["total_paise"] >= 700000 and home["collections"]["today"]["count"] >= 1
+        assert home["follow_ups_due"]["count"] >= 1
+        # cancel → refund: cancellation and refund are stamped D; the cancellations report for D has the booking, D-1 does not
+        c = call(H, "POST", f"/bookings/{b['id']}/cancel", {"reason": "Q-12 cancel", "deduction": 1000}, as_of=T)
+        assert clock.day_of(c["cancellation"]["at"]) == d and c["refund"]["amount_paise"] > 0
+        pd = call(
+            H,
+            "POST",
+            f"/refunds/{c['refund']['id']}/pay",
+            {"paid_date": d, "mode": "NEFT_RTGS", "bank_account_id": ctx["bank"]["id"], "reference": "Q12-UTR"},
+            as_of=T,
+        )
+        assert pd["status"] == "Paid" and pd["paid_date"] == d
+        # forfeiture: deduction == received
+>       b2 = _book(H, ctx, f2, d, T)
+             ^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_business_day.py:180: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_business_day.py:96: in _book
+    return call(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+H = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzMzlkNmM0ZS1lYTU1LTRmNjMtYjRjZi0xYjk1NzgwODA...yLCJleHAiOjE3OTQ3OTcxNjJ9.xB7vVJSIoBzGKmTogKmrSiIXnj4hyLEDuj8hhCs1vpU', 'X-Rate-Limit-Bypass': 'kkt-test-bypass-local'}
+method = 'POST', p = '/bookings'
+body = {'flat_id': 'a0fce7ef-2bdb-498d-9b34-4a1cfcc30c56', 'customer_id': '200bd2ed-41d2-4147-8e38-3e3d53f8e8f2', 'booking_date': '2026-11-15', 'agreement_value': 5000000, ...}
+as_of = datetime.datetime(2026, 11, 15, 0, 30, tzinfo=zoneinfo.ZoneInfo(key='Asia/Kolkata'))
+params = {}
+
+    def call(H, method, p, body=None, as_of=None, **params):
+        h = {**H, "Idempotency-Key": str(uuid.uuid4())}
+        if as_of is not None:
+            h["X-As-Of"] = as_of.isoformat()
+        r = requests.request(method, f"{API}{p}", headers=h, json=body, params=params, timeout=60)
+>       assert r.status_code in (200, 201), (method, p, r.status_code, r.text[:400])
+E       AssertionError: ('POST', '/bookings', 409, '{"detail":"Flat P9A-102 is Booked","code":"FLAT_NOT_AVAILABLE","request_id":"e3e8eeca4ebb4...error":{"code":"FLAT_NOT_AVAILABLE","message":"Flat P9A-102 is Booked","details":[],"request_id":"e3e8eeca4ebb4380"}}')
+E       assert 409 in (200, 201)
+E        +  where 409 = <Response [409]>.status_code
+
+tests/test_business_day.py:90: AssertionError
+=============================== warnings summary ===============================
+../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
+../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
+  /root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12: PendingDeprecationWarning: Please use `import python_multipart` instead.
+    import multipart
+
+../../root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854
+../../root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854
+  /root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854: DeprecationWarning: 'crypt' is deprecated and slated for removal in Python 3.13
+    from crypt import crypt as _crypt
+
+tests/test_startup_s1_s3_idempotent.py:71
+tests/test_startup_s1_s3_idempotent.py:71
+  /app/backend/tests/test_startup_s1_s3_idempotent.py:71: PytestUnknownMarkWarning: Unknown pytest.mark.timeout - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.timeout(900)
+
+tests/test_phase_k_p1.py::test_loadshed_sheds_with_prebuilt_503_and_exempts_probes
+  /root/.venv/lib/python3.11/site-packages/starlette/testclient.py:41: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    [], typing.ContextManager[anyio.abc.BlockingPortal]
+
+tests/test_phase_q.py::test_void_watermark_deterministic
+tests/test_phase_q.py::test_void_watermark_deterministic
+tests/test_phase_q.py::test_void_watermark_deterministic
+tests/test_phase_q.py::test_void_watermark_deterministic
+tests/test_phase_q.py::test_void_watermark_deterministic
+tests/test_phase_q.py::test_void_watermark_deterministic
+tests/test_phase_q.py::test_void_watermark_deterministic
+tests/test_phase_q.py::test_void_watermark_deterministic
+  /root/.venv/lib/python3.11/site-packages/pypdf/_page.py:1368: DeprecationWarning: Calling `PageObject.replace_contents()` for pages not assigned to a writer is deprecated and will be removed in pypdf 7.0.0. Attach the page to the writer first or use `PdfWriter(clone_from=...)` directly. The existing approach has proved being unreliable.
+    self.replace_contents(ContentStream(new_content_array, self.pdf))
+
+tests/test_kkt_erp.py::TestBlock::test_create_block_and_generation
+tests/test_kkt_erp.py::TestFlatType::test_create_flat_type_auto_area
+tests/test_phase_7.py::TestPortalPhase7::test_portal_booking_payment_plan
+tests/test_phase_7.py::TestPortalPhase7::test_portal_booking_payment_plan
+  /root/.venv/lib/python3.11/site-packages/_pytest/fixtures.py:1313: PytestRemovedIn10Warning: Class-scoped fixture defined as instance method is deprecated.
+  Instance attributes set in this fixture will NOT be visible to test methods,
+  as each test gets a new instance while the fixture runs only once per class.
+  Use @classmethod decorator and set attributes on cls instead.
+  See https://docs.pytest.org/en/stable/deprecations.html#class-scoped-fixture-as-instance-method
+    fixturefunc = resolve_fixture_function(fixturedef, request)
+
+tests/test_phase_5.py::TestPortalData::test_booking_detail_and_subresources
+  /root/.venv/lib/python3.11/site-packages/_pytest/python.py:171: PytestReturnNotNoneWarning: Test functions should return None, but tests/test_phase_5.py::TestPortalData::test_booking_detail_and_subresources returned <class 'str'>.
+  Did you mean to use `assert` instead of `return`?
+  See https://docs.pytest.org/en/stable/how-to/assert.html#return-not-none for more information.
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_business_day.py::test_late_night_entries_land_on_the_india_day[0-30-0]
+1 failed, 746 passed, 6 skipped, 20 warnings in 560.60s (0:09:20)

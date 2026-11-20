@@ -1,0 +1,25 @@
+JRN-135 — history counts: before = first 3G audit run (pre-fix JSONs memory/qa/db_audit/<db>.json), after = now
+| DB | collection | before | after | lower? |
+|---|---|---|---|---|
+| test_database | audit_logs | 421531 | 421531 | no |
+| test_database | audit_logs_archive | 0 | 0 | no |
+| test_database | login_events | 11267 | 11275 | no |
+| test_database | notifications | 16599 | 16599 | no |
+| test_database | job_runs | 5537 | 6037 | no |
+| kkt_medium | audit_logs | 421846 | 421846 | no |
+| kkt_medium | audit_logs_archive | 0 | 0 | no |
+| kkt_medium | login_events | 11268 | 11277 | no |
+| kkt_medium | notifications | 16644 | 16979 | no |
+| kkt_medium | job_runs | 5608 | 5616 | no |
+| kkt_volume | audit_logs | 58158 | 58225 | no |
+| kkt_volume | audit_logs_archive | 0 | 0 | no |
+| kkt_volume | login_events | 37 | 41 | no |
+| kkt_volume | notifications | 71280 | 71547 | no |
+| kkt_volume | job_runs | 148 | 153 | no |
+
+Expiry (TTL) indexes now:
+test_database ['backups.expires_at_1', 'brochure_tokens.expires_at_1', 'cache.expires_at_1', 'idempotency_claims.ttl_idem_claims', 'idempotency_keys.created_at_1', 'portal_refresh_tokens.ttl_expires', 'portal_refresh_tokens.ttl_expires_dt', 'rate_limits.expires_at_1', 'refresh_tokens.ttl_expires', 'refresh_tokens.ttl_expires_dt', 'report_cache.expires_at_1', 'uploads.created_at_1']
+kkt_medium ['backups.expires_at_1', 'brochure_tokens.expires_at_1', 'cache.expires_at_1', 'idempotency_claims.ttl_idem_claims', 'idempotency_keys.created_at_1', 'portal_refresh_tokens.ttl_expires', 'portal_refresh_tokens.ttl_expires_dt', 'rate_limits.expires_at_1', 'refresh_tokens.ttl_expires', 'refresh_tokens.ttl_expires_dt', 'report_cache.expires_at_1', 'uploads.created_at_1']
+kkt_volume ['backups.expires_at_1', 'brochure_tokens.expires_at_1', 'cache.expires_at_1', 'idempotency_claims.ttl_idem_claims', 'idempotency_keys.created_at_1', 'portal_refresh_tokens.ttl_expires_dt', 'rate_limits.expires_at_1', 'refresh_tokens.ttl_expires_dt', 'report_cache.expires_at_1', 'uploads.created_at_1']
+
+TTL on a history collection: none

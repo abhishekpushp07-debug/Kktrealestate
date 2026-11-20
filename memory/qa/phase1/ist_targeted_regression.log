@@ -1,0 +1,61 @@
+bringing up nodes...
+bringing up nodes...
+
+.................................................................F...... [ 51%]
+............................F........................sss.............    [100%]
+=================================== FAILURES ===================================
+_____________________ test_outstanding_three_balances_law ______________________
+[gw0] linux -- Python 3.11.18 /root/.venv/bin/python
+
+    def test_outstanding_three_balances_law():
+        h = _h()
+        o = requests.get(f"{API}/reports/outstanding-v2", headers=h, timeout=60).json()
+        labels = [c["label"] for c in o["columns"]]
+        assert ["Outstanding", "Advance held", "Net balance"] == [
+            l for l in labels if l in ("Outstanding", "Advance held", "Net balance")
+        ]
+        for r in o["rows"]:
+>           assert (
+                r["net_balance_paise"] == r["outstanding_paise"] - r["advance_paise"] == r["udhar_paise"] - r["jama_paise"]
+            )
+E           assert (426510700 - 0) == (587735700 - 1000000)
+
+tests/test_phase_i_reports.py:208: AssertionError
+________________________ test_propagation_health_clean _________________________
+[gw1] linux -- Python 3.11.18 /root/.venv/bin/python
+
+H = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxODBlMTgyOC02OTBjLTRmN2ItYjdiOS1lNDI0MTNiMjB...2LCJleHAiOjE3OTQ3ODA2ODZ9.sAhjv8lxQ6yN_s2j2jJe3JQl5IOYceNycVZ80YV289Q', 'X-Rate-Limit-Bypass': 'kkt-test-bypass-local'}
+
+    def test_propagation_health_clean(H):
+        h = g(H, "/admin/propagation")
+        import time as _t
+    
+        _t.sleep(1)
+        h = g(H, "/admin/propagation")
+        failing = [
+            f for f in h["failing"] if f["action"] not in ("portal.login", "auth.login")
+        ]  # concurrent logins from other workers propagate asynchronously
+>       assert failing == [], failing
+E       AssertionError: [{'id': 'e5d89a8b-b89e-43d9-860a-3f8dccd3c9ae', 'action': 'document.generated', 'created_at': '2026-11-14T19:00:00+00:00', 'propagated': {}}]
+E       assert [{'id': 'e5d8...pagated': {}}] == []
+E         
+E         Left contains one more item: {'id': 'e5d89a8b-b89e-43d9-860a-3f8dccd3c9ae', 'action': 'document.generated', 'created_at': '2026-11-14T19:00:00+00:00', 'propagated': {}}
+E         Use -v to get more diff
+
+tests/effects/test_events.py:485: AssertionError
+=============================== warnings summary ===============================
+../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
+../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
+  /root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12: PendingDeprecationWarning: Please use `import python_multipart` instead.
+    import multipart
+
+../../root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854
+../../root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854
+  /root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854: DeprecationWarning: 'crypt' is deprecated and slated for removal in Python 3.13
+    from crypt import crypt as _crypt
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_phase_i_reports.py::test_outstanding_three_balances_law - a...
+FAILED tests/effects/test_events.py::test_propagation_health_clean - Assertio...
+2 failed, 136 passed, 3 skipped, 4 warnings in 30.61s

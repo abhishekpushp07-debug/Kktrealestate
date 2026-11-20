@@ -1,0 +1,38 @@
+{
+ "ok": true,
+ "owner": [
+  "ageing",
+  "attention",
+  "call_today",
+  "construction",
+  "due_vs_received",
+  "flat_status",
+  "inflow_30",
+  "inventory",
+  "money_today",
+  "next_milestone",
+  "pipeline"
+ ],
+ "sales@kkt.in": {
+  "widgets": [
+   "call_today",
+   "flat_status",
+   "inventory",
+   "pipeline"
+  ],
+  "extra": [],
+  "has_rupee": false
+ },
+ "accounts@kkt.in": {
+  "widgets": [
+   "ageing",
+   "attention",
+   "call_today",
+   "due_vs_received",
+   "inflow_30",
+   "money_today"
+  ],
+  "extra": [],
+  "has_rupee": true
+ }
+}

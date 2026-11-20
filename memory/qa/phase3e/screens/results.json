@@ -1,0 +1,254 @@
+[
+ {
+  "theme": "light",
+  "width": 1440,
+  "screen": "home",
+  "h_overflow_px": 0,
+  "data_theme": "day"
+ },
+ {
+  "theme": "light",
+  "width": 1440,
+  "screen": "booking-waivers",
+  "h_overflow_px": 0,
+  "data_theme": "day"
+ },
+ {
+  "theme": "light",
+  "width": 1440,
+  "screen": "booking-overview-discount",
+  "h_overflow_px": 0,
+  "data_theme": "day"
+ },
+ {
+  "theme": "light",
+  "width": 1440,
+  "screen": "discount-register",
+  "h_overflow_px": 0,
+  "data_theme": "day"
+ },
+ {
+  "theme": "light",
+  "width": 1440,
+  "screen": "waiver-register",
+  "h_overflow_px": 0,
+  "data_theme": "day"
+ },
+ {
+  "theme": "light",
+  "width": 1440,
+  "screen": "customer360-lifecycle",
+  "h_overflow_px": 0,
+  "data_theme": "day"
+ },
+ {
+  "theme": "light",
+  "width": 1440,
+  "screen": "service-requests",
+  "h_overflow_px": 0,
+  "data_theme": "day"
+ },
+ {
+  "theme": "light",
+  "width": 1440,
+  "screen": "roznamcha",
+  "h_overflow_px": 0,
+  "data_theme": "day"
+ },
+ {
+  "theme": "light",
+  "width": 1440,
+  "screen": "booking-wizard",
+  "h_overflow_px": 0,
+  "data_theme": "day"
+ },
+ {
+  "theme": "light",
+  "width": 390,
+  "screen": "home",
+  "h_overflow_px": 0,
+  "data_theme": "day"
+ },
+ {
+  "theme": "light",
+  "width": 390,
+  "screen": "booking-waivers",
+  "h_overflow_px": 0,
+  "data_theme": "day"
+ },
+ {
+  "theme": "light",
+  "width": 390,
+  "screen": "booking-overview-discount",
+  "h_overflow_px": 0,
+  "data_theme": "day"
+ },
+ {
+  "theme": "light",
+  "width": 390,
+  "screen": "discount-register",
+  "h_overflow_px": 0,
+  "data_theme": "day"
+ },
+ {
+  "theme": "light",
+  "width": 390,
+  "screen": "waiver-register",
+  "h_overflow_px": 0,
+  "data_theme": "day"
+ },
+ {
+  "theme": "light",
+  "width": 390,
+  "screen": "customer360-lifecycle",
+  "h_overflow_px": 0,
+  "data_theme": "day"
+ },
+ {
+  "theme": "light",
+  "width": 390,
+  "screen": "service-requests",
+  "h_overflow_px": 0,
+  "data_theme": "day"
+ },
+ {
+  "theme": "light",
+  "width": 390,
+  "screen": "roznamcha",
+  "h_overflow_px": 0,
+  "data_theme": "day"
+ },
+ {
+  "theme": "light",
+  "width": 390,
+  "screen": "booking-wizard",
+  "h_overflow_px": 0,
+  "data_theme": "day"
+ },
+ {
+  "theme": "night",
+  "width": 1440,
+  "screen": "home",
+  "h_overflow_px": 0,
+  "data_theme": "night"
+ },
+ {
+  "theme": "night",
+  "width": 1440,
+  "screen": "booking-waivers",
+  "h_overflow_px": 0,
+  "data_theme": "night"
+ },
+ {
+  "theme": "night",
+  "width": 1440,
+  "screen": "booking-overview-discount",
+  "h_overflow_px": 0,
+  "data_theme": "night"
+ },
+ {
+  "theme": "night",
+  "width": 1440,
+  "screen": "discount-register",
+  "h_overflow_px": 0,
+  "data_theme": "night"
+ },
+ {
+  "theme": "night",
+  "width": 1440,
+  "screen": "waiver-register",
+  "h_overflow_px": 0,
+  "data_theme": "night"
+ },
+ {
+  "theme": "night",
+  "width": 1440,
+  "screen": "customer360-lifecycle",
+  "h_overflow_px": 0,
+  "data_theme": "night"
+ },
+ {
+  "theme": "night",
+  "width": 1440,
+  "screen": "service-requests",
+  "h_overflow_px": 0,
+  "data_theme": "night"
+ },
+ {
+  "theme": "night",
+  "width": 1440,
+  "screen": "roznamcha",
+  "h_overflow_px": 0,
+  "data_theme": "night"
+ },
+ {
+  "theme": "night",
+  "width": 1440,
+  "screen": "booking-wizard",
+  "h_overflow_px": 0,
+  "data_theme": "night"
+ },
+ {
+  "theme": "night",
+  "width": 390,
+  "screen": "home",
+  "h_overflow_px": 0,
+  "data_theme": "night"
+ },
+ {
+  "theme": "night",
+  "width": 390,
+  "screen": "booking-waivers",
+  "h_overflow_px": 0,
+  "data_theme": "night"
+ },
+ {
+  "theme": "night",
+  "width": 390,
+  "screen": "booking-overview-discount",
+  "h_overflow_px": 0,
+  "data_theme": "night"
+ },
+ {
+  "theme": "night",
+  "width": 390,
+  "screen": "discount-register",
+  "h_overflow_px": 0,
+  "data_theme": "night"
+ },
+ {
+  "theme": "night",
+  "width": 390,
+  "screen": "waiver-register",
+  "h_overflow_px": 0,
+  "data_theme": "night"
+ },
+ {
+  "theme": "night",
+  "width": 390,
+  "screen": "customer360-lifecycle",
+  "h_overflow_px": 0,
+  "data_theme": "night"
+ },
+ {
+  "theme": "night",
+  "width": 390,
+  "screen": "service-requests",
+  "h_overflow_px": 0,
+  "data_theme": "night"
+ },
+ {
+  "theme": "night",
+  "width": 390,
+  "screen": "roznamcha",
+  "h_overflow_px": 0,
+  "data_theme": "night"
+ },
+ {
+  "theme": "night",
+  "width": 390,
+  "screen": "booking-wizard",
+  "h_overflow_px": 0,
+  "data_theme": "night"
+ }
+]

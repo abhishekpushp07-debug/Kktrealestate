@@ -1,0 +1,4 @@
+stage 100u: 15300 req 101.7 rps p50=897.5 p95=1665.2 p99=1811.2 err=0.0% proc={'cpu_pct': 53.2, 'rss_mb': 257.8}
+stage 300u: 13235 req 86.4 rps p50=2991.4 p95=5518.7 p99=13038.5 err=3.69% proc={'cpu_pct': 68.3, 'rss_mb': 370.1}
+stage 600u: 9216 req 58.0 rps p50=10339.7 p95=19241.4 p99=22953.6 err=0.97% proc={'cpu_pct': 67.1, 'rss_mb': 497.9}
+wrote /app/memory/qa/perf

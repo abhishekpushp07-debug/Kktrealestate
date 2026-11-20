@@ -1,0 +1,27 @@
+{
+  "summary": "Retest of the iteration_35 fixes (Phase 2 chunk 2B+2C + A2), run on the preview production build with admin@kkt.in. All 5 fixes and the quick regression checks pass. (1) Theme: clicking theme-night sends PATCH /api/auth/me/preferences, which returns 200, and no 'Theme not saved' toast appears. Night survives a reload. A fresh browser context with empty localStorage logs in already in Night. Switching back to Light also returns 200 and survives a reload, and the server ui_theme is now 'light' again. (2) search-pill at 1440 px and search-icon-mobile at 390 px both open command-palette-input. (3) Palette: typing 'Rah' shows the Customers group first (palette-group-customers), then Bookings, and no Actions/Pages. The first highlighted item is the customer Rahul Malhotra, and Enter opens /customers/<id>, not Roznamcha. 'roz' shows only the label matches 'Roznamcha (today)' and 'Report · Roznamcha Summary'. An empty query shows Actions and Pages (no Recent in a fresh context, which is expected). 'zzqx' shows palette-no-match with the New customer and New lead buttons. (4) Customer 360 (Kavita Sinha) → Demands tab has 7 journey-btn-bill-* buttons. journey-btn-bill-DM-2627-14077 opens the journey panel with the entry 'Demand created · 16 May' and 15 surfaces. The backend call GET /api/journey/entity/demand/{id} returns the demand.create row that is stored on the booking. (5) New → Site visit lands on /leads?tab=visits&new=visit with the 'New site visit' dialog open. Regression: sidebar order Home, Projects, Customers, Bookings, Payments, Construction, Documents, Reports, Masters, Admin; the New menu has exactly 5 items (Booking, Payment, Lead, Customer, Site visit); Home renders cleanly in Light and Night; no horizontal scroll at 390 px (scrollWidth 390).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Home KPI sparkline cards (1440 px)", "issues": ["Values such as '₹1.56 Cr', '₹3.05 Cr' and '₹1.66 Cr' wrap onto two lines ('Cr' drops to its own line) because the sparkline takes width. Cosmetic. Seen in iteration_35 as well, still unresolved."]},
+      {"screen": "Journey panel wording", "issues": ["The review request expected 'Demand raised', but the panel shows 'Demand created'. The function is correct. Align the wording only if 'raised' was intended."]}
+    ]
+  },
+  "test_report_links": ["/app/tests/kkt2bc/test_phase2bc_prefs_search.py"],
+  "action_items": [
+    "Optional: stop the KPI sparkline card values from wrapping (use nowrap or a smaller font at the lg breakpoint).",
+    "Optional: carry over the remaining LOW items from iteration_35 (Night inverted selected chips; theme-light/theme-night testids duplicated between the top bar and the user menu)."
+  ],
+  "critical_code_review_comments": [
+    "In api.js the PATCH version guard now exempts config.unversioned, and theme.js passes {unversioned:true}. This is correct and narrowly scoped.",
+    "PaletteResults filters by label manually (shouldFilter=false) and shows records first when a query is typed. Records are not filtered on the client, so the ordering of server results decides the first highlighted item."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (journey demand endpoint verified via curl)", "frontend": "100% (all 6 requested items)"},
+  "seed_data_creation": "None. No records were created. The admin ui_theme was switched to night and then restored to light (verified via /api/auth/me).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "All iteration_35 bugs are fixed. Test record: customer ebe4e3e9-8934-4df9-895e-c94ed4cc31ba (Kavita Sinha); its first bill is DM-2627-14077. The Customer 360 tab is labelled 'Demands', not 'Bills'. Each browser_automation call gets a fresh context, which is useful for checking that the server theme is adopted at login. The admin theme was left on light."
+}

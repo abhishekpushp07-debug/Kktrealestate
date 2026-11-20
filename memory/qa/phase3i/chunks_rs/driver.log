@@ -1,0 +1,46 @@
+chunk 0 start 02:38:14 ceeac3b
+about to fork child process, waiting until server is ready for connections.
+forked process: 5846
+child process started successfully, parent exiting
+{ ok: 1 }
+rs up + restored 02:38:46
+chunk 0: ============ 51 passed, 1 skipped, 4 warnings in 259.33s (0:04:19) =============
+chunk 1 start 02:44:09 ceeac3b
+chunk 1: ================== 134 passed, 4 warnings in 76.11s (0:01:16) ==================
+chunk 2 start 02:46:32 ceeac3b
+chunk 2: ================= 122 passed, 1 skipped, 4 warnings in 47.27s ==================
+chunk 3 start 02:48:24 ceeac3b
+chunk 3: ================= 139 passed, 2 warnings in 211.80s (0:03:31) ==================
+chunk 4 start 02:53:02 ceeac3b
+chunk 4: ================= 193 passed, 3 warnings in 241.40s (0:04:01) ==================
+chunk 5 start 02:58:09 ceeac3b
+chunk 5 start 03:20:01 ceeac3b
+about to fork child process, waiting until server is ready for connections.
+forked process: 924
+child process started successfully, parent exiting
+{ ok: 1 }
+rs up + restored 03:20:36
+chunk 5: ============ 51 passed, 1 skipped, 4 warnings in 252.30s (0:04:12) =============
+chunk 6 start 03:25:50 ceeac3b
+chunk 6: ======================= 73 passed, 12 warnings in 42.63s =======================
+chunk 7 start 03:27:34 ceeac3b
+chunk 7: ======================= 46 passed, 4 warnings in 11.72s ========================
+chunk 8 start 03:28:46 ceeac3b
+chunk 8: ================== 62 passed, 4 warnings in 334.13s (0:05:34) ==================
+chunk 9 start 03:35:22 ceeac3b
+chunk 9: ======================== 26 passed, 3 skipped in 4.55s =========================
+ALL CHUNKS DONE 03:36:29
+SEQ DONE 03:36:29
+chunk 1 start 03:58:35 ceeac3b
+about to fork child process, waiting until server is ready for connections.
+forked process: 3350
+child process started successfully, parent exiting
+{ ok: 1 }
+rs up + restored 03:59:07
+chunk 1: ============ 51 passed, 1 skipped, 4 warnings in 252.80s (0:04:12) =============
+chunk 1 start 04:04:21 ceeac3b
+chunk 1: ================== 134 passed, 4 warnings in 73.46s (0:01:13) ==================
+chunk 5 start 04:06:35 ceeac3b
+chunk 5: ================= 103 passed, 4 warnings in 271.91s (0:04:31) ==================
+ALL CHUNKS DONE 04:12:09
+SEQ DONE 04:12:09

@@ -1,0 +1,370 @@
+bringing up nodes...
+bringing up nodes...
+
+........................................................................ [ 10%]
+........................................................................ [ 20%]
+........................................................................ [ 30%]
+.............................................F........s................. [ 40%]
+....................................F................................... [ 50%]
+................................................................F....... [ 60%]
+.........................F.............................................. [ 70%]
+......................................................FF................ [ 80%]
+..................F...........................sssF.F.....F.............. [ 90%]
+..............FF................s.s.................FF.....F.........    [100%]
+=================================== FAILURES ===================================
+________________ test_report_json_csv_pdf_and_etag[sales-team] _________________
+[gw0] linux -- Python 3.11.18 /root/.venv/bin/python
+
+key = 'sales-team'
+
+    @pytest.mark.parametrize("key", NEW)
+    def test_report_json_csv_pdf_and_etag(key):
+        h = _h()
+        r = requests.get(f"{API}/reports/{key}", headers=h, timeout=90)
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert "columns" in body and "rows" in body and "totals" in body and body.get("purpose")
+        tag = r.headers.get("ETag")
+        assert tag
+        r304 = requests.get(f"{API}/reports/{key}", headers={**h, "If-None-Match": tag}, timeout=90)
+>       assert r304.status_code == 304
+E       assert 200 == 304
+E        +  where 200 = <Response [200]>.status_code
+
+tests/test_phase_i_reports.py:62: AssertionError
+____________________ test_bootstrap_include_cursor_snapshot ____________________
+[gw1] linux -- Python 3.11.18 /root/.venv/bin/python
+
+    def test_bootstrap_include_cursor_snapshot():
+        h = H()
+        r = requests.get(f"{BASE}/bootstrap", headers=h, timeout=15)
+        assert (
+            r.status_code == 200
+            and r.headers.get("ETag")
+            and "Server-Timing" in r.headers
+            and r.headers.get("X-Request-ID")
+        )
+        d = r.json()
+        assert set(d) >= {
+            "me",
+            "permissions",
+            "role",
+            "project_scope",
+            "company",
+            "settings_public",
+            "catalogues_version",
+            "counts",
+        }
+>       assert (
+            requests.get(f"{BASE}/bootstrap", headers={**h, "If-None-Match": r.headers["ETag"]}, timeout=15).status_code
+            == 304
+        )
+E       assert 200 == 304
+E        +  where 200 = <Response [200]>.status_code
+E        +    where <Response [200]> = <function get at 0xf81cee19d9e0>('http://127.0.0.1:8021/api/bootstrap', headers={'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhYWJiZDE3MC0zYTVhLTQ3NmItYjIxNS01OTMzOTU4N2M...BeA', 'Idempotency-Key': '61dfe475-7f0c-46e6-b230-b554dfc87059', 'If-None-Match': '"ed881a0ad15a2e8ff121ef7e7fa4e5dc"'}, timeout=15)
+E        +      where <function get at 0xf81cee19d9e0> = requests.get
+
+tests/test_phase_11a.py:414: AssertionError
+___________ test_register_overdue_equals_outstanding_report_overdue ____________
+[gw0] linux -- Python 3.11.18 /root/.venv/bin/python
+
+admin_headers = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhYWJiZDE3MC0zYTVhLTQ3NmItYjIxNS01OTMzOTU4N2M...iYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzk0NjE1NzI0LCJleHAiOjE3OTQ2MTY2MjR9.-IUic8tZLnNrIp-unJERHmuVEbDfWyw995IuNxQz5zA'}
+
+    @pytest.mark.load_sensitive
+    def test_register_overdue_equals_outstanding_report_overdue(admin_headers):
+        k = requests.get(f"{BASE}/api/demands/kpis", headers=admin_headers).json()
+        rep = requests.get(f"{BASE}/api/reports/outstanding", headers=admin_headers).json()
+        report_overdue = rep["totals"]["overdue_paise"] if "totals" in rep else sum(r["overdue_paise"] for r in rep["rows"])
+>       assert k["overdue_paise"] == report_overdue, (k["overdue_paise"], report_overdue)
+E       AssertionError: (5281749100, 5241749100)
+E       assert 5281749100 == 5241749100
+
+tests/test_phase_p2.py:79: AssertionError
+______________________ test_no_source_line_over_160_chars ______________________
+[gw0] linux -- Python 3.11.18 /root/.venv/bin/python
+
+    def test_no_source_line_over_160_chars():
+        files = _tracked(BACKEND, "*.py") + [
+            f for f in _tracked(FRONTEND, "src") if f.endswith((".js", ".jsx", ".ts", ".tsx", ".css"))
+        ]
+        long = []
+        for f in files:
+            with open(f, encoding="utf-8") as fh:
+                long += [
+                    f"{os.path.relpath(f, BACKEND)}:{i}" for i, ln in enumerate(fh, 1) if len(ln.rstrip("\n")) > MAX_LINE
+                ]
+>       assert not long, f"{len(long)} lines > {MAX_LINE} chars: {long[:20]}"
+E       AssertionError: 3 lines > 160 chars: ['tools/demo_journeys.py:63', 'tools/demo_journeys.py:64', 'tools/demo_journeys.py:121']
+E       assert not ['tools/demo_journeys.py:63', 'tools/demo_journeys.py:64', 'tools/demo_journeys.py:121']
+
+tests/test_format_gate.py:49: AssertionError
+__________ test_tower_from_template_never_silent_about_payment_plans ___________
+[gw0] linux -- Python 3.11.18 /root/.venv/bin/python
+
+admin_headers = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhYWJiZDE3MC0zYTVhLTQ3NmItYjIxNS01OTMzOTU4N2M...iYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzk0NjE1NzI0LCJleHAiOjE3OTQ2MTY2MjR9.-IUic8tZLnNrIp-unJERHmuVEbDfWyw995IuNxQz5zA'}
+
+    def test_tower_from_template_never_silent_about_payment_plans(admin_headers):
+        """Seeded tower templates carry a default payment plan; a plan whose stage is missing from the stage plan yields a visible warning, not silence."""
+        h = admin_headers
+        seeded = [
+            t for t in _get(h, "/tower-templates")["items"] if t.get("seeded") and t.get("default_stage_plan_template_id")
+        ]
+>       assert seeded, "seed must produce tower templates"
+E       AssertionError: seed must produce tower templates
+E       assert []
+
+tests/test_phase_s1_templates.py:257: AssertionError
+______________________ test_hard_purge_refuses_real_data _______________________
+[gw1] linux -- Python 3.11.18 /root/.venv/bin/python
+
+base_url = 'http://127.0.0.1:8021'
+admin_headers = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhYWJiZDE3MC0zYTVhLTQ3NmItYjIxNS01OTMzOTU4N2M...iYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzk0NjE1NzI0LCJleHAiOjE3OTQ2MTY2MjR9.-IUic8tZLnNrIp-unJERHmuVEbDfWyw995IuNxQz5zA'}
+
+    def test_hard_purge_refuses_real_data(base_url, admin_headers):
+        sgh = next(
+            p
+            for p in requests.get(f"{base_url}/api/projects", headers=admin_headers, timeout=30).json()["items"]
+            if p["code"] == "SGH"
+        )
+        blk = requests.get(
+            f"{base_url}/api/blocks", params={"project_id": sgh["id"]}, headers=admin_headers, timeout=30
+        ).json()["items"][0]
+        r = requests.post(
+            f"{base_url}/api/admin/hard-purge",
+            json={"dry_run": True, "block_ids": [blk["id"]]},
+            headers=admin_headers,
+            timeout=60,
+        )
+        assert (
+            r.status_code == 409
+            and r.json()["detail"].startswith("Purge stopped:")
+            and "is not test data" in r.json()["detail"]
+        )
+        dry = requests.post(
+            f"{base_url}/api/admin/hard-purge", json={"dry_run": True}, headers=admin_headers, timeout=60
+        ).json()
+>       assert dry["dry_run"] is True and not dry["counts"], dry["counts"]
+E       AssertionError: {'projects': 1, 'leads': 3, 'site_visits': 1, 'customers': 4, ...}
+E       assert (True is True and not {'projects': 1, 'leads': 3, 'site_visits': 1, 'customers': 4, ...})
+
+tests/test_receipt_split.py:75: AssertionError
+__________ TestErpServiceRequests.test_filters_and_detail_and_actions __________
+[gw0] linux -- Python 3.11.18 /root/.venv/bin/python
+
+self = <tests.test_phase_5.TestErpServiceRequests object at 0xf96b94341b50>
+sales_tok = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxNzhiYzJjNC1mYThiLTQ4N2UtYjU3Yy1lZmU5YTIzZjFiZjciLCJjaWQiOiI2MDU4OTdm...oiYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzk0NjE2MDIwLCJleHAiOjE3OTQ2MTY5MjB9.jDpNeRp6WVmIdgXa0hQCJ2mRLgOHtJCrc0TwxEUISMI'
+admin_tok = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhYWJiZDE3MC0zYTVhLTQ3NmItYjIxNS01OTMzOTU4N2M0OTkiLCJjaWQiOiI2MDU4OTdm...oiYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzk0NjE2MDIwLCJleHAiOjE3OTQ2MTY5MjB9.HbaETmkfT9xXNyeOENJUH6WlZzdc8n8szw6HiQfhSFY'
+
+    def test_filters_and_detail_and_actions(self, sales_tok, admin_tok):
+        r = requests.get(f"{BASE}/api/service-requests?status=New", headers=_hdr(sales_tok))
+        assert r.status_code == 200
+        items = r.json().get("items") or []
+        sr4 = [s for s in items if s.get("ticket_number") == "SR-2627-0004"]
+        if not sr4:
+            # try by ticket number (list has grown past one page)
+            all_items = (
+                requests.get(f"{BASE}/api/service-requests?search=SR-2627-0004&page_size=100", headers=_hdr(sales_tok))
+                .json()
+                .get("items", [])
+            )
+            sr4 = [s for s in all_items if s.get("ticket_number") == "SR-2627-0004"]
+>       assert sr4, "SR-2627-0004 missing"
+E       AssertionError: SR-2627-0004 missing
+E       assert []
+
+tests/test_phase_5.py:367: AssertionError
+_____________________ test_story_chronology_zero_problems ______________________
+[gw1] linux -- Python 3.11.18 /root/.venv/bin/python
+
+    def test_story_chronology_zero_problems():
+        db = MongoClient(os.environ["MONGO_URL"])[os.environ["DB_NAME"]]
+        problems = check(db, date.today().isoformat())
+>       assert not problems, problems[:10]
+E       AssertionError: ['BK-2627-1785: booked 2026-10-20 before its lead was created 2026-11-14', 'BK-2627-1787: booked 2026-10-20 before its...before its lead was created 2026-11-14', 'BK-2627-1792: booked 2026-10-20 before its lead was created 2026-11-14', ...]
+E       assert not ['BK-2627-1785: booked 2026-10-20 before its lead was created 2026-11-14', 'BK-2627-1787: booked 2026-10-20 before its...before its lead was created 2026-11-14', 'BK-2627-1792: booked 2026-10-20 before its lead was created 2026-11-14', ...]
+
+tests/test_story_logic.py:18: AssertionError
+_____________ test_story_sequences_have_no_gaps_inside_one_rebuild _____________
+[gw1] linux -- Python 3.11.18 /root/.venv/bin/python
+
+    def test_story_sequences_have_no_gaps_inside_one_rebuild():
+        from tools.story_logic_check import gaps
+    
+        db = MongoClient(os.environ["MONGO_URL"])[os.environ["DB_NAME"]]
+>       assert not gaps(db)
+E       AssertionError: assert not ['bookings BK-2627: 1 gap(s) inside this rebuild, first [1790]', 'payments KKT/2627: 5 gap(s) inside this rebuild, first [7322, 7325, 7326, 7327, 7329]']
+E        +  where ['bookings BK-2627: 1 gap(s) inside this rebuild, first [1790]', 'payments KKT/2627: 5 gap(s) inside this rebuild, first [7322, 7325, 7326, 7327, 7329]'] = <function gaps at 0xf81ca533e840>(Database(MongoClient(host=['localhost:27017'], document_class=dict, tz_aware=False, connect=True), 'kkt_test'))
+
+tests/test_story_logic.py:44: AssertionError
+_______________ test_every_code_registered_with_matching_status ________________
+[gw1] linux -- Python 3.11.18 /root/.venv/bin/python
+
+    def test_every_code_registered_with_matching_status():
+        found = _scan()
+        assert found, "scanner found nothing — pattern broken"
+        unregistered = sorted(c for c in found if c not in ERRORS)
+        mismatched = sorted(
+            f"{c}: used {sorted(found[c])} registered {ERRORS[c]}"
+            for c in found
+            if c in ERRORS and not found[c] <= set(ERRORS[c])
+        )
+>       assert not unregistered, f"unregistered error codes: {unregistered} (add to errors.py)"
+E       AssertionError: unregistered error codes: ['NOT_TEST_DATA', 'RESEED_RUNNING'] (add to errors.py)
+E       assert not ['NOT_TEST_DATA', 'RESEED_RUNNING']
+
+tests/test_error_registry.py:36: AssertionError
+___________ TestServiceRequests.test_categories_and_create_and_reply ___________
+[gw1] linux -- Python 3.11.18 /root/.venv/bin/python
+
+self = <tests.test_phase_5.TestServiceRequests object at 0xf81ca51f5a50>
+portal_amit = {'must_change_password': False, 'access_token': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzYjA2OWJhNi1lY2IyLTQw...598Y1cA', 'refresh_token': 'mJVxvopwgzWvBPVCGxrTKqAbw40-eZDnbhEjiW4VaTeCdrze36n4uxTR2mKeja0X', 'expires_in': 1800, ...}
+
+    def test_categories_and_create_and_reply(self, portal_amit):
+        tok = portal_amit["access_token"]
+        rc = requests.get(f"{BASE}/api/portal/service-categories", headers=_hdr(tok))
+        assert rc.status_code == 200
+        bk = requests.get(f"{BASE}/api/portal/bookings", headers=_hdr(tok)).json()
+>       bid = [b for b in (bk.get("items") or bk) if b["booking_number"] == bk("first")][0]["id"]
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_phase_5.py:240: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+.0 = <list_iterator object at 0xf81ce63111e0>
+
+>   bid = [b for b in (bk.get("items") or bk) if b["booking_number"] == bk("first")][0]["id"]
+                                                                        ^^^^^^^^^^^
+E   TypeError: 'dict' object is not callable
+
+tests/test_phase_5.py:240: TypeError
+___________ TestServiceRequests.test_internal_note_hidden_on_portal ____________
+[gw1] linux -- Python 3.11.18 /root/.venv/bin/python
+
+self = <tests.test_phase_5.TestServiceRequests object at 0xf81ca51f5610>
+
+    def test_internal_note_hidden_on_portal(self):
+        r = _portal_login("9431023456")
+>       assert r.status_code == 200
+E       assert 423 == 200
+E        +  where 423 = <Response [423]>.status_code
+
+tests/test_phase_5.py:267: AssertionError
+_____________ TestPortalData.test_booking_detail_and_subresources ______________
+[gw0] linux -- Python 3.11.18 /root/.venv/bin/python
+
+self = <tests.test_phase_5.TestPortalData object at 0xf96b94354850>
+portal_amit = {'must_change_password': False, 'access_token': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzYjA2OWJhNi1lY2IyLTQw...Xi5hXbs', 'refresh_token': 'zTrv0EvaNFmsWae0uoqsPgR4w0xi6GVKbNKU86_lKvtSlKCBkdCaQfaEr07-3Xl4', 'expires_in': 1800, ...}
+
+    def test_booking_detail_and_subresources(self, portal_amit):
+        tok = portal_amit["access_token"]
+        r = requests.get(f"{BASE}/api/portal/bookings", headers=_hdr(tok))
+>       bk = [b for b in (r.json().get("items") or r.json()) if b["booking_number"] == bk("first")][0]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_phase_5.py:133: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+.0 = <list_iterator object at 0xf96b9462df60>
+
+>   bk = [b for b in (r.json().get("items") or r.json()) if b["booking_number"] == bk("first")][0]
+                                                                                   ^^
+E   NameError: cannot access free variable 'bk' where it is not associated with a value in enclosing scope
+
+tests/test_phase_5.py:133: NameError
+_________ TestConstructionAndHiddenPhoto.test_construction_and_hidden __________
+[gw0] linux -- Python 3.11.18 /root/.venv/bin/python
+
+self = <tests.test_phase_5.TestConstructionAndHiddenPhoto object at 0xf96b94355c90>
+portal_amit = {'must_change_password': False, 'access_token': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzYjA2OWJhNi1lY2IyLTQw...Xi5hXbs', 'refresh_token': 'zTrv0EvaNFmsWae0uoqsPgR4w0xi6GVKbNKU86_lKvtSlKCBkdCaQfaEr07-3Xl4', 'expires_in': 1800, ...}
+admin_tok = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhYWJiZDE3MC0zYTVhLTQ3NmItYjIxNS01OTMzOTU4N2M0OTkiLCJjaWQiOiI2MDU4OTdm...oiYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzk0NjE2MTI0LCJleHAiOjE3OTQ2MTcwMjR9.HK0vEGlHZamHXLJ665vFyVXRsP_l3G9tIYFmqjbm0t4'
+
+    def test_construction_and_hidden(self, portal_amit, admin_tok):
+        tok = portal_amit["access_token"]
+        r = requests.get(f"{BASE}/api/portal/bookings", headers=_hdr(tok)).json()
+>       bid = [b for b in (r.get("items") or r) if b["booking_number"] == bk("first")][0]["id"]
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       IndexError: list index out of range
+
+tests/test_phase_5.py:181: IndexError
+___________________________ TestPortalPDFs.test_pdfs ___________________________
+[gw1] linux -- Python 3.11.18 /root/.venv/bin/python
+
+self = <tests.test_phase_5.TestPortalPDFs object at 0xf81ca51a4e10>
+portal_amit = {'must_change_password': False, 'access_token': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzYjA2OWJhNi1lY2IyLTQw...FbGBaQM', 'refresh_token': 'Oe_wVaGgCiomGW7Kb3-8hFEE3FSYdDpKqXspazEJlhP9gk_mHa9Q7JH0nv3vRt-U', 'expires_in': 1800, ...}
+
+    def test_pdfs(self, portal_amit):
+        tok = portal_amit["access_token"]
+        r = requests.get(f"{BASE}/api/portal/bookings", headers=_hdr(tok))
+>       bk = [b for b in (r.json().get("items") or r.json()) if b["booking_number"] == bk("first")][0]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_phase_5.py:145: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+.0 = <list_iterator object at 0xf81c944f3100>
+
+>   bk = [b for b in (r.json().get("items") or r.json()) if b["booking_number"] == bk("first")][0]
+                                                                                   ^^
+E   NameError: cannot access free variable 'bk' where it is not associated with a value in enclosing scope
+
+tests/test_phase_5.py:145: NameError
+=============================== warnings summary ===============================
+../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
+../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
+  /root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12: PendingDeprecationWarning: Please use `import python_multipart` instead.
+    import multipart
+
+../../root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854
+../../root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854
+  /root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854: DeprecationWarning: 'crypt' is deprecated and slated for removal in Python 3.13
+    from crypt import crypt as _crypt
+
+tests/test_startup_s1_s3_idempotent.py:66
+tests/test_startup_s1_s3_idempotent.py:66
+  /app/backend/tests/test_startup_s1_s3_idempotent.py:66: PytestUnknownMarkWarning: Unknown pytest.mark.timeout - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.timeout(900)
+
+tests/test_phase_k_p1.py::test_loadshed_sheds_with_prebuilt_503_and_exempts_probes
+  /root/.venv/lib/python3.11/site-packages/starlette/testclient.py:41: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    [], typing.ContextManager[anyio.abc.BlockingPortal]
+
+tests/test_phase_q.py::test_void_watermark_deterministic
+tests/test_phase_q.py::test_void_watermark_deterministic
+tests/test_phase_q.py::test_void_watermark_deterministic
+tests/test_phase_q.py::test_void_watermark_deterministic
+tests/test_phase_q.py::test_void_watermark_deterministic
+tests/test_phase_q.py::test_void_watermark_deterministic
+tests/test_phase_q.py::test_void_watermark_deterministic
+tests/test_phase_q.py::test_void_watermark_deterministic
+  /root/.venv/lib/python3.11/site-packages/pypdf/_page.py:1368: DeprecationWarning: Calling `PageObject.replace_contents()` for pages not assigned to a writer is deprecated and will be removed in pypdf 7.0.0. Attach the page to the writer first or use `PdfWriter(clone_from=...)` directly. The existing approach has proved being unreliable.
+    self.replace_contents(ContentStream(new_content_array, self.pdf))
+
+tests/test_kkt_erp.py::TestBlock::test_create_block_and_generation
+tests/test_kkt_erp.py::TestFlatType::test_create_flat_type_auto_area
+tests/test_phase_7.py::TestPortalPhase7::test_portal_booking_payment_plan
+tests/test_phase_7.py::TestPortalPhase7::test_portal_booking_payment_plan
+  /root/.venv/lib/python3.11/site-packages/_pytest/fixtures.py:1313: PytestRemovedIn10Warning: Class-scoped fixture defined as instance method is deprecated.
+  Instance attributes set in this fixture will NOT be visible to test methods,
+  as each test gets a new instance while the fixture runs only once per class.
+  Use @classmethod decorator and set attributes on cls instead.
+  See https://docs.pytest.org/en/stable/deprecations.html#class-scoped-fixture-as-instance-method
+    fixturefunc = resolve_fixture_function(fixturedef, request)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_phase_i_reports.py::test_report_json_csv_pdf_and_etag[sales-team]
+FAILED tests/test_phase_11a.py::test_bootstrap_include_cursor_snapshot - asse...
+FAILED tests/test_phase_p2.py::test_register_overdue_equals_outstanding_report_overdue
+FAILED tests/test_format_gate.py::test_no_source_line_over_160_chars - Assert...
+FAILED tests/test_phase_s1_templates.py::test_tower_from_template_never_silent_about_payment_plans
+FAILED tests/test_receipt_split.py::test_hard_purge_refuses_real_data - Asser...
+FAILED tests/test_phase_5.py::TestErpServiceRequests::test_filters_and_detail_and_actions
+FAILED tests/test_story_logic.py::test_story_chronology_zero_problems - Asser...
+FAILED tests/test_story_logic.py::test_story_sequences_have_no_gaps_inside_one_rebuild
+FAILED tests/test_error_registry.py::test_every_code_registered_with_matching_status
+FAILED tests/test_phase_5.py::TestServiceRequests::test_categories_and_create_and_reply
+FAILED tests/test_phase_5.py::TestServiceRequests::test_internal_note_hidden_on_portal
+FAILED tests/test_phase_5.py::TestPortalData::test_booking_detail_and_subresources
+FAILED tests/test_phase_5.py::TestConstructionAndHiddenPhoto::test_construction_and_hidden
+FAILED tests/test_phase_5.py::TestPortalPDFs::test_pdfs - NameError: cannot a...
+15 failed, 696 passed, 6 skipped, 19 warnings in 597.65s (0:09:57)

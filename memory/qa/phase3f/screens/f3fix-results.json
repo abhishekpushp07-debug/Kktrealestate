@@ -1,0 +1,170 @@
+[
+ {
+  "theme": "light",
+  "width": 1440,
+  "screen": "collections",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 1440,
+  "screen": "collections-filters",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 1440,
+  "screen": "collections-period-open",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 1440,
+  "screen": "collections-basis-open",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 1440,
+  "screen": "outstanding-filters",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 1440,
+  "screen": "cheques-filters",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 1440,
+  "screen": "customer-ageing-filters",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 390,
+  "screen": "collections",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 390,
+  "screen": "collections-filters",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 390,
+  "screen": "collections-period-open",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 390,
+  "screen": "collections-basis-open",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 390,
+  "screen": "outstanding-filters",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 390,
+  "screen": "cheques-filters",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "light",
+  "width": 390,
+  "screen": "customer-ageing-filters",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 1440,
+  "screen": "collections",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 1440,
+  "screen": "collections-filters",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 1440,
+  "screen": "collections-period-open",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 1440,
+  "screen": "collections-basis-open",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 1440,
+  "screen": "outstanding-filters",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 1440,
+  "screen": "cheques-filters",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 1440,
+  "screen": "customer-ageing-filters",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 390,
+  "screen": "collections",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 390,
+  "screen": "collections-filters",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 390,
+  "screen": "collections-period-open",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 390,
+  "screen": "collections-basis-open",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 390,
+  "screen": "outstanding-filters",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 390,
+  "screen": "cheques-filters",
+  "h_overflow_px": 0
+ },
+ {
+  "theme": "night",
+  "width": 390,
+  "screen": "customer-ageing-filters",
+  "h_overflow_px": 0
+ }
+]

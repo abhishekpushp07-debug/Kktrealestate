@@ -1,0 +1,28 @@
+(trapped) error reading bcrypt version
+Traceback (most recent call last):
+  File "/root/.venv/lib/python3.11/site-packages/passlib/handlers/bcrypt.py", line 620, in _load_backend_mixin
+    version = _bcrypt.__about__.__version__
+              ^^^^^^^^^^^^^^^^^
+AttributeError: module 'bcrypt' has no attribute '__about__'
+index audit_logs.id skipped: An existing index has the same name as the requested index. When index names are not specified, they are auto generated 
+[startup] indexes ensured in 0.10s
+UoW mode: ordered-writes+compensation
+KKT backend serving after 0.11s (uow=ordered-writes+compensation); background startup tasks running
+{"request_id": "c5dda4c348e14395", "method": "GET", "path": "/api/health", "status": 200, "duration_ms": 2.7, "user_id": null}
+Object storage initialized
+{"request_id": "0bdad2bf39a84472", "method": "POST", "path": "/api/auth/login", "status": 200, "duration_ms": 285.4, "user_id": null}
+{"request_id": "31d1667581dc4b1d", "method": "POST", "path": "/api/admin/hard-purge", "status": 200, "duration_ms": 60.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+[startup] system_roles ok in 0.17s
+[startup] owner_bootstrap ok in 0.01s
+{"request_id": "6afff683f89049f2", "method": "POST", "path": "/api/auth/login", "status": 200, "duration_ms": 334.8, "user_id": null}
+[startup] seed_phase7 ok in 0.00s
+{"request_id": "4960ff1951204e80", "method": "GET", "path": "/api/bookings", "status": 200, "duration_ms": 260.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "edc97138c8a64c89", "method": "GET", "path": "/api/bookings/000b3314-5781-42f8-ada4-619235dc624f/ledger", "status": 200, "duration_ms": 17.4, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "407f6e8bda5447c8", "method": "POST", "path": "/api/demands/manual", "status": 201, "duration_ms": 5.3, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+raw access to ledger_entries: ledger projection rebuild
+{"request_id": "4107573d08024045", "method": "POST", "path": "/api/demands/manual", "status": 201, "duration_ms": 100.1, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "be470a245f1e4ca6", "method": "GET", "path": "/api/bookings/000b3314-5781-42f8-ada4-619235dc624f/ledger", "status": 200, "duration_ms": 12.0, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "a72346d342444ad3", "method": "GET", "path": "/api/journey/entity/booking/000b3314-5781-42f8-ada4-619235dc624f", "status": 200, "duration_ms": 11.9, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "c18d5d0b70fb4b71", "method": "POST", "path": "/api/demands/manual", "status": 422, "duration_ms": 4.1, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "694ec858305b4fd3", "method": "POST", "path": "/api/demands/manual", "status": 422, "duration_ms": 5.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "91f8fb399f9b468c", "method": "POST", "path": "/api/demands/083aa0e7-0353-4619-80b9-2f2a2471c07f/void", "status": 409, "duration_ms": 6.1, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}

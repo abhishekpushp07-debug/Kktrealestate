@@ -1,0 +1,38 @@
+{
+  "summary": "Retest of the iteration_48 fixes for Phase 3F F1 (Customer status), against the public preview URL. Public suite: 19/19 pass. New retest file: 16 of 19 pass. Fixed and confirmed: (1) Group by no longer crashes the page. Tested project then tower, all 5 levels, Clear, 12 rapid toggles, and opening grouped and ungrouped saved views one after another; 0 page errors. The menu says 'Up to 5 levels, in the order you pick' and a 6th pick shows the toast 'Group by up to 5 levels'. (2) Pinning a view works. Home 'Pinned reports' shows all 6 and each opens its view. The 7th pin is refused with 'Home holds up to 6 pinned views — unpin one first'. Rename on the old report (/reports/collections-v2) works. (3) Cascade prune works: GGV + Villa Block V, then switch to SGH only, and the tower pick and its chip are dropped ('68 bookings · SGH'). (4) These all return 422: page=abc, page_size=x, overdue_days=abc, dues_min=abc, dues_max=zz, booked_from=nope, booked_to=2026-13-45, as_of=2099-01-01, as_of=garbage. The xlsx and pdf exports also return 422. (5) The table and API show 'Overdue 267 days · other charges' and 'Due on 27 Nov 2026 · other charges', and only when account dues + cash dues == 0. (6) accounts@kkt.in made a shared QA view. Admin sees 'shared by Amit Verma' with no pin or delete icons, and the API delete by admin gives 404. (7) Not fixed: at 1440px the table is still 271px wider than its box, so Cash dues and Final status need a horizontal scroll. Still open: the Group by menu shows checkmarks, not the pick order 1..5. page=inf, page=nan, page_size=1e400 and dues_min=inf still return 500.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/reports/v3/customer-status (and exports)", "issue": "page=inf, page=nan, page_size=1e400 → 500 INTERNAL_ERROR. _params checks float(), which accepts these values, but report() then calls int(float(...)), which raises OverflowError or ValueError. dues_min=inf → 500 as well, likely when rupees are converted to paise. Fix: in _params, require math.isfinite(float(v)) or parse page and page_size with int(). nan in dues_min and overdue_days is accepted and quietly matches nothing."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Group by MultiSelect (max=5)", "issue": "Picks show a checkmark, not the pick order 1..5 the request asks for, so the level order is not visible in the menu. MultiSelect.jsx always renders the Check icon. When max is set, render value.indexOf(o.value)+1 instead.", "selector": "[data-testid^=report-group-by-opt-]", "priority": "MEDIUM"},
+      {"component": "ReportSheet FlatTable at 1440px", "issue": "The 10 default columns do not fit. Table scrollWidth is 1393px in a 1122px box (271px of horizontal scroll), so Cash dues and Final status are off-screen. At 1920 it still overflows by 56px (1398 vs 1342). The Final status column alone is 234px because 'Due on 27 Nov 2026 · other charges' does not wrap. Fix: let Final status wrap or show the '· other charges' hint on a second line, and tighten column padding.", "selector": "[data-testid=report-sheet-customer-status] table", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Customer status grouped by Final status", "issues": ["Group headers show raw keys in lowercase ('advance', 'clear', 'due', 'overdue'), not the labels used elsewhere ('Advance', 'All clear', 'Due, not late', 'Overdue')."]}
+    ]
+  },
+  "test_report_links": ["/app/tests/phase3f_public/test_reports_v3_retest49.py", "/app/tests/phase3f_public/qa_setup49.py", "/app/tests/phase3f_public/test_reports_v3_public.py", "/app/test_reports/pytest/retest49.xml"],
+  "action_items": [
+    "Show the pick order (1..5) on Group by options in MultiSelect when max is set",
+    "Make the 10 default Customer status columns fit at 1440px: wrap Final status or put '· other charges' on its own line, and reduce padding",
+    "Reject non-finite numbers (inf, nan, 1e400) in reports_v3 _params with 422",
+    "Optional: show labels, not raw status keys, in group headers when grouping by Final status"
+  ],
+  "critical_code_review_comments": [
+    "pages/Reports.jsx legacy preset rename (Enter key and the check button) has no try/catch. An empty name gets a 422 from the server and becomes an unhandled promise rejection with no toast.",
+    "SavedViews pin and unpin give no success feedback; the only cue is the icon colour changing to .on.",
+    "Removing the Project chip leaves the Tower pick in place. That is acceptable, since with no project every tower is valid, but it differs from picking a different project, which drops the tower."
+  ],
+  "updated_files": ["/app/tests/phase3f_public/test_reports_v3_retest49.py", "/app/tests/phase3f_public/qa_setup49.py"],
+  "success_rate": {"backend": "35/38 (92%): 19/19 public suite + 16/19 retest; the 3 failures are inf/nan/1e400 → 500", "frontend": "Retest items 1-6 pass, except that Group by shows no pick order. Item 7 fails (horizontal scroll at 1440px). 0 page errors across all flows."},
+  "seed_data_creation": "Made through the API, all deleted by id afterwards (each delete returned 200): 5 'QA49 pin N' and 'QA49 grouped' / 'QA49 flat' views for admin, 1 'QA49 shared acc' for accounts, plus 'QA49 legacy' (saved, renamed and deleted in the legacy UI) and 'QA shared by accounts' (deleted inside the pytest). Admin has 0 presets again.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "The frontend is a production build in build/. Run the retest with: cd /app/tests/phase3f_public && python -m pytest -c /dev/null -p no:cacheprovider test_reports_v3_retest49.py. qa_setup49.py creates the QA views and 'python qa_setup49.py clean' deletes them by id, using /tmp/qa49.json. Admin had 0 presets before and after. Remaining work: pick-order numbers, the 1440 column fit, and 500 on inf/nan. Option values: GGV=kkt-reports-hub--7kz2bq77, SGH=kkt-reports-hub--7kz2bq77, Villa Block V=kkt-reports-hub--7kz2bq77.",
+  "rca of the issue": "500 on inf/nan: routers/reports_v3.py _params checks with float(p[k]), which accepts 'inf', 'nan' and '1e400' (overflows to inf). report() line 174 then calls int(float(...)), which raises OverflowError (inf) or ValueError (nan) outside the try block. Table overflow: the 10 columns add up to about 1390px, with Final status at 234px because it does not wrap, while the content box is 1122px at 1440 with the sidebar open."
+}

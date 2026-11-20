@@ -1,0 +1,30 @@
+{
+  "meta": {
+    "base": "http://127.0.0.1:8002",
+    "levels": [
+      600
+    ],
+    "seconds": 40,
+    "at": "20261027T013217Z",
+    "note": "Sandbox: ONE uvicorn worker, shared CPU with the preview stack and MongoDB on the same container. Production capacity = measured per-worker RPS \u00d7 workers (ESTIMATE)."
+  },
+  "results": [
+    {
+      "users": 600,
+      "requests": 600,
+      "rps": 9.9,
+      "p50_ms": 60316.9,
+      "p95_ms": 60350.4,
+      "p99_ms": 60351.3,
+      "errors": {
+        "ReadTimeout": 600
+      },
+      "5xx_non_shed": 0,
+      "shed_503": 0,
+      "rss_mb_before": 1257.4,
+      "rss_mb_after": 1258.4,
+      "hot_paths": [],
+      "kind": "measured"
+    }
+  ]
+}

@@ -1,0 +1,121 @@
+yarn run v1.22.22
+$ node scripts/build.js
+[build] PUBLIC_URL=/ REACT_APP_BASE_PATH=/
+(node:130287) [DEP0176] DeprecationWarning: fs.F_OK is deprecated, use fs.constants.F_OK instead
+(Use `node --trace-deprecation ...` to show where the warning was created)
+Creating an optimized production build...
+Compiled successfully.
+
+File sizes after gzip:
+
+  137.86 kB  build/static/js/3981.d17b2ada.chunk.js
+  115.1 kB   build/static/js/main.dea4a13b.js
+  106.37 kB  build/static/js/6421.705c9074.chunk.js
+  35.27 kB   build/static/js/8354.8963f90b.chunk.js
+  21.77 kB   build/static/js/7406.e10d58f4.chunk.js
+  19.38 kB   build/static/js/750.e97346c5.chunk.js
+  17.3 kB    build/static/js/5327.00e964de.chunk.js
+  17.01 kB   build/static/css/main.09d7a97b.css
+  16.14 kB   build/static/js/3353.9439ac01.chunk.js
+  15.8 kB    build/static/js/7674.df708fd0.chunk.js
+  15.35 kB   build/static/js/6097.bb9c03b0.chunk.js
+  14.08 kB   build/static/js/5640.caa365cb.chunk.js
+  14.04 kB   build/static/js/3959.033781e0.chunk.js
+  13.89 kB   build/static/js/1581.28fd14dc.chunk.js
+  13.55 kB   build/static/js/1111.7e8959f4.chunk.js
+  13.06 kB   build/static/js/7073.8d110566.chunk.js
+  12.38 kB   build/static/js/9506.e8f4db2e.chunk.js
+  12.28 kB   build/static/js/9028.410a862b.chunk.js
+  11.72 kB   build/static/js/11.f088c9d2.chunk.js
+  11.7 kB    build/static/js/3814.4a3e0721.chunk.js
+  11.29 kB   build/static/js/4921.74e634ff.chunk.js
+  11.29 kB   build/static/js/9710.84d78802.chunk.js
+  11.21 kB   build/static/js/8899.b0bbe4b0.chunk.js
+  10.58 kB   build/static/js/9880.657cf689.chunk.js
+  10.46 kB   build/static/js/859.aeb55ead.chunk.js
+  10.4 kB    build/static/js/8619.3c3e4f83.chunk.js
+  10.37 kB   build/static/js/3240.ca9aabe2.chunk.js
+  9.86 kB    build/static/js/916.983b63c7.chunk.js
+  9.74 kB    build/static/js/3768.f0b6e382.chunk.js
+  9.59 kB    build/static/js/8535.747579b6.chunk.js
+  9.25 kB    build/static/js/3839.307c059e.chunk.js
+  9.15 kB    build/static/js/5573.eff87bfe.chunk.js
+  8.82 kB    build/static/js/4406.7edb1980.chunk.js
+  8.79 kB    build/static/js/1552.c9be358c.chunk.js
+  8.5 kB     build/static/js/3760.2703cc88.chunk.js
+  7.99 kB    build/static/js/2512.4fdebf5c.chunk.js
+  7.94 kB    build/static/js/2937.8ac0b193.chunk.js
+  7.76 kB    build/static/js/955.7dff09a4.chunk.js
+  7.65 kB    build/static/js/8867.c1c8755c.chunk.js
+  7.58 kB    build/static/js/8145.6d030bc8.chunk.js
+  7.55 kB    build/static/js/3077.4f824222.chunk.js
+  7.49 kB    build/static/js/2152.35d94a0c.chunk.js
+  7.37 kB    build/static/js/966.36a1a45c.chunk.js
+  7.19 kB    build/static/js/4640.5d4741da.chunk.js
+  7.09 kB    build/static/js/7277.077293f4.chunk.js
+  7.09 kB    build/static/js/7458.b1b2ec38.chunk.js
+  6.93 kB    build/static/js/846.74baeaf8.chunk.js
+  6.79 kB    build/static/js/4184.e5688a42.chunk.js
+  6.78 kB    build/static/js/932.1a9f0396.chunk.js
+  6.76 kB    build/static/js/5603.687abf6e.chunk.js
+  5.96 kB    build/static/js/901.1588fd27.chunk.js
+  5.8 kB     build/static/js/200.8231adb9.chunk.js
+  5.8 kB     build/static/js/2107.860a94f1.chunk.js
+  5.65 kB    build/static/js/5807.68564139.chunk.js
+  5.62 kB    build/static/js/995.bc8495f3.chunk.js
+  5.53 kB    build/static/js/5533.4adf0291.chunk.js
+  5.14 kB    build/static/js/1735.96fbdc9d.chunk.js
+  5 kB       build/static/js/7302.f4dffda7.chunk.js
+  4.95 kB    build/static/js/4116.10d4c20b.chunk.js
+  4.92 kB    build/static/js/8710.4707db4b.chunk.js
+  4.8 kB     build/static/js/6599.7dd58019.chunk.js
+  4.26 kB    build/static/js/1143.6065d030.chunk.js
+  4.26 kB    build/static/js/8339.9010cc0e.chunk.js
+  4.14 kB    build/static/js/7420.3d911e64.chunk.js
+  4.14 kB    build/static/js/4806.529c3c34.chunk.js
+  3.99 kB    build/static/js/1793.ffd343a3.chunk.js
+  3.92 kB    build/static/js/323.1b3fc1c3.chunk.js
+  3.91 kB    build/static/js/9528.3bad4ca8.chunk.js
+  3.78 kB    build/static/js/9250.36b74fee.chunk.js
+  3.78 kB    build/static/js/6869.af3c5f2f.chunk.js
+  3.66 kB    build/static/js/1335.fbacab79.chunk.js
+  3.4 kB     build/static/js/4592.5fed298c.chunk.js
+  3.35 kB    build/static/js/394.a6b8dc49.chunk.js
+  3.34 kB    build/static/js/8800.33cceaa4.chunk.js
+  3.21 kB    build/static/js/2021.4e73d687.chunk.js
+  2.96 kB    build/static/js/4859.a75793b0.chunk.js
+  2.93 kB    build/static/js/2350.64e306ba.chunk.js
+  2.75 kB    build/static/js/2984.e689aa19.chunk.js
+  2.74 kB    build/static/js/6724.c188aa3b.chunk.js
+  2.41 kB    build/static/js/6937.5623c34d.chunk.js
+  2.14 kB    build/static/js/6196.1cf46bb9.chunk.js
+  1.93 kB    build/static/js/610.7cfc319e.chunk.js
+  1.74 kB    build/static/js/8229.12b570b0.chunk.js
+  1.71 kB    build/static/js/9131.22b079c4.chunk.js
+  1.62 kB    build/static/js/2519.93c98f66.chunk.js
+  1.61 kB    build/static/js/8687.01d09846.chunk.js
+  1.48 kB    build/static/js/8289.c711d4b7.chunk.js
+  1.47 kB    build/static/js/6620.f837b0be.chunk.js
+  1.36 kB    build/static/js/1448.f4a197a9.chunk.js
+  1.31 kB    build/static/js/1539.b5bc4404.chunk.js
+  1.22 kB    build/static/js/2721.8db0e912.chunk.js
+  1.16 kB    build/static/js/9590.8ff68b58.chunk.js
+  644 B      build/static/js/1568.f5fc548a.chunk.js
+  481 B      build/static/js/3772.e4376bc9.chunk.js
+  254 B      build/static/js/2607.1ff5edc4.chunk.js
+
+The project was built assuming it is hosted at /.
+You can control this with the homepage field in your package.json.
+
+The build folder is ready to be deployed.
+You may serve it with a static server:
+
+  yarn global add serve
+  serve -s build
+
+Find out more about deployment here:
+
+  https://cra.link/deployment
+
+[build] ok: build/index.html + static/
+Done in 11.80s.

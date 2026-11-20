@@ -1,0 +1,50 @@
+{
+ "stages": [
+  {
+   "vus": 20,
+   "assertions": {
+    "lead_created:ok": 48,
+    "lead_converted:ok": 48,
+    "booking_created:ok": 48,
+    "booking_total_matches_preview:ok": 48,
+    "payment_posted:ok": 44,
+    "c360_shows_booking:ok": 42,
+    "ledger_received_equals_payment:ok": 41,
+    "ledger_bill_raised_positive:ok": 42,
+    "inventory_flat_booked:ok": 42,
+    "receipt_pdf:ok": 42,
+    "demand_register:ok": 41,
+    "project_statement:ok": 41,
+    "stage_demands_match_active_bookings:ok": 2,
+    "documents_register:ok": 2,
+    "ledger_received_equals_payment:FAIL": 1,
+    "integrity_ok_after_stage:ok": 1
+   },
+   "failed_assertions": [
+    {
+     "assertion": "ledger_received_equals_payment",
+     "detail": "received 38250000 vs 19125000"
+    }
+   ]
+  },
+  {
+   "vus": 50,
+   "assertions": {
+    "lead_created:ok": 50,
+    "lead_converted:ok": 50,
+    "booking_created:ok": 50,
+    "booking_total_matches_preview:ok": 50,
+    "payment_posted:ok": 49,
+    "c360_shows_booking:ok": 31,
+    "ledger_received_equals_payment:ok": 30,
+    "ledger_bill_raised_positive:ok": 30,
+    "inventory_flat_booked:ok": 27,
+    "receipt_pdf:ok": 27,
+    "demand_register:ok": 15,
+    "project_statement:ok": 15,
+    "integrity_ok_after_stage:ok": 1
+   },
+   "failed_assertions": []
+  }
+ ]
+}

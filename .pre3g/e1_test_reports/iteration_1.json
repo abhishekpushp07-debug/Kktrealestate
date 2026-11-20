@@ -1,0 +1,39 @@
+{
+  "iteration": 1,
+  "batch": "Phase 1 batch (a): JRN-2,3,5,6,8,9,24,25,33 (8 matrix criteria)",
+  "passed": 13,
+  "failed": 2,
+  "retest_needed": true,
+  "bugs": [
+    {"severity": "medium", "criterion": "JRN-8 Reports agree with the journeys", "title": "Home 'Due ageing' widget disagrees with Reports -> Outstanding & ageing",
+     "evidence": "GET /api/dashboard/home ageing_paise = not_due 14,743,100 / 0-30 4,344,374 / 31-60 5,462,161 / 61-90 8,823,725 / 90+ 0 (bucket counts not_due 27, 0-30 9); the Home widget shows open total Rs 3,45,44,264. GET /api/reports/outstanding-v2 ageing = 14,743,100 / 4,614,414 / 5,462,161 / 8,823,725 / 43,290,915, Outstanding Rs 7,69,34,315. Home's 90+ band is 0 and its total is less than half the report's. The Demand register total (580 demands, balance Rs 3,45,44,264) uses the same narrower basis. Possibly bills-only versus bills plus other charges, but the criterion requires Home and the report to match. Test: test_tscheck_reports_agree.py::test_home_ageing_matches_report"},
+    {"severity": "medium", "criterion": "JRN-6 Nothing dated after today", "title": "Demo seed wrote 13 audit/activity rows dated after the business day (17 Nov 2026)",
+     "evidence": "audit_logs with created_at > 2026-11-16T18:30Z: 13 rows. Example: id 28f3d887, action lead.stage, created_at 2026-11-17T05:00:00+00:00. It shows as '17 Nov' in Home Recent activity and at the top of Admin -> Audit. Test: test_tscheck_journey_order.py::test_no_activity_dated_after_today"}
+  ],
+  "notes": [
+    "JRN-2: the audit row's action is 'admin.test_data_purged'. The UI shows the raw action key, not the label 'Test data purged' from the criterion. The check matches the raw key.",
+    "JRN-2: the briefing says SGH shows only Towers A, B, C. That holds. GGV has Villa Block V and Villa Block P (Premium).",
+    "JRN-9: 138 flats: 78 Booked, 56 Available, 3 Hold, 1 Blocked. All have a saleable area and price_paise. 4 unsold flats are on Hold/Blocked, not Available, which matches the stated 56.",
+    "Reports: the end date defaulted to 15 Nov in the UTC browser, a known deviation. The check picks 16 Nov explicitly; FY total Rs 18,75,11,936 then matches.",
+    "As the journey requires, a real hard purge (confirm HARD-PURGE, empty selection) was executed once per backend run. counts {} and record totals unchanged. Each run adds one admin.test_data_purged audit row.",
+    "The localhost:3000 frontend returns 404 for /api (no proxy), so browser checks run against the preview URL (ingress)."
+  ],
+  "action_items": [],
+  "checks": [
+    {"criterion": "JRN-2 Every screen clean after hard purge", "name": "test_tscheck_purge.py (dry-run {}, confirm purge removes nothing + audit row, projects/towers, masters, Load Test search)", "lane": "backend", "status": "passed", "evidence": "POST /api/admin/hard-purge dry_run -> 200 counts {}; confirm -> 200; GET /api/audit-logs?action=admin.test_data_purged -> 1+ rows; /customers & /leads search 'Load Test' -> items []"},
+    {"criterion": "JRN-2 Every screen clean after hard purge", "name": "purge-screens-clean", "lane": "browser", "status": "passed", "evidence": "/projects lists SGH + GGV only, no QA/test/LT CLP/Imported; Admin Audit shows admin.test_data_purged row"},
+    {"criterion": "JRN-3 Purge refuses real data", "name": "test_tscheck_purge.py::test_purge_refuses_real_tower", "lane": "backend", "status": "passed", "evidence": "POST /api/admin/hard-purge block_ids=[SGH Tower A] confirm -> 409 'Purge stopped: ... is not test data'; bookings/units unchanged"},
+    {"criterion": "JRN-5 + JRN-33 Home is alive today", "name": "test_tscheck_home_today.py", "lane": "backend", "status": "passed", "evidence": "GET /api/dashboard/home business_day 2026-11-16, collections_mtd 15485546, cheques 1, visits 1, followups 1; GET /api/leads?due_today=true -> 1 lead due 2026-11-16"},
+    {"criterion": "JRN-5 + JRN-33 Home is alive today", "name": "home-alive-today", "lane": "browser", "status": "passed", "evidence": "Greeting 'MONDAY, 16 NOVEMBER 2026'; tiles show Rs 1,54,85,546 collected, cheques 1 / Rs 40,000, visits 1, follow-ups 1"},
+    {"criterion": "JRN-6 Booking journey complete and in order", "name": "test_tscheck_journey_order.py::test_journey[1348,1349,1352]", "lane": "backend", "status": "passed", "evidence": "Ledgers for BK-2526-1348 (A, ontime), 1349 (C, ontime), 1352 (GGV, fullpaid): sorted dates, first row booking DEMAND, max <= 2026-11-16, sum(bill)-sum(recv) = last balance (7,10,162 / 7,41,144 / 6,68,436)"},
+    {"criterion": "JRN-6 Nothing dated after today", "name": "test_tscheck_journey_order.py::test_no_activity_dated_after_today", "lane": "backend", "status": "failed", "evidence": "recent activity lead.stage created_at 2026-11-17T05:00:00Z (13 audit rows after today)"},
+    {"criterion": "JRN-6 Booking journey complete and in order", "name": "booking-journey-ledger", "lane": "browser", "status": "passed", "evidence": "BK-2526-1348 detail: booked 18 Apr 2025, Outstanding Rs 7,10,162, no dates after 16 Nov 2026"},
+    {"criterion": "JRN-8 Reports agree with the journeys", "name": "test_tscheck_reports_agree.py (collections FY, outstanding/overdue/bands)", "lane": "backend", "status": "passed", "evidence": "collections-v2 total 187511936; outstanding-v2 outstanding 76934315, overdue 62191215, bands sum = outstanding"},
+    {"criterion": "JRN-8 Home tiles agree with reports", "name": "test_tscheck_reports_agree.py::test_home_ageing_matches_report", "lane": "backend", "status": "failed", "evidence": "home [14743100,4344374,5462161,8823725,0] (x100 paise) vs report [14743100,4614414,5462161,8823725,43290915]"},
+    {"criterion": "JRN-8 Reports agree with the journeys", "name": "reports-agree-headline", "lane": "browser", "status": "passed", "evidence": "Collections 1 Apr-16 Nov: Rs 18,75,11,936; Outstanding Rs 7,69,34,315, Overdue Rs 6,21,91,215, all 5 bands match"},
+    {"criterion": "JRN-9 Flats priced explicitly", "name": "test_tscheck_flats_priced.py", "lane": "backend", "status": "passed", "evidence": "GET /api/flats 138 items, all saleable_sqft & price_paise set, 56 Available"},
+    {"criterion": "JRN-9 Flats priced explicitly", "name": "inventory-flats-priced", "lane": "browser", "status": "passed", "evidence": "SGH (120 records) & GGV (18) inventory show sq.ft. + Rs price per row; no 'no price'"},
+    {"criterion": "JRN-24 Some bills not due yet", "name": "test_tscheck_not_due_bills.py + bills-not-due-yet", "lane": "backend", "status": "passed", "evidence": "band counts Not due 25 / 10 / 10 / 12 / 68; open bills due after today incl. <=30 days; every ON_STAGE bill dated >= stage completed_on. Browser: Demand register shows 'Open ... 10 Nov 2026 -> due 25 Nov 2026' and due 25 Dec 2026 rows"},
+    {"criterion": "JRN-25 Next billing stage waiting", "name": "test_tscheck_next_stage_preview.py + construction-next-stage-preview", "lane": "browser", "status": "passed", "evidence": "Tower B/C first pending = Plastering; preview headline 16 bookings Rs 1,46,83,726 (B) and 30 bookings Rs 2,51,23,680 (C); dialog dismissed, Plastering still pending; outstanding udhar unchanged on rerun"}
+  ]
+}

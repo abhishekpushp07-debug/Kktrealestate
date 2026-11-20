@@ -1,0 +1,66 @@
+{
+ "stages": [
+  {
+   "vus": 3,
+   "assertions": {
+    "lead_created:ok": 15,
+    "lead_converted:ok": 15,
+    "booking_created:ok": 14,
+    "booking_total_matches_preview:ok": 14,
+    "payment_posted:ok": 13,
+    "journey_exception:FAIL": 12,
+    "integrity_ok_after_stage:ok": 1
+   },
+   "failed_assertions": [
+    {
+     "assertion": "journey_exception",
+     "detail": "AttributeError: 'str' object has no attribute 'get'"
+    },
+    {
+     "assertion": "journey_exception",
+     "detail": "AttributeError: 'str' object has no attribute 'get'"
+    },
+    {
+     "assertion": "journey_exception",
+     "detail": "AttributeError: 'str' object has no attribute 'get'"
+    },
+    {
+     "assertion": "journey_exception",
+     "detail": "AttributeError: 'str' object has no attribute 'get'"
+    },
+    {
+     "assertion": "journey_exception",
+     "detail": "AttributeError: 'str' object has no attribute 'get'"
+    },
+    {
+     "assertion": "journey_exception",
+     "detail": "AttributeError: 'str' object has no attribute 'get'"
+    },
+    {
+     "assertion": "journey_exception",
+     "detail": "AttributeError: 'str' object has no attribute 'get'"
+    },
+    {
+     "assertion": "journey_exception",
+     "detail": "AttributeError: 'str' object has no attribute 'get'"
+    },
+    {
+     "assertion": "journey_exception",
+     "detail": "AttributeError: 'str' object has no attribute 'get'"
+    },
+    {
+     "assertion": "journey_exception",
+     "detail": "AttributeError: 'str' object has no attribute 'get'"
+    },
+    {
+     "assertion": "journey_exception",
+     "detail": "AttributeError: 'str' object has no attribute 'get'"
+    },
+    {
+     "assertion": "journey_exception",
+     "detail": "AttributeError: 'str' object has no attribute 'get'"
+    }
+   ]
+  }
+ ]
+}

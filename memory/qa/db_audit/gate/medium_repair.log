@@ -1,0 +1,8 @@
+money before 1749 669 3254 8186875500
+recompute run 1: {"blocks":13,"projects":3,"customers":138,"trend_scopes":4,"ms":1835}
+bucket 2026-11 {'collections_account': 970982400, 'collections_cash': 1030010600, 'collections_other': 148650200}
+recompute run 2: {"blocks":13,"projects":3,"customers":138,"trend_scopes":4,"ms":1860}
+bucket 2026-11 {'collections_account': 970982400, 'collections_cash': 1030010600, 'collections_other': 148650200}
+money after 1749 669 3254 8186875500
+tieout exit 0
+DONE

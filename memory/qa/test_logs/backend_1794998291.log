@@ -1,0 +1,86 @@
+(trapped) error reading bcrypt version
+Traceback (most recent call last):
+  File "/root/.venv/lib/python3.11/site-packages/passlib/handlers/bcrypt.py", line 620, in _load_backend_mixin
+    version = _bcrypt.__about__.__version__
+              ^^^^^^^^^^^^^^^^^
+AttributeError: module 'bcrypt' has no attribute '__about__'
+index audit_logs.id skipped: An existing index has the same name as the requested index. When index names are not specified, they are auto generated 
+[startup] indexes ensured in 0.10s
+UoW mode: ordered-writes+compensation
+KKT backend serving after 0.11s (uow=ordered-writes+compensation); background startup tasks running
+{"request_id": "b3cd716cf81f42ae", "method": "GET", "path": "/api/health", "status": 200, "duration_ms": 72.7, "user_id": null}
+Object storage initialized
+{"request_id": "60391fa3937a4de9", "method": "POST", "path": "/api/auth/login", "status": 200, "duration_ms": 358.0, "user_id": null}
+{"request_id": "0e3ef943c28f4533", "method": "POST", "path": "/api/admin/hard-purge", "status": 200, "duration_ms": 80.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+[startup] system_roles ok in 0.19s
+[startup] owner_bootstrap ok in 0.01s
+{"request_id": "cc58ce2de6654a69", "method": "POST", "path": "/api/auth/login", "status": 200, "duration_ms": 345.8, "user_id": null}
+{"request_id": "e7f25e636e58465f", "method": "POST", "path": "/api/admin/ops/after-commit/drain", "status": 200, "duration_ms": 2.7, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+[startup] seed_phase7 ok in 0.00s
+{"request_id": "c85b299d5ab24960", "method": "POST", "path": "/api/admin/ops/after-commit/drain", "status": 200, "duration_ms": 2.7, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "33ec32d0c23a4c0d", "method": "POST", "path": "/api/admin/ops/after-commit/drain", "status": 200, "duration_ms": 2.5, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "ad159e6a65b24c7d", "method": "POST", "path": "/api/admin/ops/after-commit/drain", "status": 200, "duration_ms": 2.7, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "1ad7fafbfb654617", "method": "POST", "path": "/api/admin/ops/after-commit/drain", "status": 200, "duration_ms": 2.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "4fd8a93e79ba4840", "method": "POST", "path": "/api/admin/ops/after-commit/drain", "status": 200, "duration_ms": 5.4, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "80071a3f72a7466c", "method": "GET", "path": "/api/admin/ops", "status": 200, "duration_ms": 54.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "2a8faef50dc94297", "method": "GET", "path": "/api/bookings", "status": 200, "duration_ms": 75.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "5fa033227ae645d9", "method": "GET", "path": "/api/bookings", "status": 200, "duration_ms": 13.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "05c08584d1f14432", "method": "GET", "path": "/api/bookings/567afeec-6a93-4181-be4e-6f8a7b75b09f", "status": 200, "duration_ms": 11.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "2bacf9c4d65c43e5", "method": "POST", "path": "/api/admin/ops/after-commit/drain", "status": 200, "duration_ms": 2.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+[phase7] integrity: ok=True bookings=79 counts={}
+[startup] integrity_report ok in 0.32s
+[startup] inventory_masters ok in 0.02s
+{"request_id": "bd2d8b0c06c94b57", "method": "POST", "path": "/api/admin/ops/after-commit/drain", "status": 200, "duration_ms": 2.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+[startup] seed_s1_templates ok in 0.00s
+[startup] migrate_s1_templates ok in 0.00s
+{"request_id": "9e90b1ead4e946b4", "method": "POST", "path": "/api/waivers", "status": 422, "duration_ms": 79.2, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "86039e864c2447f8", "method": "POST", "path": "/api/admin/ops/after-commit/drain", "status": 200, "duration_ms": 3.3, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+[startup] pricing_ps ok in 0.02s
+{"request_id": "d375c68a4191409b", "method": "POST", "path": "/api/admin/ops/after-commit/drain", "status": 200, "duration_ms": 2.7, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+[startup] schema_validators ok in 0.01s
+[startup] price_paise_backfill ok in 0.00s
+{"request_id": "062e0cfc0af943b5", "method": "POST", "path": "/api/admin/ops/after-commit/drain", "status": 200, "duration_ms": 77.2, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+[startup] background tasks complete in 2.6s: {'seed_if_empty': 'skipped (watermark)', 'seed_phase15': 'skipped (watermark)', 'seed_phase3': 'skipped (watermark)', 'system_roles': 0.19, 'seed_marketing_user': 'skipped (watermark)', 'owner_bootstrap': 0.01, 'migrate_phase7': 'skipped (watermark)', 'seed_phase7': 0.0, 'backfill_demand_installments': 'skipped (watermark)', 'migrate_phase_g': 'skipped (watermark)', 'sweep_notifications': 'skipped (watermark)', 'integrity_report': 0.32, 'inventory_masters': 0.02, 'counters': 'skipped (watermark)', 'seed_s1_templates': 0.0, 'migrate_s1_templates': 0.0, 'reconcile': 'skipped (watermark)', 'startup_phase11': 'skipped (watermark)', 'pricing_ps': 0.02, 'schema_validators': 0.01, 'price_paise_backfill': 0.0, 'backfill_paid_parts': 'skipped (watermark)'}
+{"request_id": "47766f21ccba435a", "method": "POST", "path": "/api/admin/ops/after-commit/drain", "status": 200, "duration_ms": 2.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "77c90af21c1e4da5", "method": "POST", "path": "/api/admin/ops/after-commit/drain", "status": 200, "duration_ms": 2.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "2cc1504ea6de4518", "method": "GET", "path": "/api/projects", "status": 200, "duration_ms": 25.7, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "b6ebd25be92045d8", "method": "GET", "path": "/api/master/block-types", "status": 200, "duration_ms": 7.3, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "6fef944937254735", "method": "GET", "path": "/api/master/flat-types", "status": 200, "duration_ms": 8.2, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "4a34a190ba594967", "method": "POST", "path": "/api/blocks", "status": 201, "duration_ms": 58.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "00f9627542674bf7", "method": "GET", "path": "/api/master/payment-plans", "status": 200, "duration_ms": 9.5, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "3c9a8445be824084", "method": "POST", "path": "/api/payment-plan-assignments", "status": 201, "duration_ms": 26.5, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "36ebab55e18c4bb5", "method": "GET", "path": "/api/flats", "status": 200, "duration_ms": 8.1, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "a7798f54d5704968", "method": "PATCH", "path": "/api/flats/af9494a1-5ae7-456f-af33-1952d90ab047/pricing", "status": 200, "duration_ms": 27.4, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "c72bb65714614f24", "method": "GET", "path": "/api/flats/af9494a1-5ae7-456f-af33-1952d90ab047", "status": 200, "duration_ms": 11.0, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "0c36f0e97d444824", "method": "POST", "path": "/api/customers", "status": 201, "duration_ms": 29.2, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "a7522c8a02bb4eba", "method": "GET", "path": "/api/projects/8e4ef80c-0ce8-4fe6-8c46-7b552afe0d8a/blocks/01dd0987-073b-4013-8e9b-e9f4f1905af2/payment-plans", "status": 200, "duration_ms": 5.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+raw access to ledger_entries: ledger projection rebuild
+raw access to ledger_entries: ledger projection rebuild
+{"request_id": "7b40ea82c62b4b4c", "method": "POST", "path": "/api/bookings", "status": 201, "duration_ms": 1198.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796", "slow": true}
+raw access to ledger_entries: ledger projection rebuild
+{"request_id": "d1eda3a45a984846", "method": "POST", "path": "/api/payments", "status": 201, "duration_ms": 168.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "31f3a70a069046d2", "method": "POST", "path": "/api/bookings/4dc7e331-472d-4733-9359-2a85883e3cde/cancel", "status": 409, "duration_ms": 15.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "7777982719bd4b2f", "method": "POST", "path": "/api/admin/ops/after-commit/drain", "status": 200, "duration_ms": 544.0, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796", "slow": true}
+{"request_id": "5e9a60ac984f481b", "method": "POST", "path": "/api/admin/ops/after-commit/drain", "status": 200, "duration_ms": 3.0, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+raw access to ledger_entries: ledger projection rebuild
+{"request_id": "48033da282de4070", "method": "POST", "path": "/api/payments", "status": 201, "duration_ms": 60.9, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+raw access to ledger_entries: ledger projection rebuild
+{"request_id": "06deff4b356849cb", "method": "POST", "path": "/api/payments", "status": 201, "duration_ms": 243.7, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+raw access to ledger_entries: ledger projection rebuild
+{"request_id": "a2d4e348a3cb44a8", "method": "POST", "path": "/api/payments/69127266-d77d-4810-a9b0-420bd7fa149e/reverse", "status": 200, "duration_ms": 57.1, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "d1de91ef5afb40bb", "method": "POST", "path": "/api/admin/ops/after-commit/drain", "status": 200, "duration_ms": 70.3, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "9bd78e5c3f3c435e", "method": "GET", "path": "/api/projects", "status": 200, "duration_ms": 14.1, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "046d7204ddd1405b", "method": "GET", "path": "/api/master/block-types", "status": 200, "duration_ms": 6.3, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "c4f37ac762884a63", "method": "GET", "path": "/api/master/flat-types", "status": 200, "duration_ms": 7.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "671f660f25314ee6", "method": "POST", "path": "/api/blocks", "status": 201, "duration_ms": 44.3, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "2db8274326b64028", "method": "GET", "path": "/api/master/payment-plans", "status": 200, "duration_ms": 10.4, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "e17aa18a1d824ff8", "method": "POST", "path": "/api/payment-plan-assignments", "status": 201, "duration_ms": 42.5, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "338d8141cfef4b52", "method": "GET", "path": "/api/flats", "status": 200, "duration_ms": 9.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "ea1a1973bd904ef7", "method": "PATCH", "path": "/api/flats/db46d978-0038-43a1-8d05-1cea50d3d7bb/pricing", "status": 200, "duration_ms": 29.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "51b60d494afb4ca0", "method": "GET", "path": "/api/flats/db46d978-0038-43a1-8d05-1cea50d3d7bb", "status": 200, "duration_ms": 12.1, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "d157df02331f4e19", "method": "PATCH", "path": "/api/flats/78384dfc-8273-4688-84c7-1d53a68c9473/pricing", "status": 200, "duration_ms": 28.0, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "599f36b1f99248e3", "method": "GET", "path": "/api/flats/78384dfc-8273-4688-84c7-1d53a68c9473", "status": 200, "duration_ms": 14.2, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "f50508cefe134a0c", "method": "GET", "path": "/api/blocks/b6159ff8-9235-43f1-a370-62481a5fbbe6/construction", "status": 200, "duration_ms": 10.4, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "4dab025231a74c68", "method": "POST", "path": "/api/blocks/b6159ff8-9235-43f1-a370-62481a5fbbe6/construction/stage", "status": 200, "duration_ms": 23.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "ed43af841e0a4f9c", "method": "POST", "path": "/api/blocks/b6159ff8-9235-43f1-a370-62481a5fbbe6/construction/stage", "status": 409, "duration_ms": 27.1, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "d4342fdd556046aa", "method": "POST", "path": "/api/admin/ops/after-commit/drain", "status": 200, "duration_ms": 1205.4, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796", "slow": true}

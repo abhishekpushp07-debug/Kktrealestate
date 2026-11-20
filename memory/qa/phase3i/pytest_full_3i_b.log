@@ -1,0 +1,153 @@
+bringing up nodes...
+bringing up nodes...
+
+........................................................................ [  7%]
+........................................................................ [ 14%]
+........................................................................ [ 22%]
+........................................................................ [ 29%]
+........................................................................ [ 37%]
+..F.......................................s............................. [ 44%]
+........................................................................ [ 52%]
+........................................................................ [ 59%]
+........................................................................ [ 67%]
+........................................................................ [ 74%]
+........................................................................ [ 82%]
+....................................................sss................. [ 89%]
+................F..........................................ss........... [ 97%]
+.........................                                                [100%]
+=================================== FAILURES ===================================
+_____________ test_read_model_marks_are_shared_and_survive_a_crash _____________
+[gw1] linux -- Python 3.11.18 /root/.venv/bin/python
+
+    def test_read_model_marks_are_shared_and_survive_a_crash():
+        cid = f"t3g-{uuid.uuid4().hex}"
+        _py(
+            f"from services import read_model_state as S\nasyncio.run(S.persist(customer_id='{cid}'))"
+        )  # process 1 marks, then dies
+        out = _py(f"""
+    from datetime import UTC, datetime
+    from services import read_model_state as S
+    async def go():
+        a = await S.shared_pending("c:{cid}")
+        b = await S.load_shared(0) and "{cid}" in S.dirty["customers"]
+        S.dirty["customers"].discard("{cid}")
+        await S.clear({{"customers": {{"{cid}"}}}}, datetime.now(UTC))
+        return [a, b, await S.shared_pending("c:{cid}")]
+    print(json.dumps(asyncio.run(go())))
+    """)
+>       assert out == [True, True, False]
+E       assert [True, True, True] == [True, True, False]
+E         
+E         At index 2 diff: True != False
+E         Use -v to get more diff
+
+tests/test_phase3g_integrity.py:222: AssertionError
+__________________ test_undone_letter_marker_is_replayed_once __________________
+[gw0] linux -- Python 3.11.18 /root/.venv/bin/python
+
+mongo = Database(MongoClient(host=['localhost:27017'], document_class=dict, tz_aware=False, connect=True), 'kkt_test')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0xfea5f4499fd0>
+
+    def test_undone_letter_marker_is_replayed_once(mongo, monkeypatch):
+        os.environ.setdefault("DB_NAME", mongo.name)
+        from services import documents, letter_queue
+    
+        calls = []
+    
+        async def fake(bid, kinds, actor, demand_ids=None):
+            calls.append((bid, tuple(demand_ids)))
+    
+        monkeypatch.setattr(documents, "auto_register", fake)
+        bid, did = f"lq-{uuid.uuid4().hex[:8]}", f"lq-d-{uuid.uuid4().hex[:8]}"
+        mongo.letter_queue.insert_one(
+            {
+                "booking_id": bid,
+                "demand_ids": [did],
+                "actor": {"id": "t"},
+                "created_at": "2020-01-01T00:00:00+00:00",
+                "done_at": None,
+            }
+        )
+    
+        async def go():
+            from db import db as adb
+    
+            await letter_queue.reconcile(importlib.import_module("services.documents").auto_register, 60, 500)
+            await letter_queue.reconcile(importlib.import_module("services.documents").auto_register, 60, 500)
+            return await adb.letter_queue.find_one({"booking_id": bid})
+    
+>       row = asyncio.run(go())
+              ^^^^^^^^^^^^^^^^^
+
+tests/test_phase3i_queue_archive.py:51: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/usr/local/lib/python3.11/asyncio/runners.py:190: in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/asyncio/runners.py:118: in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/asyncio/base_events.py:654: in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+tests/test_phase3i_queue_archive.py:47: in go
+    await letter_queue.reconcile(importlib.import_module("services.documents").auto_register, 60, 500)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+auto_register = <function test_undone_letter_marker_is_replayed_once.<locals>.fake at 0xfea5f45f5260>
+max_age_s = 60, limit = 500
+
+    async def reconcile(auto_register, max_age_s: int = 60, limit: int = 50) -> int:
+        cutoff = (datetime.now(UTC) - timedelta(seconds=max_age_s)).isoformat()
+>       rows = await db.letter_queue.find({"done_at": None, "created_at": {"$lt": cutoff}}).limit(limit).to_list(None)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       RuntimeError: Task <Task pending name='Task-53' coro=<test_undone_letter_marker_is_replayed_once.<locals>.go() running at /app/backend/tests/test_phase3i_queue_archive.py:47> cb=[_run_until_complete_cb() at /usr/local/lib/python3.11/asyncio/base_events.py:181]> got Future <Future pending> attached to a different loop
+
+services/letter_queue.py:32: RuntimeError
+=============================== warnings summary ===============================
+../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
+../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
+  /root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12: PendingDeprecationWarning: Please use `import python_multipart` instead.
+    import multipart
+
+../../root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854
+../../root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854
+  /root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854: DeprecationWarning: 'crypt' is deprecated and slated for removal in Python 3.13
+    from crypt import crypt as _crypt
+
+tests/test_startup_s1_s3_idempotent.py:71
+tests/test_startup_s1_s3_idempotent.py:71
+  /app/backend/tests/test_startup_s1_s3_idempotent.py:71: PytestUnknownMarkWarning: Unknown pytest.mark.timeout - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.timeout(900)
+
+tests/test_phase_k_p1.py::test_loadshed_sheds_with_prebuilt_503_and_exempts_probes
+  /root/.venv/lib/python3.11/site-packages/starlette/testclient.py:41: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    [], typing.ContextManager[anyio.abc.BlockingPortal]
+
+tests/test_phase_q.py: 10 warnings
+  /root/.venv/lib/python3.11/site-packages/pypdf/_page.py:1368: DeprecationWarning: Calling `PageObject.replace_contents()` for pages not assigned to a writer is deprecated and will be removed in pypdf 7.0.0. Attach the page to the writer first or use `PdfWriter(clone_from=...)` directly. The existing approach has proved being unreliable.
+    self.replace_contents(ContentStream(new_content_array, self.pdf))
+
+tests/test_kkt_erp.py::TestBlock::test_create_block_and_generation
+tests/test_kkt_erp.py::TestFlatType::test_create_flat_type_auto_area
+tests/test_phase_7.py::TestPortalPhase7::test_portal_booking_payment_plan
+tests/test_phase_7.py::TestPortalPhase7::test_portal_booking_payment_plan
+  /root/.venv/lib/python3.11/site-packages/_pytest/fixtures.py:1313: PytestRemovedIn10Warning: Class-scoped fixture defined as instance method is deprecated.
+  Instance attributes set in this fixture will NOT be visible to test methods,
+  as each test gets a new instance while the fixture runs only once per class.
+  Use @classmethod decorator and set attributes on cls instead.
+  See https://docs.pytest.org/en/stable/deprecations.html#class-scoped-fixture-as-instance-method
+    fixturefunc = resolve_fixture_function(fixturedef, request)
+
+tests/test_phase_5.py::TestPortalData::test_booking_detail_and_subresources
+  /root/.venv/lib/python3.11/site-packages/_pytest/python.py:171: PytestReturnNotNoneWarning: Test functions should return None, but tests/test_phase_5.py::TestPortalData::test_booking_detail_and_subresources returned <class 'str'>.
+  Did you mean to use `assert` instead of `return`?
+  See https://docs.pytest.org/en/stable/how-to/assert.html#return-not-none for more information.
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_phase3g_integrity.py::test_read_model_marks_are_shared_and_survive_a_crash
+FAILED tests/test_phase3i_queue_archive.py::test_undone_letter_marker_is_replayed_once
+2 failed, 953 passed, 6 skipped, 22 warnings in 1331.26s (0:22:11)
+pytest exit 1

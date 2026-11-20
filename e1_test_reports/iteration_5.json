@@ -1,0 +1,22 @@
+{
+  "iteration": 5,
+  "mode": "retest",
+  "passed": 3,
+  "failed": 1,
+  "retest_needed": true,
+  "checks": [
+    {"criterion": "JRN-37 Hold reasons master is reachable + Every Masters and Admin → Advanced link opens its own page", "name": "masters-links-own-pages", "lane": "browser", "status": "passed", "evidence": "/masters/m/hold-reasons h1='Hold Reasons' and it lists 'tscheck custom reason' and 'Token received (custom)'. /masters/m/allocation-categories h1='Allocation Categories'. /masters/m/tscheck-nonexistent shows testid master-unknown 'Unknown list'. All 13 hub links and 13 Advanced links open their own page titles (Flat Types, Floor Templates, Tower Templates, Construction Stages, Stage Plan Templates, Payment Plan Templates, Charge Heads, Parking Slot Types, Payment Modes, Bank Accounts, Company Settings, Company & letterhead, Users & Roles, PLC Types, Spec Categories, Spec Items, Room/Area/Block Types, Amenities, Projects, Notices, Catalogues, Website · Site Settings, Document Types). None fell through to Dashboard. Add/edit/deactivate and where-used were not exercised: no tscheck rows were created."},
+    {"criterion": "Upcoming dues report unchanged after the speed fix", "name": "test_tscheck_upcoming_dues.py", "lane": "backend", "status": "passed", "evidence": "GET /api/reports/upcoming-dues?days=30|90|365 -> 200. days=30: 158 items, total_paise 12119021200 = sum of item total_paise. Every row has total = cash + account."},
+    {"criterion": "Upcoming dues report unchanged after the speed fix", "name": "upcoming-dues-and-week-nav (upcoming-dues part)", "lane": "browser", "status": "failed", "evidence": "/reports/upcoming-dues ('Upcoming Dues (legacy)'): the page's own call to /api/reports/upcoming-dues returned 200 with 158 items, but the UI shows 'Rows 0' and 'No data for these filters'. There is no 30/90/365 selector. The Home page has no upcoming-dues widget."},
+    {"criterion": "Site visits week navigation uses business days", "name": "upcoming-dues-and-week-nav (week part)", "lane": "browser", "status": "passed", "evidence": "Week view opens on '16 Nov 2026 – 22 Nov 2026' (Monday, the IST as-of day). Next -> '23 Nov – 29 Nov'. Previous x2 -> '09 Nov – 15 Nov'. Each click moves exactly 7 days. Sunday behaviour checked in code only: weekStart maps Sunday to the previous Monday."}
+  ],
+  "bugs": [
+    {"severity": "medium", "criterion": "Upcoming dues report unchanged after the speed fix", "title": "Reports → Upcoming dues always shows 0 rows although the API returns rows", "evidence": "Browser: Rows 0 / 'No data for these filters' (screenshot upcoming-dues-and-week-nav-failure.png). API: GET /api/reports/upcoming-dues -> 200 {items:[158 rows], total_paise:12119021200, horizon_days:30}. Cause: routers/construction.py returns the rows under 'items', but pages/Reports.jsx renders data.rows (e.g. line 337 'Rows' = d.rows?.length). Possible fixes: return 'rows', or map items to rows. Also add a days (30/90/365) filter to FILTERS['upcoming-dues']."}
+  ],
+  "action_items": [
+    {"type": "note", "severity": "low", "detail": "The Home page has no upcoming-dues widget. /api/dashboard returns collections.upcoming_installments, but no frontend file renders it. Either build the widget or drop it from the criterion."},
+    {"type": "note", "severity": "low", "detail": "The 'Message templates' page h1 reads 'Demand raised', which is the first template name, not 'Message templates'. This is cosmetic."},
+    {"type": "note", "severity": "low", "detail": "Older tester-owned tests are stale after the earlier demo refresh: test_tscheck_business_day.py and test_tscheck_refresh_keeps_ids.py::test_refresh_done_today_with_backup assert on the prior snapshot or backup and on today's rows. These are not app bugs and were not counted."},
+    {"type": "note", "severity": "low", "detail": "The where-used and add/edit/deactivate controls on Hold reasons were not exercised in this short retest."}
+  ]
+}

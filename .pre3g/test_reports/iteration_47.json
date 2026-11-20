@@ -1,0 +1,33 @@
+{
+  "summary": "Frontend-only close-out check as admin@kkt.in (Playwright, 1920x1080, no payments posted, billpe.com and project 'Ye' not touched). 5 of 6 checks pass. Failing: the '+ add note' link on the Record payment sheet is almost invisible on the live build, because the served bundle is older than the source fix.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "PostPayment '+ add note'", "issue": "Live bundle renders className 'text-accent'. In tailwind.config.js 'accent' DEFAULT = --accent-soft (#eef3fe), so the text is near-white on a white sheet, computed rgb(238,243,254). Source now has 'text-sapphire' (#2f63e0, fine contrast), but /app/frontend/build/static/js was built at 06:46:58 and PostPayment.jsx was modified at 06:47:06. The fix is not in the served bundle (PREVIEW_MODE=production).", "selector": "[data-testid='pp-add-note']", "priority": "HIGH"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "verified": [
+    "Shalini Thakur card CUST-2627-7266: class 'e-jcard wine', status 'OVERDUE 226 DAYS' (CSS uppercase), ₹6.4 L due, Collect CTA in coral. She appears in 'overdue 30+' and 'needs attention' via /api/customers?card_segment=overdue (total 77). Note: search bypasses the segment chip by design (card_segment undefined when q is set).",
+    "Chip counts: needs attention 77 · overdue 30+ 76 · on track 0 · all clear 1 · advance 5 · no booking yet 2 · kyc pending 0 · all 80. The /api/customers/segments partition holds: overdue 77 + on_track 0 + clear 1 + advance_only 0 + no_booking 2 = 80 = all. The UI shows 'overdue 30+' (76), so the 76+0+1+2 = 79 visible sum is 1 short of all. That 1 is an overdue customer under 30 days, by design. attention 77 == overdue 77 (kyc 0, follow-ups add nothing new).",
+    "ALL CLEAR: Santosh Jha CUST-2526-2898, class 'e-jcard calm', status renders 'ALL CLEAR' (text 'All clear' + uppercase), pill 'all clear', 100% received.",
+    "/reports hub-caption-outstanding-v2 = '₹5.98 Cr overdue · till today' (figure ₹7.43 Cr).",
+    "Record payment from Shalini card → booking ?pay=1 sheet. Fields: Booking, Amount, Date, Mode, plus pp-add-note. pp-remarks is absent until the link is clicked; then it shows, gets autofocus, accepts typing, and stays shown when cleared. Choosing NEFT shows Bank account (default SBI) plus the existing instrument fields (Drawn on bank / Instrument-UTR no. / Instrument date), which are unchanged from before. Not submitted.",
+    "Projects list via API: ['Ganesh Green Villas','Shree Ganesh Heights','Ye']. No 'QA Photo Retest'; the UI body text confirms."
+  ],
+  "test_report_links": [],
+  "action_items": [
+    "Rebuild/redeploy the frontend so the 'text-sapphire' change to pp-add-note in PostPayment.jsx reaches the served bundle, then re-check the link colour (expect rgb(47,99,224)). Also look for any other edits made after the 06:46:58 build.",
+    "Optional: 'text-accent' maps to the soft background token (shadcn naming). Avoid it for text anywhere, or rename to prevent repeats."
+  ],
+  "critical_code_review_comments": [
+    "tailwind 'accent' = --accent-soft (a background tint) while CSS var --accent = sapphire. The same name means two different things, which is how this bug happened."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "skipped", "frontend": "83% (5/6)"},
+  "seed_data_creation": "none",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Shalini booking id 082f6579-e63c-4e39-91f1-7deec786c588 (BK-2627-2661); opening it with ?pay=1 opens the sheet. Hub testids: hub-caption-<key>. Customer chips: segment-<key>. The served frontend is a production build in /app/frontend/build, so compare its mtime with the source mtime when a fix looks missing."
+}

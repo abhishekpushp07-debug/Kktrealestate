@@ -1,0 +1,206 @@
+(trapped) error reading bcrypt version
+Traceback (most recent call last):
+  File "/root/.venv/lib/python3.11/site-packages/passlib/handlers/bcrypt.py", line 620, in _load_backend_mixin
+    version = _bcrypt.__about__.__version__
+              ^^^^^^^^^^^^^^^^^
+AttributeError: module 'bcrypt' has no attribute '__about__'
+index audit_logs.id skipped: An existing index has the same name as the requested index. When index names are not specified, they are auto generated 
+[startup] indexes ensured in 0.12s
+UoW mode: ordered-writes+compensation
+KKT backend serving after 0.13s (uow=ordered-writes+compensation); background startup tasks running
+Object storage initialized
+[startup] system_roles ok in 0.15s
+[startup] owner_bootstrap ok in 0.01s
+[startup] seed_phase7 ok in 0.00s
+{"request_id": "98d168bcd8d6472e", "method": "GET", "path": "/api/health", "status": 200, "duration_ms": 2.7, "user_id": null}
+{"request_id": "3cace705ffe54ac3", "method": "POST", "path": "/api/auth/login", "status": 200, "duration_ms": 217.1, "user_id": null}
+{"request_id": "2cb3add519444046", "method": "POST", "path": "/api/admin/hard-purge", "status": 200, "duration_ms": 72.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "0c71ffa189454362", "method": "POST", "path": "/api/auth/login", "status": 200, "duration_ms": 207.1, "user_id": null}
+{"request_id": "492cf183d3f043d9", "method": "POST", "path": "/api/admin/ops/after-commit/drain", "status": 200, "duration_ms": 2.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "945fa6f6348649b0", "method": "POST", "path": "/api/admin/ops/after-commit/drain", "status": 200, "duration_ms": 3.1, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "43350de90b8a488e", "method": "POST", "path": "/api/admin/ops/after-commit/drain", "status": 200, "duration_ms": 2.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+[phase7] integrity: ok=True bookings=79 counts={}
+[startup] integrity_report ok in 0.66s
+{"request_id": "c7b35135fb2f40d2", "method": "POST", "path": "/api/admin/ops/after-commit/drain", "status": 200, "duration_ms": 2.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "94f2bb73ac16424f", "method": "POST", "path": "/api/admin/ops/after-commit/drain", "status": 200, "duration_ms": 3.1, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+[startup] inventory_masters ok in 0.02s
+{"request_id": "8cfa46e82db44662", "method": "POST", "path": "/api/admin/ops/after-commit/drain", "status": 200, "duration_ms": 74.0, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+[startup] seed_s1_templates ok in 0.00s
+[startup] migrate_s1_templates ok in 0.00s
+[startup] pricing_ps ok in 0.02s
+[startup] schema_validators ok in 0.01s
+{"request_id": "8dc2ea14574742c8", "method": "GET", "path": "/api/admin/ops", "status": 200, "duration_ms": 483.0, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+[startup] price_paise_backfill ok in 0.00s
+[startup] background tasks complete in 2.6s: {'seed_if_empty': 'skipped (watermark)', 'seed_phase15': 'skipped (watermark)', 'seed_phase3': 'skipped (watermark)', 'system_roles': 0.15, 'seed_marketing_user': 'skipped (watermark)', 'owner_bootstrap': 0.01, 'migrate_phase7': 'skipped (watermark)', 'seed_phase7': 0.0, 'backfill_demand_installments': 'skipped (watermark)', 'migrate_phase_g': 'skipped (watermark)', 'sweep_notifications': 'skipped (watermark)', 'integrity_report': 0.66, 'inventory_masters': 0.02, 'counters': 'skipped (watermark)', 'seed_s1_templates': 0.0, 'migrate_s1_templates': 0.0, 'reconcile': 'skipped (watermark)', 'startup_phase11': 'skipped (watermark)', 'pricing_ps': 0.02, 'schema_validators': 0.01, 'price_paise_backfill': 0.0, 'backfill_paid_parts': 'skipped (watermark)'}
+{"request_id": "85f6b08f342a4998", "method": "GET", "path": "/api/bookings", "status": 200, "duration_ms": 132.3, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "3a4c2527acfb45ee", "method": "GET", "path": "/api/bookings", "status": 200, "duration_ms": 15.7, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "1ec3f0c6bb4d4785", "method": "GET", "path": "/api/bookings/567afeec-6a93-4181-be4e-6f8a7b75b09f", "status": 200, "duration_ms": 9.9, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "678277b37bb54367", "method": "POST", "path": "/api/admin/ops/after-commit/drain", "status": 200, "duration_ms": 2.3, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "f2abf159ae5a4cad", "method": "POST", "path": "/api/admin/ops/after-commit/drain", "status": 200, "duration_ms": 2.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "24f2038c13d843fd", "method": "POST", "path": "/api/waivers", "status": 422, "duration_ms": 8.7, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "bde6afef6c6f4e05", "method": "POST", "path": "/api/admin/ops/after-commit/drain", "status": 200, "duration_ms": 2.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "02efb21bcd604538", "method": "POST", "path": "/api/admin/ops/after-commit/drain", "status": 200, "duration_ms": 2.7, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "527a2391772a4aeb", "method": "POST", "path": "/api/admin/ops/after-commit/drain", "status": 200, "duration_ms": 2.7, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "09dad38c5b844f40", "method": "POST", "path": "/api/admin/ops/after-commit/drain", "status": 200, "duration_ms": 3.0, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+raw access to ledger_entries: ledger projection rebuild
+{"request_id": "3b9c048122464129", "method": "POST", "path": "/api/payments", "status": 201, "duration_ms": 65.3, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "cbbc934af62a4420", "method": "POST", "path": "/api/admin/ops/after-commit/drain", "status": 200, "duration_ms": 79.4, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "6d0e560e498b4d24", "method": "GET", "path": "/api/projects", "status": 200, "duration_ms": 11.5, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "04590e19ae304fba", "method": "GET", "path": "/api/master/block-types", "status": 200, "duration_ms": 4.9, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "d63f9d69663e4fde", "method": "GET", "path": "/api/master/flat-types", "status": 200, "duration_ms": 6.0, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "b8ac98da77fe4e66", "method": "POST", "path": "/api/blocks", "status": 201, "duration_ms": 34.3, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "a2fa451caaea4e19", "method": "GET", "path": "/api/master/payment-plans", "status": 200, "duration_ms": 6.9, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "8043eb9c0e4c4229", "method": "POST", "path": "/api/payment-plan-assignments", "status": 201, "duration_ms": 22.2, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "33193182265e4486", "method": "GET", "path": "/api/flats", "status": 200, "duration_ms": 6.5, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "fc8bf03bb64240c2", "method": "PATCH", "path": "/api/flats/3b166c68-214c-46ea-90a1-12555432fb7b/pricing", "status": 200, "duration_ms": 19.4, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "836243f76ab04847", "method": "GET", "path": "/api/flats/3b166c68-214c-46ea-90a1-12555432fb7b", "status": 200, "duration_ms": 9.4, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "79d24ca57baf46ce", "method": "POST", "path": "/api/customers", "status": 201, "duration_ms": 25.9, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "c368adfd76054985", "method": "GET", "path": "/api/projects/8e4ef80c-0ce8-4fe6-8c46-7b552afe0d8a/blocks/fc574534-ee1e-46e9-8a8a-4bfc128b1001/payment-plans", "status": 200, "duration_ms": 4.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+raw access to ledger_entries: ledger projection rebuild
+raw access to ledger_entries: ledger projection rebuild
+{"request_id": "e76e2bbca24e4078", "method": "POST", "path": "/api/bookings", "status": 201, "duration_ms": 106.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+raw access to ledger_entries: ledger projection rebuild
+{"request_id": "eb9e7db0b98b40fd", "method": "POST", "path": "/api/payments", "status": 201, "duration_ms": 43.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "9902f108b2544f5c", "method": "POST", "path": "/api/bookings/c96325ad-0c38-4451-8aa5-0d5a3ccf4e41/cancel", "status": 409, "duration_ms": 9.4, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "b3d19be102d143a1", "method": "POST", "path": "/api/admin/ops/after-commit/drain", "status": 200, "duration_ms": 1292.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796", "slow": true}
+{"request_id": "8f6b561e5b5b4244", "method": "POST", "path": "/api/admin/ops/after-commit/drain", "status": 200, "duration_ms": 2.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+raw access to ledger_entries: ledger projection rebuild
+{"request_id": "80ebfd968269442e", "method": "POST", "path": "/api/payments", "status": 201, "duration_ms": 47.5, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "680d63e927054142", "path": "/api/payments", "error": "unhandled"}
+Traceback (most recent call last):
+  File "/root/.venv/lib/python3.11/site-packages/starlette/middleware/base.py", line 159, in call_next
+    message = await recv_stream.receive()
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/.venv/lib/python3.11/site-packages/anyio/streams/memory.py", line 133, in receive
+    raise EndOfStream from None
+anyio.EndOfStream
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/app/.pre3g/backend/infra.py", line 292, in dispatch
+    response = await asyncio.wait_for(call_next(request), timeout=budget)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/asyncio/tasks.py", line 489, in wait_for
+    return fut.result()
+           ^^^^^^^^^^^^
+  File "/root/.venv/lib/python3.11/site-packages/starlette/middleware/base.py", line 165, in call_next
+    raise app_exc
+  File "/root/.venv/lib/python3.11/site-packages/starlette/middleware/base.py", line 151, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "/root/.venv/lib/python3.11/site-packages/starlette/middleware/base.py", line 189, in __call__
+    with collapse_excgroups():
+  File "/usr/local/lib/python3.11/contextlib.py", line 158, in __exit__
+    self.gen.throw(typ, value, traceback)
+  File "/root/.venv/lib/python3.11/site-packages/starlette/_utils.py", line 93, in collapse_excgroups
+    raise exc
+  File "/root/.venv/lib/python3.11/site-packages/starlette/middleware/base.py", line 191, in __call__
+    response = await self.dispatch_func(request, call_next)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/app/.pre3g/backend/infra.py", line 444, in dispatch
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/.venv/lib/python3.11/site-packages/starlette/middleware/base.py", line 165, in call_next
+    raise app_exc
+  File "/root/.venv/lib/python3.11/site-packages/starlette/middleware/base.py", line 151, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "/root/.venv/lib/python3.11/site-packages/starlette/middleware/gzip.py", line 24, in __call__
+    await responder(scope, receive, send)
+  File "/root/.venv/lib/python3.11/site-packages/starlette/middleware/gzip.py", line 44, in __call__
+    await self.app(scope, receive, self.send_with_gzip)
+  File "/root/.venv/lib/python3.11/site-packages/starlette/middleware/base.py", line 189, in __call__
+    with collapse_excgroups():
+  File "/usr/local/lib/python3.11/contextlib.py", line 158, in __exit__
+    self.gen.throw(typ, value, traceback)
+  File "/root/.venv/lib/python3.11/site-packages/starlette/_utils.py", line 93, in collapse_excgroups
+    raise exc
+  File "/root/.venv/lib/python3.11/site-packages/starlette/middleware/base.py", line 191, in __call__
+    response = await self.dispatch_func(request, call_next)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/app/.pre3g/backend/infra.py", line 34, in dispatch
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/.venv/lib/python3.11/site-packages/starlette/middleware/base.py", line 165, in call_next
+    raise app_exc
+  File "/root/.venv/lib/python3.11/site-packages/starlette/middleware/base.py", line 151, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "/root/.venv/lib/python3.11/site-packages/starlette/middleware/cors.py", line 85, in __call__
+    await self.app(scope, receive, send)
+  File "/root/.venv/lib/python3.11/site-packages/starlette/middleware/exceptions.py", line 65, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/root/.venv/lib/python3.11/site-packages/starlette/_exception_handler.py", line 64, in wrapped_app
+    raise exc
+  File "/root/.venv/lib/python3.11/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    await app(scope, receive, sender)
+  File "/root/.venv/lib/python3.11/site-packages/starlette/routing.py", line 756, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/root/.venv/lib/python3.11/site-packages/starlette/routing.py", line 776, in app
+    await route.handle(scope, receive, send)
+  File "/root/.venv/lib/python3.11/site-packages/starlette/routing.py", line 297, in handle
+    await self.app(scope, receive, send)
+  File "/root/.venv/lib/python3.11/site-packages/starlette/routing.py", line 77, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/root/.venv/lib/python3.11/site-packages/starlette/_exception_handler.py", line 64, in wrapped_app
+    raise exc
+  File "/root/.venv/lib/python3.11/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    await app(scope, receive, sender)
+  File "/root/.venv/lib/python3.11/site-packages/starlette/routing.py", line 72, in app
+    response = await func(request)
+               ^^^^^^^^^^^^^^^^^^^
+  File "/root/.venv/lib/python3.11/site-packages/fastapi/routing.py", line 278, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/.venv/lib/python3.11/site-packages/fastapi/routing.py", line 191, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/app/.pre3g/backend/routers/payments.py", line 471, in post_payment
+    await db.payments.insert_one(p)
+  File "/usr/local/lib/python3.11/concurrent/futures/thread.py", line 58, in run
+    result = self.fn(*self.args, **self.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/.venv/lib/python3.11/site-packages/pymongo/synchronous/collection.py", line 875, in insert_one
+    self._insert_one(
+  File "/root/.venv/lib/python3.11/site-packages/pymongo/synchronous/collection.py", line 815, in _insert_one
+    self._database.client._retryable_write(
+  File "/root/.venv/lib/python3.11/site-packages/pymongo/synchronous/mongo_client.py", line 2099, in _retryable_write
+    return self._retry_with_session(retryable, func, s, bulk, operation, operation_id)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/.venv/lib/python3.11/site-packages/pymongo/synchronous/mongo_client.py", line 1969, in _retry_with_session
+    return self._retry_internal(
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/root/.venv/lib/python3.11/site-packages/pymongo/_csot.py", line 126, in csot_wrapper
+    return func(self, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/.venv/lib/python3.11/site-packages/pymongo/synchronous/mongo_client.py", line 2022, in _retry_internal
+    ).run()
+      ^^^^^
+  File "/root/.venv/lib/python3.11/site-packages/pymongo/synchronous/mongo_client.py", line 2890, in run
+    res = self._read() if self._is_read else self._write()
+                                             ^^^^^^^^^^^^^
+  File "/root/.venv/lib/python3.11/site-packages/pymongo/synchronous/mongo_client.py", line 3105, in _write
+    return self._func(self._session, conn, self._retryable)  # type: ignore
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/.venv/lib/python3.11/site-packages/pymongo/synchronous/collection.py", line 813, in _insert_command
+    _check_write_command_response(result)
+  File "/root/.venv/lib/python3.11/site-packages/pymongo/helpers_shared.py", line 365, in _check_write_command_response
+    _raise_last_write_error(write_errors)
+  File "/root/.venv/lib/python3.11/site-packages/pymongo/helpers_shared.py", line 335, in _raise_last_write_error
+    raise DuplicateKeyError(error.get("errmsg"), 11000, error)
+pymongo.errors.DuplicateKeyError: E11000 duplicate key error collection: kkt_test.payments index: uniq_payment_idempotency_key dup key: { idempotency_key: "a017de1346c14e53bfff09afe038af00" }, full error: {'index': 0, 'code': 11000, 'errmsg': 'E11000 duplicate key error collection: kkt_test.payments index: uniq_payment_idempotency_key dup key: { idempotency_key: "a017de1346c14e53bfff09afe038af00" }', 'keyPattern': {'idempotency_key': 1}, 'keyValue': {'idempotency_key': 'a017de1346c14e53bfff09afe038af00'}}
+{"request_id": "680d63e927054142", "method": "POST", "path": "/api/payments", "status": 500, "duration_ms": 21.1, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "05b815d9af2b46e2", "method": "POST", "path": "/api/admin/ops/after-commit/drain", "status": 200, "duration_ms": 42.9, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "e02ce27348084b11", "method": "GET", "path": "/api/projects", "status": 200, "duration_ms": 10.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "8ffce004c69e4f82", "method": "GET", "path": "/api/master/block-types", "status": 200, "duration_ms": 4.4, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "dd3e1dadeac743d8", "method": "GET", "path": "/api/master/flat-types", "status": 200, "duration_ms": 5.2, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "1063517372684c22", "method": "POST", "path": "/api/blocks", "status": 201, "duration_ms": 28.0, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "c10883bf92ae4d6a", "method": "GET", "path": "/api/master/payment-plans", "status": 200, "duration_ms": 6.7, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "73b171f615e14090", "method": "POST", "path": "/api/payment-plan-assignments", "status": 201, "duration_ms": 23.1, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "1f215bcee84b48ea", "method": "GET", "path": "/api/flats", "status": 200, "duration_ms": 13.3, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "cc49866f4bb64947", "method": "PATCH", "path": "/api/flats/296ae616-1166-45cb-b3dd-e3ead9f014a1/pricing", "status": 200, "duration_ms": 15.4, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "51fccc8768b34eb1", "method": "GET", "path": "/api/flats/296ae616-1166-45cb-b3dd-e3ead9f014a1", "status": 200, "duration_ms": 9.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "b6a5d0bc2d894f01", "method": "PATCH", "path": "/api/flats/bbbf28d8-2eba-4d97-82b0-4788f9cde3ea/pricing", "status": 200, "duration_ms": 22.0, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "c6620533840d4ab4", "method": "GET", "path": "/api/flats/bbbf28d8-2eba-4d97-82b0-4788f9cde3ea", "status": 200, "duration_ms": 12.9, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "544563eda38c47cb", "method": "GET", "path": "/api/blocks/7860bd44-25f9-4571-82ac-facd9c7bf192/construction", "status": 200, "duration_ms": 15.9, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "f0d09e3f782d4162", "method": "POST", "path": "/api/blocks/7860bd44-25f9-4571-82ac-facd9c7bf192/construction/stage", "status": 200, "duration_ms": 18.2, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "d6aae6940cca4343", "method": "POST", "path": "/api/blocks/7860bd44-25f9-4571-82ac-facd9c7bf192/construction/stage", "status": 200, "duration_ms": 18.2, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "072beafac6b94e47", "method": "POST", "path": "/api/admin/ops/after-commit/drain", "status": 200, "duration_ms": 2066.4, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796", "slow": true}

@@ -1,0 +1,147 @@
+bringing up nodes...
+bringing up nodes...
+
+..........FF                                                             [100%]
+=================================== FAILURES ===================================
+___________________ test_transfer_keeps_the_money_law[False] ___________________
+[gw1] linux -- Python 3.11.18 /root/.venv/bin/python
+
+H = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyMTAzMDAwNy0yN2VlLTRjMDUtODcwOS05ZGM1OWZkN2U...xLCJleHAiOjE3OTQ3ODM3MjF9.SGftMr2ysgj3KHsslK_I5qXfemfViqvUy4R241DW8sU', 'X-Rate-Limit-Bypass': 'kkt-test-bypass-local'}
+revise_first = False
+
+    @pytest.mark.parametrize("revise_first", [False, True])
+    def test_transfer_keeps_the_money_law(H, revise_first):
+        flats = call(H, "GET", "/flats", status="Available", page_size=40)["items"]
+        priced = [f for f in flats if f.get("price")]
+        f1, f2 = priced[-1 - 2 * revise_first], priced[-2 - 2 * revise_first]
+        cust = call(H, "GET", "/customers", page_size=12)["items"][-2 - revise_first]
+        price = f1["price"]
+        today = clock.today_iso()
+        b = call(
+            H,
+            "POST",
+            "/bookings",
+            {
+                "flat_id": f1["id"],
+                "customer_id": cust["id"],
+                "booking_date": today,
+                "agreement_value": price,
+                "cash_agreed": round(price * 0.6, 2),
+                "account_agreed": round(price - round(price * 0.6, 2), 2),
+                "remarks": "D1 transfer law",
+            },
+        )
+        modes = {m["code"]: m for m in call(H, "GET", "/master/payment-modes")["items"]}
+        raised = call(H, "GET", f"/bookings/{b['id']}")["summary"]
+        assert raised["total_udhar_paise"] > 0, "booking instalment raised a bill"
+        for amt in (25000, raised["total_udhar_paise"] // 100 + 50000):  # partial payment, then one that leaves an advance
+>           call(
+                H,
+                "POST",
+                "/payments",
+                {
+                    "booking_id": b["id"],
+                    "allocation": "auto",
+                    "amount": amt,
+                    "payment_date": today,
+                    "payment_mode_id": modes["CASH"]["id"],
+                    "remarks": "D1",
+                },
+            )
+
+tests/test_transfer_money_law.py:77: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+H = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyMTAzMDAwNy0yN2VlLTRjMDUtODcwOS05ZGM1OWZkN2U...xLCJleHAiOjE3OTQ3ODM3MjF9.SGftMr2ysgj3KHsslK_I5qXfemfViqvUy4R241DW8sU', 'X-Rate-Limit-Bypass': 'kkt-test-bypass-local'}
+method = 'POST', p = '/payments'
+body = {'booking_id': '3c8f0f3d-7ea6-426c-93bb-891fb6bde32d', 'allocation': 'auto', 'amount': 3307920, 'payment_date': '2026-11-16', ...}
+params = {}
+
+    def call(H, method, p, body=None, **params):
+        h = {**H, "Idempotency-Key": str(uuid.uuid4())}
+        r = requests.request(method, f"{API}{p}", headers=h, json=body, params=params, timeout=60)
+>       assert r.status_code in (200, 201), (method, p, r.status_code, r.text[:400])
+E       AssertionError: ('POST', '/payments', 409, '{"detail":"Cash bucket agreed ₹29,90,400; already received ₹0; cannot accept ₹30,65,400. R...000,"error":{"code":"BUCKET_EXCEEDS_AGREED","message":"Cash bucket agreed ₹29,90,400; already received ₹0; cannot acc')
+E       assert 409 in (200, 201)
+E        +  where 409 = <Response [409]>.status_code
+
+tests/test_transfer_money_law.py:32: AssertionError
+___________________ test_transfer_keeps_the_money_law[True] ____________________
+[gw1] linux -- Python 3.11.18 /root/.venv/bin/python
+
+H = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyMTAzMDAwNy0yN2VlLTRjMDUtODcwOS05ZGM1OWZkN2U...xLCJleHAiOjE3OTQ3ODM3MjF9.SGftMr2ysgj3KHsslK_I5qXfemfViqvUy4R241DW8sU', 'X-Rate-Limit-Bypass': 'kkt-test-bypass-local'}
+revise_first = True
+
+    @pytest.mark.parametrize("revise_first", [False, True])
+    def test_transfer_keeps_the_money_law(H, revise_first):
+        flats = call(H, "GET", "/flats", status="Available", page_size=40)["items"]
+        priced = [f for f in flats if f.get("price")]
+        f1, f2 = priced[-1 - 2 * revise_first], priced[-2 - 2 * revise_first]
+        cust = call(H, "GET", "/customers", page_size=12)["items"][-2 - revise_first]
+        price = f1["price"]
+        today = clock.today_iso()
+        b = call(
+            H,
+            "POST",
+            "/bookings",
+            {
+                "flat_id": f1["id"],
+                "customer_id": cust["id"],
+                "booking_date": today,
+                "agreement_value": price,
+                "cash_agreed": round(price * 0.6, 2),
+                "account_agreed": round(price - round(price * 0.6, 2), 2),
+                "remarks": "D1 transfer law",
+            },
+        )
+        modes = {m["code"]: m for m in call(H, "GET", "/master/payment-modes")["items"]}
+        raised = call(H, "GET", f"/bookings/{b['id']}")["summary"]
+        assert raised["total_udhar_paise"] > 0, "booking instalment raised a bill"
+        for amt in (25000, raised["total_udhar_paise"] // 100 + 50000):  # partial payment, then one that leaves an advance
+>           call(
+                H,
+                "POST",
+                "/payments",
+                {
+                    "booking_id": b["id"],
+                    "allocation": "auto",
+                    "amount": amt,
+                    "payment_date": today,
+                    "payment_mode_id": modes["CASH"]["id"],
+                    "remarks": "D1",
+                },
+            )
+
+tests/test_transfer_money_law.py:77: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+H = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyMTAzMDAwNy0yN2VlLTRjMDUtODcwOS05ZGM1OWZkN2U...xLCJleHAiOjE3OTQ3ODM3MjF9.SGftMr2ysgj3KHsslK_I5qXfemfViqvUy4R241DW8sU', 'X-Rate-Limit-Bypass': 'kkt-test-bypass-local'}
+method = 'POST', p = '/payments'
+body = {'booking_id': '6f771f99-c6bd-465d-b103-627730438972', 'allocation': 'auto', 'amount': 4913790, 'payment_date': '2026-11-16', ...}
+params = {}
+
+    def call(H, method, p, body=None, **params):
+        h = {**H, "Idempotency-Key": str(uuid.uuid4())}
+        r = requests.request(method, f"{API}{p}", headers=h, json=body, params=params, timeout=60)
+>       assert r.status_code in (200, 201), (method, p, r.status_code, r.text[:400])
+E       AssertionError: ('POST', '/payments', 409, '{"detail":"Cash bucket agreed ₹45,19,800; already received ₹0; cannot accept ₹45,94,800. R...000,"error":{"code":"BUCKET_EXCEEDS_AGREED","message":"Cash bucket agreed ₹45,19,800; already received ₹0; cannot acc')
+E       assert 409 in (200, 201)
+E        +  where 409 = <Response [409]>.status_code
+
+tests/test_transfer_money_law.py:32: AssertionError
+=============================== warnings summary ===============================
+../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
+../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
+  /root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12: PendingDeprecationWarning: Please use `import python_multipart` instead.
+    import multipart
+
+../../root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854
+../../root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854
+  /root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854: DeprecationWarning: 'crypt' is deprecated and slated for removal in Python 3.13
+    from crypt import crypt as _crypt
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_transfer_money_law.py::test_transfer_keeps_the_money_law[False]
+FAILED tests/test_transfer_money_law.py::test_transfer_keeps_the_money_law[True]
+2 failed, 10 passed, 4 warnings in 4.01s

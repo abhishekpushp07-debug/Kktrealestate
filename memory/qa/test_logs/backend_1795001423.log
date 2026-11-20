@@ -1,0 +1,148 @@
+(trapped) error reading bcrypt version
+Traceback (most recent call last):
+  File "/root/.venv/lib/python3.11/site-packages/passlib/handlers/bcrypt.py", line 620, in _load_backend_mixin
+    version = _bcrypt.__about__.__version__
+              ^^^^^^^^^^^^^^^^^
+AttributeError: module 'bcrypt' has no attribute '__about__'
+index audit_logs.id skipped: An existing index has the same name as the requested index. When index names are not specified, they are auto generated 
+[startup] indexes ensured in 0.12s
+UoW mode: ordered-writes+compensation
+KKT backend serving after 0.13s (uow=ordered-writes+compensation); background startup tasks running
+Object storage initialized
+[startup] system_roles ok in 0.15s
+[startup] owner_bootstrap ok in 0.00s
+{"request_id": "7b90d1180a324580", "method": "GET", "path": "/api/health", "status": 200, "duration_ms": 2.9, "user_id": null}
+[startup] seed_phase7 ok in 0.00s
+{"request_id": "6a9431f846be4994", "method": "POST", "path": "/api/auth/login", "status": 200, "duration_ms": 414.3, "user_id": null}
+{"request_id": "e27dfdc353ce4f70", "method": "POST", "path": "/api/admin/hard-purge", "status": 200, "duration_ms": 79.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+[phase7] integrity: ok=True bookings=79 counts={}
+[startup] integrity_report ok in 0.22s
+{"request_id": "60e7a3ec5a85453f", "method": "POST", "path": "/api/auth/login", "status": 200, "duration_ms": 210.9, "user_id": null}
+[startup] inventory_masters ok in 0.23s
+[startup] seed_s1_templates ok in 0.00s
+[startup] migrate_s1_templates ok in 0.00s
+{"request_id": "dcbe7958f87b4140", "method": "GET", "path": "/api/bookings", "status": 200, "duration_ms": 334.5, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "f952cedab70049d2", "method": "GET", "path": "/api/bookings", "status": 200, "duration_ms": 83.7, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "46f57b1f7e2347bf", "method": "GET", "path": "/api/bookings/02b8ab7d-f964-416e-a3e7-a1e5c3bffd5e/actions", "status": 200, "duration_ms": 9.4, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+[startup] pricing_ps ok in 0.03s
+{"request_id": "dc2775978ade470d", "method": "POST", "path": "/api/bookings/02b8ab7d-f964-416e-a3e7-a1e5c3bffd5e/payment-plan", "status": 409, "duration_ms": 75.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "957ac98317374515", "method": "GET", "path": "/api/bookings/055e79bf-87b4-4f99-a0ab-1d7ca0a6794a/actions", "status": 200, "duration_ms": 7.4, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "a522cc0752e943a1", "method": "POST", "path": "/api/bookings/055e79bf-87b4-4f99-a0ab-1d7ca0a6794a/payment-plan", "status": 409, "duration_ms": 5.9, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+[startup] schema_validators ok in 0.02s
+{"request_id": "4c95b1fa0cf545dd", "method": "GET", "path": "/api/bookings/0a2ed1e9-de24-40ff-a747-6f20ddae416b/actions", "status": 200, "duration_ms": 7.5, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+[startup] price_paise_backfill ok in 0.00s
+{"request_id": "2df2bcf45a62445b", "method": "POST", "path": "/api/bookings/0a2ed1e9-de24-40ff-a747-6f20ddae416b/payment-plan", "status": 409, "duration_ms": 5.5, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+[startup] background tasks complete in 2.5s: {'seed_if_empty': 'skipped (watermark)', 'seed_phase15': 'skipped (watermark)', 'seed_phase3': 'skipped (watermark)', 'system_roles': 0.15, 'seed_marketing_user': 'skipped (watermark)', 'owner_bootstrap': 0.0, 'migrate_phase7': 'skipped (watermark)', 'seed_phase7': 0.0, 'backfill_demand_installments': 'skipped (watermark)', 'migrate_phase_g': 'skipped (watermark)', 'sweep_notifications': 'skipped (watermark)', 'integrity_report': 0.22, 'inventory_masters': 0.23, 'counters': 'skipped (watermark)', 'seed_s1_templates': 0.0, 'migrate_s1_templates': 0.0, 'reconcile': 'skipped (watermark)', 'startup_phase11': 'skipped (watermark)', 'pricing_ps': 0.03, 'schema_validators': 0.02, 'price_paise_backfill': 0.0, 'backfill_paid_parts': 'skipped (watermark)'}
+{"request_id": "cb906cc95fc04030", "method": "GET", "path": "/api/bookings/0f182087-29ab-45fc-9b7a-af1482751536/actions", "status": 200, "duration_ms": 6.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "1fe1383ec10342d4", "method": "POST", "path": "/api/bookings/0f182087-29ab-45fc-9b7a-af1482751536/payment-plan", "status": 409, "duration_ms": 4.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "040171c2d1d14454", "method": "GET", "path": "/api/bookings/1524b173-43aa-47b1-adfc-50f1d30a31a8/actions", "status": 200, "duration_ms": 6.1, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "e3a91e1c071f48a9", "method": "POST", "path": "/api/bookings/1524b173-43aa-47b1-adfc-50f1d30a31a8/payment-plan", "status": 409, "duration_ms": 4.9, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "8a496aee06dd4653", "method": "GET", "path": "/api/bookings/4576b2a4-eab3-46c9-b37b-22dac8c00f4e/actions", "status": 200, "duration_ms": 5.5, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "875ff9bcfb21407b", "method": "GET", "path": "/api/bookings/a1ffe778-5d59-4365-8997-ef6555793b89/actions", "status": 200, "duration_ms": 5.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "c0294543685c49ff", "method": "GET", "path": "/api/bookings", "status": 200, "duration_ms": 27.7, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "ca2aa46bb806469f", "method": "GET", "path": "/api/bookings/02b8ab7d-f964-416e-a3e7-a1e5c3bffd5e", "status": 200, "duration_ms": 9.1, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "9aa084f5e65f4ee2", "method": "GET", "path": "/api/bookings/02b8ab7d-f964-416e-a3e7-a1e5c3bffd5e/ledger", "status": 200, "duration_ms": 10.1, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "2fe2f448e9014169", "method": "GET", "path": "/api/bookings/055e79bf-87b4-4f99-a0ab-1d7ca0a6794a", "status": 200, "duration_ms": 10.2, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "61a9751458d84123", "method": "GET", "path": "/api/bookings/055e79bf-87b4-4f99-a0ab-1d7ca0a6794a/ledger", "status": 200, "duration_ms": 12.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "43d70f84b2834c17", "method": "GET", "path": "/api/bookings/0a2ed1e9-de24-40ff-a747-6f20ddae416b", "status": 200, "duration_ms": 8.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "6b80f83472dd4c78", "method": "GET", "path": "/api/bookings/0a2ed1e9-de24-40ff-a747-6f20ddae416b/ledger", "status": 200, "duration_ms": 9.7, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "72e741524c3f4500", "method": "GET", "path": "/api/bookings/0f182087-29ab-45fc-9b7a-af1482751536", "status": 200, "duration_ms": 8.5, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "e80de4f28d42424a", "method": "GET", "path": "/api/bookings/0f182087-29ab-45fc-9b7a-af1482751536/ledger", "status": 200, "duration_ms": 9.3, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "262585ac423349f8", "method": "GET", "path": "/api/bookings/1524b173-43aa-47b1-adfc-50f1d30a31a8", "status": 200, "duration_ms": 8.4, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "5d878125403b4ca4", "method": "GET", "path": "/api/bookings/1524b173-43aa-47b1-adfc-50f1d30a31a8/ledger", "status": 200, "duration_ms": 9.5, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "1b2d79f960c645a3", "method": "GET", "path": "/api/bookings/17754d69-cae3-4d5d-8576-17de78bc6995", "status": 200, "duration_ms": 6.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "cd5027a9a8614aed", "method": "GET", "path": "/api/bookings/17754d69-cae3-4d5d-8576-17de78bc6995/ledger", "status": 200, "duration_ms": 6.2, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "5d3ce9890534489d", "method": "GET", "path": "/api/bookings/2089fdc4-6f44-4a49-8dff-3fa3a8b66964", "status": 200, "duration_ms": 7.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "61fd2a02d3af4f04", "method": "GET", "path": "/api/bookings/2089fdc4-6f44-4a49-8dff-3fa3a8b66964/ledger", "status": 200, "duration_ms": 8.0, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "0c627ac068b44ba4", "method": "GET", "path": "/api/bookings/21871d09-f80c-44b1-9f25-64e5dd8e64a1", "status": 200, "duration_ms": 7.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "9324707e40f049c0", "method": "GET", "path": "/api/bookings/21871d09-f80c-44b1-9f25-64e5dd8e64a1/ledger", "status": 200, "duration_ms": 8.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "38dca274a1784883", "method": "GET", "path": "/api/bookings/268bcbb6-aafc-45c7-8705-9332b1e4c645", "status": 200, "duration_ms": 8.2, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "eddf00177e864e9b", "method": "GET", "path": "/api/bookings/268bcbb6-aafc-45c7-8705-9332b1e4c645/ledger", "status": 200, "duration_ms": 9.4, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "cb0aba360b2341af", "method": "GET", "path": "/api/bookings/2781d8c3-f5b4-4640-8d16-bbef697f612b", "status": 200, "duration_ms": 8.7, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "a2e6744a1697411d", "method": "GET", "path": "/api/bookings/2781d8c3-f5b4-4640-8d16-bbef697f612b/ledger", "status": 200, "duration_ms": 11.0, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "6078313a60794354", "method": "GET", "path": "/api/bookings/29c004c9-5ac2-40c0-b17b-ef1ec36ab701", "status": 200, "duration_ms": 8.4, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "18615c9347a74d07", "method": "GET", "path": "/api/bookings/29c004c9-5ac2-40c0-b17b-ef1ec36ab701/ledger", "status": 200, "duration_ms": 8.4, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "5efbcfe4ed74495c", "method": "GET", "path": "/api/bookings/2a8be4e8-941a-4b80-9e24-79cc850c9e7a", "status": 200, "duration_ms": 8.7, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "55ccd7fea9fe428e", "method": "GET", "path": "/api/bookings/2a8be4e8-941a-4b80-9e24-79cc850c9e7a/ledger", "status": 200, "duration_ms": 11.2, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "d192625d37f14f3e", "method": "GET", "path": "/api/bookings/2e1b3130-03b6-41d0-a6e5-e6c17906ac5e", "status": 200, "duration_ms": 7.7, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "1f74b4e16e0443dd", "method": "GET", "path": "/api/bookings/2e1b3130-03b6-41d0-a6e5-e6c17906ac5e/ledger", "status": 200, "duration_ms": 6.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "97cfc066cbc84b71", "method": "GET", "path": "/api/bookings/311b342d-970f-40f3-88fd-3632c798f8f8", "status": 200, "duration_ms": 8.9, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "fb939c7a376d4e97", "method": "GET", "path": "/api/bookings/311b342d-970f-40f3-88fd-3632c798f8f8/ledger", "status": 200, "duration_ms": 10.9, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "475417fdce834701", "method": "GET", "path": "/api/bookings/36a54f12-c1b5-42f4-b153-cc2da1c0af44", "status": 200, "duration_ms": 8.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "1df89f4a72054731", "method": "GET", "path": "/api/bookings/36a54f12-c1b5-42f4-b153-cc2da1c0af44/ledger", "status": 200, "duration_ms": 9.3, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "5787f1566ce94ebe", "method": "GET", "path": "/api/bookings", "status": 200, "duration_ms": 18.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "0777329d50514146", "method": "GET", "path": "/api/customers/e52d5a65-97ce-44d6-ae44-ec6d4fa3712c/events", "status": 200, "duration_ms": 42.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "56b68c419ea2411d", "method": "POST", "path": "/api/leads", "status": 201, "duration_ms": 28.7, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "284e513b06ff4f67", "method": "GET", "path": "/api/catalogues/lead_source/typed-value", "status": 200, "duration_ms": 8.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "92e1091f26e64eb3", "method": "POST", "path": "/api/leads", "status": 201, "duration_ms": 14.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "9e23642870164690", "method": "GET", "path": "/api/catalogues/lead_source/typed-value", "status": 200, "duration_ms": 7.3, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "4848c6d89ec3438a", "method": "GET", "path": "/api/catalogues/lead_source/typed-value", "status": 200, "duration_ms": 7.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "f988239975924f4f", "method": "DELETE", "path": "/api/leads/ca3aad19-460c-4128-a797-965779e61a78", "status": 405, "duration_ms": 2.1, "user_id": null}
+{"request_id": "c8d430b51f55431c", "method": "DELETE", "path": "/api/leads/8912d47b-a042-4e4c-88ba-3066112194aa", "status": 405, "duration_ms": 1.9, "user_id": null}
+{"request_id": "b61965f0514f42d6", "method": "GET", "path": "/api/reports/outstanding-v2", "status": 200, "duration_ms": 36.5, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "e06ad6d54fd94e56", "method": "GET", "path": "/api/bookings/4b3ccf22-ca28-4fb2-9b62-b761eefe4591", "status": 200, "duration_ms": 8.3, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "653c3032894a44f8", "method": "GET", "path": "/api/reports/collections-v2", "status": 200, "duration_ms": 101.1, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://internal/api/reports/collections-v2?group_by=receipt&from_date=2026-04-01&to_date=2026-11-18 "HTTP/1.1 200 OK"
+{"request_id": "481f131858594da9", "method": "GET", "path": "/api/reports/v3/collections", "status": 200, "duration_ms": 151.2, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "fd38b4098a934975", "method": "GET", "path": "/api/reports/collections-v2", "status": 200, "duration_ms": 67.3, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "19663d0a3a224a41", "method": "GET", "path": "/api/reports/v3/collections-v2", "status": 200, "duration_ms": 7.3, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "41e48f5eac8f485a", "method": "GET", "path": "/api/reports/roznamcha-summary", "status": 200, "duration_ms": 27.1, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://internal/api/reports/roznamcha-summary?group_by=day&from_date=2026-04-01&to_date=2026-11-18 "HTTP/1.1 200 OK"
+{"request_id": "26fb724fafa84d9c", "method": "GET", "path": "/api/reports/v3/day-book", "status": 200, "duration_ms": 45.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "53a618764f6946c3", "method": "GET", "path": "/api/reports/roznamcha-summary", "status": 200, "duration_ms": 25.3, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "2b65a597ecf040bd", "method": "GET", "path": "/api/reports/v3/roznamcha-summary", "status": 200, "duration_ms": 5.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "c9e1a9d0d56e4d00", "method": "GET", "path": "/api/reports/bank-receipts", "status": 200, "duration_ms": 12.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://internal/api/reports/bank-receipts?from_date=2026-04-01&to_date=2026-11-18 "HTTP/1.1 200 OK"
+{"request_id": "c1aa80027469438c", "method": "GET", "path": "/api/reports/collections-v2", "status": 200, "duration_ms": 4.4, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://internal/api/reports/collections-v2?from_date=2026-04-01&to_date=2026-11-18&group_by=month "HTTP/1.1 200 OK"
+{"request_id": "b5682c61e129443a", "method": "GET", "path": "/api/reports/v3/bank-receipts", "status": 200, "duration_ms": 46.0, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "cf794825bf2940d7", "method": "GET", "path": "/api/reports/bank-receipts", "status": 200, "duration_ms": 12.7, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "f85cbca508a54495", "method": "GET", "path": "/api/reports/v3/bank-receipts", "status": 200, "duration_ms": 5.0, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "0ebb5a543e3748ac", "method": "GET", "path": "/api/reports/cheques", "status": 200, "duration_ms": 51.3, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://internal/api/reports/cheques "HTTP/1.1 200 OK"
+{"request_id": "10e8a257110e48b6", "method": "GET", "path": "/api/reports/v3/cheques", "status": 200, "duration_ms": 75.5, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "adbe9e8ca96b4a84", "method": "GET", "path": "/api/reports/cheques", "status": 200, "duration_ms": 50.4, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "25301b4a165042a8", "method": "GET", "path": "/api/reports/v3/cheques", "status": 200, "duration_ms": 7.2, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "4c3826daa3ec4514", "method": "GET", "path": "/api/reports/demand-vs-collection", "status": 200, "duration_ms": 26.5, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://internal/api/reports/demand-vs-collection "HTTP/1.1 200 OK"
+{"request_id": "f3252e5a43f24120", "method": "GET", "path": "/api/reports/demand-vs-collection", "status": 200, "duration_ms": 22.9, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://internal/api/reports/demand-vs-collection "HTTP/1.1 200 OK"
+{"request_id": "b421d90a8b2a4ae0", "method": "GET", "path": "/api/reports/v3/bills-vs-collection", "status": 200, "duration_ms": 63.9, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "226a0a90e5e64b8e", "method": "GET", "path": "/api/reports/demand-vs-collection", "status": 200, "duration_ms": 18.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "1af0e0275a6c4ced", "method": "GET", "path": "/api/reports/v3/demand-vs-collection", "status": 200, "duration_ms": 5.0, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "aba54269c8ed4236", "method": "GET", "path": "/api/reports/v3/outstanding", "status": 200, "duration_ms": 44.7, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "eca0b21a09144919", "method": "GET", "path": "/api/reports/outstanding-v2", "status": 200, "duration_ms": 7.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "7a655b3a1c9c4dc7", "method": "GET", "path": "/api/reports/v3/outstanding-v2", "status": 200, "duration_ms": 8.5, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "40ebfcbd82dd432a", "method": "GET", "path": "/api/reports/cash-vs-account", "status": 200, "duration_ms": 16.2, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://internal/api/reports/cash-vs-account?group_by=booking "HTTP/1.1 200 OK"
+{"request_id": "9541f3bd2c904117", "method": "GET", "path": "/api/reports/v3/cash-vs-account", "status": 200, "duration_ms": 33.2, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "bbc124ccb1e74e01", "method": "GET", "path": "/api/reports/cash-vs-account", "status": 200, "duration_ms": 16.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "460698a712824f82", "method": "GET", "path": "/api/reports/v3/cash-vs-account", "status": 200, "duration_ms": 8.0, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "5849eb4c95794f93", "method": "GET", "path": "/api/reports/other-charges", "status": 200, "duration_ms": 18.3, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://internal/api/reports/other-charges?group_by=booking "HTTP/1.1 200 OK"
+{"request_id": "8eda030513564eb0", "method": "GET", "path": "/api/reports/v3/other-charges", "status": 200, "duration_ms": 40.4, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "3abe1feb86914a5e", "method": "GET", "path": "/api/reports/other-charges", "status": 200, "duration_ms": 16.9, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "8660db6d0a06436b", "method": "GET", "path": "/api/reports/v3/other-charges", "status": 200, "duration_ms": 6.9, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "37f4364ea8f742f3", "method": "GET", "path": "/api/reports/receivables-forecast", "status": 200, "duration_ms": 67.7, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://internal/api/reports/receivables-forecast?group_by=booking "HTTP/1.1 200 OK"
+{"request_id": "cf116d16891345b6", "method": "GET", "path": "/api/reports/v3/receivables-forecast", "status": 200, "duration_ms": 84.3, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "9441d9e760eb4297", "method": "GET", "path": "/api/reports/receivables-forecast", "status": 200, "duration_ms": 62.3, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "7e4e6708565d4d8b", "method": "GET", "path": "/api/reports/v3/receivables-forecast", "status": 200, "duration_ms": 7.0, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "3f062033f4b04c0a", "method": "GET", "path": "/api/reports/waiver-register", "status": 200, "duration_ms": 4.5, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+HTTP Request: GET http://internal/api/reports/waiver-register?from_date=2026-04-01&to_date=2026-11-18 "HTTP/1.1 200 OK"
+{"request_id": "8c2c990140dc41be", "method": "GET", "path": "/api/reports/v3/waivers", "status": 200, "duration_ms": 18.3, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "5b55d67b82b54c9c", "method": "GET", "path": "/api/reports/waiver-register", "status": 200, "duration_ms": 4.5, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "c04e44117bb24c3d", "method": "GET", "path": "/api/reports/v3/waiver-register", "status": 200, "duration_ms": 4.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "6199b32087b14b4a", "method": "GET", "path": "/api/projects", "status": 200, "duration_ms": 10.7, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "456507769fb44500", "method": "GET", "path": "/api/projects/8e4ef80c-0ce8-4fe6-8c46-7b552afe0d8a/tower-sales", "status": 200, "duration_ms": 7.4, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "2fee91ad03ae4838", "method": "POST", "path": "/api/auth/login", "status": 200, "duration_ms": 209.9, "user_id": null}
+{"request_id": "2fe87bc3637643d4", "method": "GET", "path": "/api/projects/8e4ef80c-0ce8-4fe6-8c46-7b552afe0d8a/tower-sales", "status": 200, "duration_ms": 6.7, "user_id": "7a07f9db-5321-4f33-a132-4d753b75fcd2"}
+{"request_id": "77ab89ad738a425e", "method": "POST", "path": "/api/auth/login", "status": 200, "duration_ms": 207.8, "user_id": null}
+{"request_id": "04508d89aea94f5d", "method": "GET", "path": "/api/projects/8e4ef80c-0ce8-4fe6-8c46-7b552afe0d8a/tower-sales", "status": 403, "duration_ms": 3.0, "user_id": "14d46916-e603-44ed-b710-295d3d284e79"}
+{"request_id": "c3a698fa019a47d0", "method": "GET", "path": "/api/projects/8e4ef80c-0ce8-4fe6-8c46-7b552afe0d8a/tower-sales", "status": 200, "duration_ms": 5.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "9efb8e929d9f4c24", "method": "GET", "path": "/api/projects", "status": 200, "duration_ms": 9.9, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "86d6f970bfb4479a", "method": "GET", "path": "/api/projects/8e4ef80c-0ce8-4fe6-8c46-7b552afe0d8a/tower-sales", "status": 200, "duration_ms": 6.0, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "6932aeba27f54a61", "method": "GET", "path": "/api/flats", "status": 200, "duration_ms": 12.2, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "b1d420fee2ec443e", "method": "POST", "path": "/api/customers", "status": 201, "duration_ms": 15.1, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "210d6f15ed034de4", "method": "GET", "path": "/api/projects/8e4ef80c-0ce8-4fe6-8c46-7b552afe0d8a/blocks/21dca443-0913-4d8f-923f-c23959081b49/payment-plans", "status": 200, "duration_ms": 4.5, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "c910478562c14b8d", "method": "POST", "path": "/api/bookings", "status": 422, "duration_ms": 15.0, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}

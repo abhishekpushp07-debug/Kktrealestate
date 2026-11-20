@@ -1,0 +1,115 @@
+bringing up nodes...
+bringing up nodes...
+
+........................................................................ [  9%]
+........................................................................ [ 18%]
+........................................................................ [ 28%]
+............................................................s........... [ 37%]
+........................................................................ [ 46%]
+........................................................................ [ 56%]
+........................................................................ [ 65%]
+................................................................F....... [ 75%]
+........................................................................ [ 84%]
+.....................sss................................................ [ 93%]
+.....s......s..................................                          [100%]
+=================================== FAILURES ===================================
+___________________________ test_cancel_booking_flow ___________________________
+[gw0] linux -- Python 3.11.18 /root/.venv/bin/python
+
+H = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzMzlkNmM0ZS1lYTU1LTRmNjMtYjRjZi0xYjk1NzgwODA...iYWNjZXNzIiwiYXVkIjoiZXJwIiwiaWF0IjoxNzk0ODEyMzA2LCJleHAiOjE3OTQ4MTMyMDZ9.-0zA6PzXVLQc3soKuNSNKyhg2gC7s41nDfgAWYD4JlI'}
+
+    def test_cancel_booking_flow(H):
+        """Cancels a booking this test creates: picking "the first Active booking" once cancelled the story:fullpaid anchor
+        and the shared work_booking that other tests post money on."""
+        import uuid
+        from datetime import date
+    
+        sgh = next(
+            p
+            for p in requests.get(f"{BASE}/api/projects?page_size=50", headers=H, timeout=20).json()["items"]
+            if p["code"] == "SGH"
+        )
+        flats = requests.get(
+            f"{BASE}/api/flats?project_id={sgh['id']}&status=Available&page_size=200", headers=H, timeout=30
+        ).json()["items"]
+        flat = claim_flat(flats, lambda f: f.get("bookable") is not False)
+        tag = uuid.uuid4().hex[:6]
+        cid = requests.post(
+            f"{BASE}/api/customers",
+            json={"full_name": f"TEST 11F Cancel {tag}", "phone": f"9{tag.encode().hex()[:9]}"},
+            headers={**H, "Idempotency-Key": str(uuid.uuid4())},
+            timeout=30,
+        ).json()["id"]
+        plans = requests.get(
+            f"{BASE}/api/projects/{sgh['id']}/blocks/{flat['block_id']}/payment-plans", headers=H, timeout=30
+        ).json()["items"]
+        made = requests.post(
+            f"{BASE}/api/bookings",
+            json={
+                "flat_id": flat["id"],
+                "customer_id": cid,
+                "booking_date": date.today().isoformat(),
+                "agreement_value": 2500000,
+                "cash_agreed": 500000,
+                "account_agreed": 2000000,
+                "payment_plan_id": plans[0]["id"] if plans else None,
+            },
+            headers={**H, "Idempotency-Key": str(uuid.uuid4())},
+            timeout=60,
+        )
+>       assert made.status_code == 201, made.text
+E       AssertionError: {"detail":"Flat T266-101 was just taken by another booking","code":"FLAT_NOT_AVAILABLE","request_id":"072b7ea6aceb4a0b","error":{"code":"FLAT_NOT_AVAILABLE","message":"Flat T266-101 was just taken by another booking","details":[],"request_id":"072b7ea6aceb4a0b"}}
+E       assert 409 == 201
+E        +  where 409 = <Response [409]>.status_code
+
+tests/test_phase_11f.py:148: AssertionError
+=============================== warnings summary ===============================
+../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
+../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
+  /root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12: PendingDeprecationWarning: Please use `import python_multipart` instead.
+    import multipart
+
+../../root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854
+../../root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854
+  /root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854: DeprecationWarning: 'crypt' is deprecated and slated for removal in Python 3.13
+    from crypt import crypt as _crypt
+
+tests/test_startup_s1_s3_idempotent.py:71
+tests/test_startup_s1_s3_idempotent.py:71
+  /app/backend/tests/test_startup_s1_s3_idempotent.py:71: PytestUnknownMarkWarning: Unknown pytest.mark.timeout - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.timeout(900)
+
+tests/test_phase_k_p1.py::test_loadshed_sheds_with_prebuilt_503_and_exempts_probes
+  /root/.venv/lib/python3.11/site-packages/starlette/testclient.py:41: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    [], typing.ContextManager[anyio.abc.BlockingPortal]
+
+tests/test_phase_q.py::test_void_watermark_deterministic
+tests/test_phase_q.py::test_void_watermark_deterministic
+tests/test_phase_q.py::test_void_watermark_deterministic
+tests/test_phase_q.py::test_void_watermark_deterministic
+tests/test_phase_q.py::test_void_watermark_deterministic
+tests/test_phase_q.py::test_void_watermark_deterministic
+  /root/.venv/lib/python3.11/site-packages/pypdf/_page.py:1368: DeprecationWarning: Calling `PageObject.replace_contents()` for pages not assigned to a writer is deprecated and will be removed in pypdf 7.0.0. Attach the page to the writer first or use `PdfWriter(clone_from=...)` directly. The existing approach has proved being unreliable.
+    self.replace_contents(ContentStream(new_content_array, self.pdf))
+
+tests/test_kkt_erp.py::TestBlock::test_create_block_and_generation
+tests/test_kkt_erp.py::TestFlatType::test_create_flat_type_auto_area
+tests/test_phase_7.py::TestPortalPhase7::test_portal_booking_payment_plan
+tests/test_phase_7.py::TestPortalPhase7::test_portal_booking_payment_plan
+  /root/.venv/lib/python3.11/site-packages/_pytest/fixtures.py:1313: PytestRemovedIn10Warning: Class-scoped fixture defined as instance method is deprecated.
+  Instance attributes set in this fixture will NOT be visible to test methods,
+  as each test gets a new instance while the fixture runs only once per class.
+  Use @classmethod decorator and set attributes on cls instead.
+  See https://docs.pytest.org/en/stable/deprecations.html#class-scoped-fixture-as-instance-method
+    fixturefunc = resolve_fixture_function(fixturedef, request)
+
+tests/test_phase_5.py::TestPortalData::test_booking_detail_and_subresources
+  /root/.venv/lib/python3.11/site-packages/_pytest/python.py:171: PytestReturnNotNoneWarning: Test functions should return None, but tests/test_phase_5.py::TestPortalData::test_booking_detail_and_subresources returned <class 'str'>.
+  Did you mean to use `assert` instead of `return`?
+  See https://docs.pytest.org/en/stable/how-to/assert.html#return-not-none for more information.
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_phase_11f.py::test_cancel_booking_flow - AssertionError: {"...
+1 failed, 760 passed, 6 skipped, 18 warnings in 740.35s (0:12:20)

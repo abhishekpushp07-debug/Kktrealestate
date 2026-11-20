@@ -1,0 +1,52 @@
+{
+  "summary": "Phase 3F F1 (Reports engine + Customer status pilot), tested against the public preview URL. Backend: 18 of 19 public API tests pass (hub 5x10 plus control room, the 10 columns in order, totals identity bills−acc−cash−waived+advance == acc+cash dues, row sums == totals, cascade options, overdue 30+ sentence, as-of 31 Mar 2026, date and dues ranges, group project+tower grand total == ungrouped, 6 levels → 422, unknown param → 422, sort asc/desc, cols, sales gets 403 on the report and export, xlsx/pdf exports, presets: shared, pin limit 409, QA cleanup). The 1 failure: non-numeric page, page_size or overdue_days returns 500. Frontend: hub layout, banner → report, row click → /bookings/{id}, multi-select filters (select all, search, clear, chips), status + days overdue, clear-all, include cancelled, booking-date presets, as-of calendar, column chooser and reset, sort, Excel/PDF, Share copy, reload from URL, empty and error/retry states, 390px cards and the Filters · N toggle, Night/Day from the phone menu, sales sees Access restricted. Found 2 critical frontend bugs: (1) changing Group by in the UI crashes the whole page to white in both directions; (2) pinning a saved view always failed. I fixed (2) and rebuilt the frontend.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/reports/v3/{key} (+ export.xlsx/.pdf)", "issue": "Non-numeric page=abc, page_size=x or overdue_days=abc → 500 INTERNAL_ERROR. Cause: bare int() in routers/reports_v3.py report() and engine.apply_filters 'min' kind. These should return 422."},
+      {"endpoint": "GET /api/reports/v3/customer-status", "issue": "dues_min=abc is silently ignored, and an as_of in the future is silently clamped to today (engine.parse_date). Neither returns 422."},
+      {"endpoint": "PATCH/DELETE /api/reports/presets/{id}", "issue": "Only the owner can patch or delete (filter on user_id). A teammate's shared view still shows pin and delete icons in SavedViews; clicking them gives 404 'Preset not found'."},
+      {"endpoint": "POST /api/reports/presets", "issue": "Saving a view requires reports.collections.view, not the report's own permission. A role with reports.outstanding.view but without collections.view cannot save Customer status views."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "ReportSheet Group by (report-group-by)", "issue": "CRITICAL: choosing a Group by level in the UI crashes the page to white (pageerror \"Cannot read properties of undefined (reading 'map')\"). Removing grouping crashes too (\"reading 'length'\"). Cause: useQuery uses placeholderData: keepPreviousData. The groupBy that picks the table comes from the URL at once, but d is still the previous response, so GroupTable gets d.groups === undefined, and FlatTable/PhoneCards get d.rows === undefined. Opening ?group=project,tower directly works. The same crash will hit opening a saved view whose group setting differs from the current one. Fix: choose the table by data shape (d.groups ? GroupTable : FlatTable), or default to groups={d.groups || []} / rows={d.rows || []}, or skip keepPreviousData when the group key changes.", "selector": "[data-testid=report-group-by-opt-project]", "priority": "CRITICAL"},
+      {"component": "SavedViews pin (report-view-pin-{id})", "issue": "FIXED BY TESTER: pinning always failed with toast 'PATCH /reports/presets/{id} requires a version (optimistic concurrency)'. The api.js interceptor rejects a PATCH that has no version unless config.unversioned is set. Changed SavedViews.patch to api.patch(url, body, { unversioned: true }) and rebuilt the production bundle. Now pin works, Home shows the 6 pins, and the 7th is refused with 'Home holds up to 6 pinned views — unpin one first'. The same bug is still in pages/Reports.jsx lines 1060/1070 (legacy preset rename PATCH {name}); not fixed.", "selector": "[data-testid^=report-view-pin-]", "priority": "HIGH"},
+      {"component": "FilterBar cascade", "issue": "Child selections are not pruned when the parent changes. Steps: pick Project GGV, pick Tower Villa Block V, switch Project to SGH. Result: '0 bookings · SGH · Villa Block V' and the stale Tower chip stays. Fix: drop tower/floor/flat values whose parent is no longer chosen.", "selector": "[data-testid=rf-project]", "priority": "MEDIUM"},
+      {"component": "Group by Select all", "issue": "Group by has 7 options and a 'Select all'. Clicking it does nothing (onChange ignores more than 5) with no feedback. Hide Select all for group-by or show 'up to 5 levels'.", "selector": "[data-testid=report-group-by-all]", "priority": "LOW"}
+    ],
+    "integration_issues": [
+      {"flow": "Final status vs dues columns", "issue": "Final status comes from total outstanding including other charges, as on the customer card. But the 10 default columns, the formula and the hub headline show only instalment dues. So 10 of 80 rows today, and 41 of 54 at as-of 31 Mar 2026, read 'Overdue N days' or 'Due on …' with ₹0 Account dues and ₹0 Cash dues. Example: Bina Sinha GGV V7 shows 'Overdue 267 days' and ₹0/₹0; her other_charges_due is ₹6,68,436. Owners will read this as a bug. Suggest a hint (e.g. 'Overdue 267 days · other charges') or showing Other charges due when it is non-zero.", "affected_selectors": ["[data-testid^=report-row-]"]}
+    ],
+    "design_issues": [
+      {"screen": "Customer status desktop 1920", "issues": ["The table scrolls sideways by 24px (scrollWidth 1366 vs clientWidth 1342), so the Final status column is clipped ('Due on 03 Dec 202…'). Tighten column widths or let the sheet use more of the 1920 width.", "Segment summaries on the hub ('1 on the new engine · 10 reports') are tiny (~7px) and low contrast."]},
+      {"screen": "Exports", "issue_note": "The client saves the xlsx as 'customer-status.xlsx', ignoring the server's dated name customer-status-YYYY-MM-DD.xlsx. The PDF opens in a blob tab and the object URL is never revoked.", "issues": ["Use the server Content-Disposition filename"]}
+    ]
+  },
+  "test_report_links": ["/app/tests/phase3f_public/test_reports_v3_public.py", "/app/tests/phase3f_public/probe_asof.py", "/app/tests/phase3f_public/inspect_xlsx.py", "/app/tests/phase3f_public/qa_presets.py", "/app/test_reports/pytest/phase3f_public.xml"],
+  "action_items": [
+    "CRITICAL: fix the Group by crash in ReportSheet.jsx (keepPreviousData plus groupBy from the URL → d.groups/d.rows undefined); pick the table by response shape",
+    "Review the tester's fix in SavedViews.jsx (unversioned PATCH) and apply the same fix to pages/Reports.jsx legacy preset rename PATCH",
+    "Prune child cascade selections (tower/floor/flat) when the parent selection changes",
+    "Return 422 (not 500) for non-numeric page, page_size and overdue_days; validate dues_min/max",
+    "Make Final status with ₹0 instalment dues readable (other-charges hint or column)",
+    "Fix the Final status column clipping at 1920px",
+    "Hide pin/delete on other users' shared views (or allow them); align preset permission with the report permission"
+  ],
+  "critical_code_review_comments": [
+    "routers/reports_v3.py report(): int(p.get('page')) and int(p.get('page_size')) are unguarded → 500",
+    "engine.apply_filters 'min' kind: int(p[k]) is unguarded → 500",
+    "hub(): tiles awaited one by one in a list comprehension; fine now, but slow once more reports are on the engine",
+    "SavedViews: delete has no confirmation; shared views from others show actions that 404",
+    "download(): URL.createObjectURL is never revoked"
+  ],
+  "updated_files": ["/app/frontend/src/components/reports3/SavedViews.jsx (api.patch ... { unversioned: true }) + production bundle rebuilt via node scripts/dev.js --build-only", "/app/tests/phase3f_public/*"],
+  "success_rate": {"backend": "95% (18/19)", "frontend": "~85% (group-by UI crash; pin fixed by tester; cascade stale child)"},
+  "seed_data_creation": "None kept. Created 7 'QA view …' presets (admin), all deleted by id; pytest preset test cleans up in finally. Admin theme toggled to Night and restored to Day. No booking or money data touched.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "test_credentials": "admin@kkt.in / sales@kkt.in / accounts@kkt.in with Kkt@12345 (from /app/memory/test_credentials.md); all worked",
+  "context_for_next_testing_agent": "The frontend is a PRODUCTION build (PREVIEW_MODE=production); edits need `cd /app/frontend && node scripts/dev.js --build-only` (~1 min), served from build/ live. Public tests: cd /app/tests/phase3f_public && python -m pytest -c /dev/null -p no:cacheprovider test_reports_v3_public.py. To repro the group crash: open /reports/v3/customer-status, click report-group-by, then report-group-by-opt-project → white page. Admin had 0 pinned views before testing.",
+  "rca of the issue": "Group crash: ReportSheet decides FlatTable vs GroupTable from splitList(sp.get('group')), which updates at once, while q.data still holds the previous key's response (keepPreviousData), so the shapes mismatch for one render and the page throws. Pin failure: lib/api.js rejects any PATCH with an object body that has no `version` unless config.unversioned; SavedViews did not pass it."
+}

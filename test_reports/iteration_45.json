@@ -1,0 +1,45 @@
+{
+  "summary": "Frontend-only check of the Phase 3 design round and the Sales Home blank-page fix on the preview production build. Every requested item passes. Home renders for sales, accounts and siteengineer with no page errors. The split line uses words for empty shares, the project dialog has titled sections and Photos, Documents shows the Who/What/Output cards, Construction shows the Tower card, and Night/Day works. Two minor findings, below. No data was created or changed. The SGH Edit dialog was opened and closed without saving; 'Ye' was not touched.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/home/bundle (inventory widget, masked roles)", "issue": "For sales the masked inventory reports booked=0, sold=79, blocked=0. Admin gets booked=78, blocked=1. The masking seems to merge 'Blocked' into 'Sold', so the Sales Home tile reads '79 of 186 booked or sold' while the Projects page and admin say 78 of 186."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/masters generic sheets (Bank Accounts, Charge Heads)", "issues": ["Flat Types has Elite caps section headers (IDENTITY, ROOMS, AREAS, SPECIFICATIONS). The generic StructuredMaster sheets for Bank Accounts and Charge Heads have no section headers or helper lines, just a plain list of fields. The Elite style is only partly applied across masters forms."]},
+      {"screen": "Edit project dialog - Photos", "issues": ["The helper text is repeated: the section line 'the starred one is the cover on the banner and the project page' appears again under the uploader ('Images under 15 MB · the starred photo is the cover...')."]},
+      {"screen": "Sales Home", "issues": ["Caption grammar: '1 site visits today' should be singular."]}
+    ]
+  },
+  "passed_checks": [
+    "sales@kkt.in /dashboard: shows 'good morning, neha.' with TODAY'S WORK (2) and SALES & STOCK (3); 0 page errors. The flats-available tile says '104 · across 6 towers', not 'unsold value ₹0'.",
+    "accounts@kkt.in and siteengineer@kkt.in Home: both render fully with 0 page errors.",
+    "Admin bookings: GGV account-only bookings show 'no cash share · Account ₹1 Cr of ₹1 Cr · other charges ₹6.4 L unpaid' (data-testid money-strip-split). 'Cash ₹0 of ₹0' appears on none of the 8 bookings checked.",
+    "Edit project dialog (SGH): has PROJECT, REGISTRATION & DATES and PHOTOS caps sections with helper lines, a cover photo and Add photos. Fields are prefilled, and Escape closes it without saving.",
+    "/documents (Generate): gen-who, gen-what and gen-actions cards show WHO / WHAT / OUTPUT titles with helper lines.",
+    "/construction: TOWER card with Project and Tower selectors plus the empty-state card.",
+    "/masters: Flat Types, Bank Accounts and Charge Heads 'New' buttons (master-new-btn) open side sheets.",
+    "theme-night and theme-day switch the body background (rgb(5,7,12) / white). Night mode stays on after navigating; Documents and Construction were checked in Night."
+  ],
+  "test_report_links": [],
+  "action_items": [
+    "Optional: give the generic StructuredMaster sheets (Bank Accounts, Charge Heads, etc.) Elite section headers and helper lines if the brief meant all masters forms.",
+    "Optional: remove the repeated cover-photo helper text in ProjectDialog Photos.",
+    "Optional: masked inventory - keep Blocked out of 'Sold' (or exclude it from 'taken') so Sales Home matches the Projects page at 78 of 186.",
+    "Optional: pluralise 'site visits' correctly."
+  ],
+  "critical_code_review_comments": [
+    "MoneyStrip SplitPart: if paid>0 and billed=0 (for example an advance before any bill) it renders 'Cash ₹X of ₹0'. Consider an 'advance' wording.",
+    "HomeWidgets sales(): t.available.count has no optional chaining (t.available?.count), unlike booked/sold. It would crash the same way if a future mask drops 'available'."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "not tested (frontend only)", "frontend": "100% of requested checks passed; 3 minor design notes"},
+  "seed_data_creation": "none",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Login at /login using input[type=email]/[type=password] and Enter. The project page is /projects/{id} (SGH 8e4ef80c-0ce8-4fe6-8c46-7b552afe0d8a) and the edit button is project-edit-btn. Account-only GGV bookings, e.g. /bookings/082f6579-e63c-4e39-91f1-7deec786c588, test the 'no cash share' wording. Home data comes from /api/home/bundle. The browser tool rewrites screenshot path= expressions, so use literal strings."
+}

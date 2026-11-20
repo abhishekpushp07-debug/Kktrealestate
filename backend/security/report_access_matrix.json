@@ -1,0 +1,308 @@
+{
+ "advance-holders": {
+  "export": "reports.outstanding.export",
+  "view": [
+   "reports.outstanding.view"
+  ]
+ },
+ "agreements": {
+  "export": "reports.sales_team.export",
+  "view": [
+   "reports.sales_team.view"
+  ]
+ },
+ "bank-receipts": {
+  "export": "reports.bank_wise.export",
+  "view": [
+   "reports.bank_wise.view"
+  ]
+ },
+ "bills-vs-collection": {
+  "export": "reports.demand_vs_collection.export",
+  "view": [
+   "reports.demand_vs_collection.view"
+  ]
+ },
+ "booking-health": {
+  "export": "reports.outstanding.export",
+  "view": [
+   "reports.outstanding.view"
+  ]
+ },
+ "booking-register": {
+  "export": "reports.sales_team.export",
+  "view": [
+   "reports.sales_team.view"
+  ]
+ },
+ "call-list": {
+  "export": "reports.outstanding.export",
+  "view": [
+   "reports.outstanding.view"
+  ]
+ },
+ "cancellations": {
+  "export": "reports.cancellations_refunds.export",
+  "view": [
+   "reports.cancellations_refunds.view"
+  ]
+ },
+ "cancelled-customers": {
+  "export": "reports.cancellations_refunds.export",
+  "view": [
+   "reports.cancellations_refunds.view"
+  ]
+ },
+ "cash-vs-account": {
+  "export": "reports.cash_vs_account.export",
+  "view": [
+   "reports.cash_vs_account.view"
+  ]
+ },
+ "cheques": {
+  "export": "reports.cheque_register.export",
+  "view": [
+   "reports.cheque_register.view"
+  ]
+ },
+ "collections": {
+  "export": "reports.collections.export",
+  "view": [
+   "reports.collections.view"
+  ]
+ },
+ "construction-vs-plan": {
+  "export": "reports.construction_vs_plan.export",
+  "view": [
+   "reports.construction_vs_plan.view"
+  ]
+ },
+ "customer-ageing": {
+  "export": "reports.outstanding.export",
+  "view": [
+   "reports.outstanding.view"
+  ]
+ },
+ "customer-directory": {
+  "export": "reports.outstanding.export",
+  "view": [
+   "reports.outstanding.view"
+  ]
+ },
+ "customer-statement": {
+  "export": "reports.outstanding.export",
+  "view": [
+   "reports.outstanding.view"
+  ]
+ },
+ "customer-status": {
+  "export": "reports.outstanding.export",
+  "view": [
+   "reports.outstanding.view"
+  ]
+ },
+ "day-book": {
+  "export": "reports.roznamcha.export",
+  "view": [
+   "reports.roznamcha.view"
+  ]
+ },
+ "discount-register": {
+  "export": "reports.discount_register.export",
+  "view": [
+   "reports.discount_register.view"
+  ]
+ },
+ "follow-ups": {
+  "export": "reports.lead_funnel.export",
+  "view": [
+   "reports.lead_funnel.view"
+  ]
+ },
+ "hold-register": {
+  "export": "reports.inventory.export",
+  "view": [
+   "reports.inventory.view",
+   "masters.flat.view"
+  ]
+ },
+ "inventory-status": {
+  "export": "reports.inventory.export",
+  "view": [
+   "reports.inventory.view",
+   "masters.flat.view"
+  ]
+ },
+ "kyc-pending": {
+  "export": "reports.outstanding.export",
+  "view": [
+   "reports.outstanding.view"
+  ]
+ },
+ "landowner": {
+  "export": "reports.inventory_control.export",
+  "view": [
+   "reports.inventory_control.view"
+  ]
+ },
+ "lead-ageing": {
+  "export": "reports.lead_funnel.export",
+  "view": [
+   "reports.lead_funnel.view"
+  ]
+ },
+ "lead-funnel": {
+  "export": "reports.lead_funnel.export",
+  "view": [
+   "reports.lead_funnel.view"
+  ]
+ },
+ "lead-register": {
+  "export": "reports.lead_funnel.export",
+  "view": [
+   "reports.lead_funnel.view"
+  ]
+ },
+ "lost-leads": {
+  "export": "reports.lead_funnel.export",
+  "view": [
+   "reports.lead_funnel.view"
+  ]
+ },
+ "other-charges": {
+  "export": "reports.other_charges.export",
+  "view": [
+   "reports.other_charges.view"
+  ]
+ },
+ "outstanding": {
+  "export": "reports.outstanding.export",
+  "view": [
+   "reports.outstanding.view"
+  ]
+ },
+ "parking": {
+  "export": "reports.inventory.export",
+  "view": [
+   "reports.inventory.view",
+   "masters.flat.view"
+  ]
+ },
+ "payment-behaviour": {
+  "export": "reports.outstanding.export",
+  "view": [
+   "reports.outstanding.view"
+  ]
+ },
+ "plan-position": {
+  "export": "reports.outstanding.export",
+  "view": [
+   "reports.outstanding.view"
+  ]
+ },
+ "price-list": {
+  "export": "reports.inventory.export",
+  "view": [
+   "reports.inventory.view",
+   "masters.flat.view"
+  ]
+ },
+ "project-statement": {
+  "export": "reports.project_statement.export",
+  "view": [
+   "reports.project_statement.view"
+  ]
+ },
+ "realised-rate": {
+  "export": "reports.sales_team.export",
+  "view": [
+   "reports.sales_team.view"
+  ]
+ },
+ "receivables-forecast": {
+  "export": "reports.receivables_forecast.export",
+  "view": [
+   "reports.receivables_forecast.view"
+  ]
+ },
+ "response-time": {
+  "export": "reports.lead_funnel.export",
+  "view": [
+   "reports.lead_funnel.view"
+  ]
+ },
+ "sales-summary": {
+  "export": "reports.sales_team.export",
+  "view": [
+   "reports.sales_team.view"
+  ]
+ },
+ "sales-team": {
+  "export": "reports.sales_team.export",
+  "view": [
+   "reports.sales_team.view"
+  ]
+ },
+ "sales-velocity": {
+  "export": "reports.inventory.export",
+  "view": [
+   "reports.inventory.view",
+   "masters.flat.view"
+  ]
+ },
+ "service-sla": {
+  "export": "reports.service_sla.export",
+  "view": [
+   "reports.service_sla.view"
+  ]
+ },
+ "source-performance": {
+  "export": "reports.lead_funnel.export",
+  "view": [
+   "reports.lead_funnel.view"
+  ]
+ },
+ "stacking-plan": {
+  "export": "reports.inventory.export",
+  "view": [
+   "reports.inventory.view",
+   "masters.flat.view"
+  ]
+ },
+ "stage-bills": {
+  "export": "reports.outstanding.export",
+  "view": [
+   "reports.outstanding.view"
+  ]
+ },
+ "team-pipeline": {
+  "export": "reports.lead_funnel.export",
+  "view": [
+   "reports.lead_funnel.view"
+  ]
+ },
+ "transfers": {
+  "export": "reports.sales_team.export",
+  "view": [
+   "reports.sales_team.view"
+  ]
+ },
+ "visit-conversion": {
+  "export": "reports.site_visit_conversion.export",
+  "view": [
+   "reports.site_visit_conversion.view"
+  ]
+ },
+ "visit-register": {
+  "export": "reports.site_visit_conversion.export",
+  "view": [
+   "reports.site_visit_conversion.view"
+  ]
+ },
+ "waivers": {
+  "export": "reports.waiver_register.export",
+  "view": [
+   "reports.waiver_register.view"
+  ]
+ }
+}

@@ -1,0 +1,19 @@
+{
+ "lead_number|2425": 4,
+ "visit_number|2526": 60,
+ "customer_number|2526": 57,
+ "booking_number|2526": 56,
+ "demand_number|2526": 224,
+ "receipt_number|2526": 394,
+ "lead_number|2526": 69,
+ "visit_number|2425": 1,
+ "refund_number|2526": 2,
+ "receipt_number|2627": 1817,
+ "demand_number|2627": 1868,
+ "visit_number|2627": 27,
+ "customer_number|2627": 6180,
+ "booking_number|2627": 1567,
+ "lead_number|2627": 3672,
+ "service_request_number|2627": 240,
+ "refund_number|2627": 973
+}

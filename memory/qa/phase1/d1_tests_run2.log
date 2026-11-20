@@ -1,0 +1,115 @@
+bringing up nodes...
+bringing up nodes...
+
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+___________________ test_transfer_keeps_the_money_law[False] ___________________
+[gw0] linux -- Python 3.11.18 /root/.venv/bin/python
+
+H = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyMTAzMDAwNy0yN2VlLTRjMDUtODcwOS05ZGM1OWZkN2U...1LCJleHAiOjE3OTQ3ODM3NTV9.cJ7kDxcvQjVOKrlJ7B4UJ5As10nWwwcB5YrrU7fn4zk', 'X-Rate-Limit-Bypass': 'kkt-test-bypass-local'}
+revise_first = False
+
+    @pytest.mark.parametrize("revise_first", [False, True])
+    def test_transfer_keeps_the_money_law(H, revise_first):
+        flats = call(H, "GET", "/flats", status="Available", page_size=40)["items"]
+        priced = [f for f in flats if f.get("price")]
+        f1, f2 = priced[-1 - 2 * revise_first], priced[-2 - 2 * revise_first]
+        cust = call(H, "GET", "/customers", page_size=12)["items"][-2 - revise_first]
+        price = f1["price"]
+        today = clock.today_iso()
+        b = call(
+            H,
+            "POST",
+            "/bookings",
+            {
+                "flat_id": f1["id"],
+                "customer_id": cust["id"],
+                "booking_date": today,
+                "agreement_value": price,
+                "cash_agreed": round(price * 0.6, 2),
+                "account_agreed": round(price - round(price * 0.6, 2), 2),
+                "remarks": "D1 transfer law",
+            },
+        )
+        modes = {m["code"]: m for m in call(H, "GET", "/master/payment-modes")["items"]}
+        raised = call(H, "GET", f"/bookings/{b['id']}")["summary"]
+        assert raised["total_udhar_paise"] > 0, "booking instalment raised a bill"
+        cash_room = (round(price * 0.6 * 100) - raised["cash_order_raised_paise"]) // 100
+        assert cash_room > 1, raised
+        extra = min(5000, cash_room - 1)  # leaves a Cash advance within the agreed Cash bucket
+        for amt in (25000, raised["cash_order_raised_paise"] // 100 - 25000 + extra):  # partial, then into advance
+            call(
+                H,
+                "POST",
+                "/payments",
+                {
+                    "booking_id": b["id"],
+                    "allocation": "auto",
+                    "amount": amt,
+                    "payment_date": today,
+                    "payment_mode_id": modes["CASH"]["id"],
+                    "remarks": "D1",
+                },
+            )
+        before = assert_law(H, b["id"], cust["id"])
+>       assert before["summary"]["advance_paise"] > 0
+E       assert 0 > 0
+
+tests/test_transfer_money_law.py:94: AssertionError
+___________________ test_transfer_keeps_the_money_law[True] ____________________
+[gw0] linux -- Python 3.11.18 /root/.venv/bin/python
+
+H = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyMTAzMDAwNy0yN2VlLTRjMDUtODcwOS05ZGM1OWZkN2U...1LCJleHAiOjE3OTQ3ODM3NTV9.cJ7kDxcvQjVOKrlJ7B4UJ5As10nWwwcB5YrrU7fn4zk', 'X-Rate-Limit-Bypass': 'kkt-test-bypass-local'}
+revise_first = True
+
+    @pytest.mark.parametrize("revise_first", [False, True])
+    def test_transfer_keeps_the_money_law(H, revise_first):
+        flats = call(H, "GET", "/flats", status="Available", page_size=40)["items"]
+        priced = [f for f in flats if f.get("price")]
+        f1, f2 = priced[-1 - 2 * revise_first], priced[-2 - 2 * revise_first]
+        cust = call(H, "GET", "/customers", page_size=12)["items"][-2 - revise_first]
+        price = f1["price"]
+        today = clock.today_iso()
+        b = call(
+            H,
+            "POST",
+            "/bookings",
+            {
+                "flat_id": f1["id"],
+                "customer_id": cust["id"],
+                "booking_date": today,
+                "agreement_value": price,
+                "cash_agreed": round(price * 0.6, 2),
+                "account_agreed": round(price - round(price * 0.6, 2), 2),
+                "remarks": "D1 transfer law",
+            },
+        )
+        modes = {m["code"]: m for m in call(H, "GET", "/master/payment-modes")["items"]}
+        raised = call(H, "GET", f"/bookings/{b['id']}")["summary"]
+        assert raised["total_udhar_paise"] > 0, "booking instalment raised a bill"
+        cash_room = (round(price * 0.6 * 100) - raised["cash_order_raised_paise"]) // 100
+        assert cash_room > 1, raised
+        extra = min(5000, cash_room - 1)  # leaves a Cash advance within the agreed Cash bucket
+        for amt in (25000, raised["cash_order_raised_paise"] // 100 - 25000 + extra):  # partial, then into advance
+            call(
+                H,
+                "POST",
+                "/payments",
+                {
+                    "booking_id": b["id"],
+                    "allocation": "auto",
+                    "amount": amt,
+                    "payment_date": today,
+                    "payment_mode_id": modes["CASH"]["id"],
+                    "remarks": "D1",
+                },
+            )
+        before = assert_law(H, b["id"], cust["id"])
+>       assert before["summary"]["advance_paise"] > 0
+E       assert 0 > 0
+
+tests/test_transfer_money_law.py:94: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_transfer_money_law.py::test_transfer_keeps_the_money_law[False]
+FAILED tests/test_transfer_money_law.py::test_transfer_keeps_the_money_law[True]
+2 failed in 3.87s

@@ -1,0 +1,118 @@
+COMMIT ceeac3b files: tests/test_plan_timeline.py tests/test_portal_leaks.py tests/test_prepublish_alerts_csv.py tests/test_prepublish_fixes.py tests/test_price_truth.py tests/test_project_cover.py tests/test_project_photos.py tests/test_project_statement.py tests/test_rbac.py tests/test_rbac_granular.py tests/test_receipt_split.py tests/test_received_bridge.py tests/test_refresh_frozen_clock.py tests/test_refresh_keeps_setup.py
+============================= test session starts ==============================
+platform linux -- Python 3.11.18, pytest-9.1.1, pluggy-1.7.0 -- /root/.venv/bin/python
+rootdir: /app/backend
+configfile: pytest.ini
+plugins: locust-2.47.0, platformdirs-4.13.5, asyncio-1.4.0, anyio-4.15.1, xdist-3.8.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+created: 2/2 workers
+2 workers [46 items]
+
+scheduling tests via LoadScopeScheduling
+
+tests/test_rbac.py::test_registry_complete_every_guarded_route_registered 
+tests/test_rbac_granular.py::test_legacy_expansion_is_behaviourally_equivalent 
+[gw1] [  2%] PASSED tests/test_rbac_granular.py::test_legacy_expansion_is_behaviourally_equivalent 
+tests/test_rbac_granular.py::test_system_roles_cover_their_legacy_routes 
+[gw1] [  4%] PASSED tests/test_rbac_granular.py::test_system_roles_cover_their_legacy_routes 
+tests/test_rbac_granular.py::test_clerk_effective_permissions_exact 
+[gw0] [  6%] PASSED tests/test_rbac.py::test_registry_complete_every_guarded_route_registered 
+tests/test_rbac.py::test_tree_has_modules_features_actions 
+[gw0] [  8%] PASSED tests/test_rbac.py::test_tree_has_modules_features_actions 
+tests/test_rbac.py::test_multi_role_union_and_direct_deny 
+[gw1] [ 10%] PASSED tests/test_rbac_granular.py::test_clerk_effective_permissions_exact 
+tests/test_rbac_granular.py::test_clerk_can_view_and_post_but_not_reverse 
+[gw0] [ 13%] PASSED tests/test_rbac.py::test_multi_role_union_and_direct_deny 
+tests/test_rbac.py::test_super_admin_unrestrictable_and_last_super_admin 
+[gw0] [ 15%] PASSED tests/test_rbac.py::test_super_admin_unrestrictable_and_last_super_admin 
+tests/test_rbac.py::test_new_user_defaults_to_employee_zero_permissions 
+[gw0] [ 17%] PASSED tests/test_rbac.py::test_new_user_defaults_to_employee_zero_permissions 
+tests/test_rbac.py::test_access_change_is_audited 
+[gw0] [ 19%] PASSED tests/test_rbac.py::test_access_change_is_audited 
+tests/test_prepublish_fixes.py::test_manual_price_override_then_revert_restores_rate_card_breakup 
+[gw0] [ 21%] PASSED tests/test_prepublish_fixes.py::test_manual_price_override_then_revert_restores_rate_card_breakup 
+tests/test_prepublish_fixes.py::test_audit_csv_changes_are_rupees_not_paise 
+[gw0] [ 23%] PASSED tests/test_prepublish_fixes.py::test_audit_csv_changes_are_rupees_not_paise 
+tests/test_prepublish_fixes.py::test_to_csv_never_emits_paise_columns 
+[gw0] [ 26%] PASSED tests/test_prepublish_fixes.py::test_to_csv_never_emits_paise_columns 
+tests/test_prepublish_fixes.py::test_construction_preview_states_no_dues_reason 
+[gw1] [ 28%] PASSED tests/test_rbac_granular.py::test_clerk_can_view_and_post_but_not_reverse 
+tests/test_rbac_granular.py::test_clerk_reports_collections_only 
+[gw0] [ 30%] PASSED tests/test_prepublish_fixes.py::test_construction_preview_states_no_dues_reason 
+tests/test_project_statement.py::test_rows_tie_out_to_booking_summaries_and_sign_convention 
+[gw0] [ 32%] PASSED tests/test_project_statement.py::test_rows_tie_out_to_booking_summaries_and_sign_convention 
+tests/test_project_statement.py::test_csv_totals_equal_json_totals 
+[gw1] [ 34%] PASSED tests/test_rbac_granular.py::test_clerk_reports_collections_only 
+tests/test_rbac_granular.py::test_direct_grant_and_deny_on_clerk 
+[gw0] [ 36%] PASSED tests/test_project_statement.py::test_csv_totals_equal_json_totals 
+tests/test_project_statement.py::test_unknown_query_param_is_400 
+[gw0] [ 39%] PASSED tests/test_project_statement.py::test_unknown_query_param_is_400 
+tests/test_project_statement.py::test_pdf_renders_and_is_logged_and_zero_access_is_403 
+[gw1] [ 41%] PASSED tests/test_rbac_granular.py::test_direct_grant_and_deny_on_clerk 
+tests/test_receipt_split.py::test_receipt_parts_explodes_allocations_and_keeps_whole_receipts 
+[gw1] [ 43%] PASSED tests/test_receipt_split.py::test_receipt_parts_explodes_allocations_and_keeps_whole_receipts 
+tests/test_receipt_split.py::test_home_month_split_equals_sum_of_allocation_parts 
+[gw0] [ 45%] PASSED tests/test_project_statement.py::test_pdf_renders_and_is_logged_and_zero_access_is_403 
+tests/test_refresh_keeps_setup.py::test_every_master_and_catalogue_collection_is_setup 
+[gw1] [ 47%] PASSED tests/test_receipt_split.py::test_home_month_split_equals_sum_of_allocation_parts 
+tests/test_receipt_split.py::test_paid_parts_backfill_is_idempotent 
+[gw0] [ 50%] PASSED tests/test_refresh_keeps_setup.py::test_every_master_and_catalogue_collection_is_setup 
+tests/test_refresh_keeps_setup.py::test_refresh_wipe_keeps_a_custom_entry_in_every_setup_collection 
+[gw1] [ 52%] PASSED tests/test_receipt_split.py::test_paid_parts_backfill_is_idempotent 
+tests/test_receipt_split.py::test_hard_purge_refuses_real_data 
+[gw0] [ 54%] PASSED tests/test_refresh_keeps_setup.py::test_refresh_wipe_keeps_a_custom_entry_in_every_setup_collection 
+tests/test_refresh_keeps_setup.py::test_refresh_leaves_owner_setup_byte_identical 
+[gw1] [ 56%] PASSED tests/test_receipt_split.py::test_hard_purge_refuses_real_data 
+tests/test_portal_leaks.py::test_portal_responses_have_no_internal_keys 
+[gw0] [ 58%] PASSED tests/test_refresh_keeps_setup.py::test_refresh_leaves_owner_setup_byte_identical 
+tests/test_refresh_keeps_setup.py::test_refresh_restores_setup_bytes 
+[gw0] [ 60%] PASSED tests/test_refresh_keeps_setup.py::test_refresh_restores_setup_bytes 
+tests/test_received_bridge.py::test_cheque_dated_30_mar_cleared_2_apr_counts_in_the_new_year_by_clearance 
+[gw0] [ 63%] PASSED tests/test_received_bridge.py::test_cheque_dated_30_mar_cleared_2_apr_counts_in_the_new_year_by_clearance 
+tests/test_received_bridge.py::test_same_cheque_in_the_old_year_is_dated_in_cleared_after 
+[gw0] [ 65%] PASSED tests/test_received_bridge.py::test_same_cheque_in_the_old_year_is_dated_in_cleared_after 
+tests/test_received_bridge.py::test_not_live_booking_reversal_and_refund_terms 
+[gw0] [ 67%] PASSED tests/test_received_bridge.py::test_not_live_booking_reversal_and_refund_terms 
+tests/test_plan_timeline.py::test_plan_timeline_rows_match_plan_and_bills 
+[gw1] [ 69%] PASSED tests/test_portal_leaks.py::test_portal_responses_have_no_internal_keys 
+tests/test_portal_leaks.py::test_attachment_shape 
+[gw1] [ 71%] PASSED tests/test_portal_leaks.py::test_attachment_shape 
+tests/test_portal_leaks.py::test_notification_shape 
+[gw1] [ 73%] PASSED tests/test_portal_leaks.py::test_notification_shape 
+tests/test_price_truth.py::test_price_paise_is_the_only_stored_price 
+[gw1] [ 76%] PASSED tests/test_price_truth.py::test_price_paise_is_the_only_stored_price 
+tests/test_price_truth.py::test_public_prices_unchanged_in_rupees 
+[gw0] [ 78%] PASSED tests/test_plan_timeline.py::test_plan_timeline_rows_match_plan_and_bills 
+tests/test_plan_timeline.py::test_list_segment_counts 
+[gw1] [ 80%] PASSED tests/test_price_truth.py::test_public_prices_unchanged_in_rupees 
+tests/test_project_cover.py::test_cover_upload_round_trip 
+[gw0] [ 82%] PASSED tests/test_plan_timeline.py::test_list_segment_counts 
+tests/test_prepublish_alerts_csv.py::test_csv_money_cells_are_plain_numbers 
+[gw0] [ 84%] PASSED tests/test_prepublish_alerts_csv.py::test_csv_money_cells_are_plain_numbers 
+tests/test_prepublish_alerts_csv.py::test_job_failed_alert_self_clears_after_ok_run_and_can_be_acknowledged 
+[gw0] [ 86%] PASSED tests/test_prepublish_alerts_csv.py::test_job_failed_alert_self_clears_after_ok_run_and_can_be_acknowledged 
+tests/test_refresh_frozen_clock.py::test_nightly_loop_fires_at_3am_ist[frozen0-2.0] 
+[gw0] [ 89%] PASSED tests/test_refresh_frozen_clock.py::test_nightly_loop_fires_at_3am_ist[frozen0-2.0] 
+tests/test_refresh_frozen_clock.py::test_nightly_loop_fires_at_3am_ist[frozen1-86399.0] 
+[gw0] [ 91%] PASSED tests/test_refresh_frozen_clock.py::test_nightly_loop_fires_at_3am_ist[frozen1-86399.0] 
+[gw1] [ 93%] PASSED tests/test_project_cover.py::test_cover_upload_round_trip 
+tests/test_project_cover.py::test_cover_rejects_non_image 
+[gw1] [ 95%] PASSED tests/test_project_cover.py::test_cover_rejects_non_image 
+tests/test_project_photos.py::test_photos_lifecycle_restores_cover 
+[gw1] [ 97%] PASSED tests/test_project_photos.py::test_photos_lifecycle_restores_cover 
+tests/test_project_photos.py::test_photo_refusal_message 
+[gw1] [100%] PASSED tests/test_project_photos.py::test_photo_refusal_message 
+
+=============================== warnings summary ===============================
+../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
+../../root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12
+  /root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12: PendingDeprecationWarning: Please use `import python_multipart` instead.
+    import multipart
+
+../../root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854
+../../root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854
+  /root/.venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854: DeprecationWarning: 'crypt' is deprecated and slated for removal in Python 3.13
+    from crypt import crypt as _crypt
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================= 46 passed, 4 warnings in 11.72s ========================

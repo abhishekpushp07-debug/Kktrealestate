@@ -1,0 +1,171 @@
+COMMIT ceeac3b files: tests/test_phase_n_inventory.py tests/test_phase_n_reports.py tests/test_phase_p.py tests/test_phase_p2.py tests/test_phase_ps_pricing.py tests/test_phase_q.py tests/test_phase_s1_templates.py tests/test_phase_s2_api.py tests/test_phase_s2_wording.py tests/test_phase_s3_allocation.py tests/test_phase_y.py tests/test_phase_z1_backup.py tests/test_phase_z2_kyc.py tests/test_phase_z3_pace.py
+============================= test session starts ==============================
+platform linux -- Python 3.11.18, pytest-9.1.1, pluggy-1.7.0 -- /root/.venv/bin/python
+rootdir: /app/backend
+configfile: pytest.ini
+plugins: locust-2.47.0, platformdirs-4.13.5, asyncio-1.4.0, anyio-4.15.1, xdist-3.8.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+created: 2/2 workers
+2 workers [73 items]
+
+scheduling tests via LoadScopeScheduling
+
+tests/test_phase_ps_pricing.py::test_generated_flats_have_no_area_or_price 
+tests/test_phase_q.py::test_channel_interface_and_not_configured 
+[gw1] [  1%] PASSED tests/test_phase_q.py::test_channel_interface_and_not_configured 
+tests/test_phase_q.py::test_pick_channel_consent_and_contact 
+[gw1] [  2%] PASSED tests/test_phase_q.py::test_pick_channel_consent_and_contact 
+tests/test_phase_q.py::test_template_render_en_hi_and_unknown_placeholder 
+[gw1] [  4%] PASSED tests/test_phase_q.py::test_template_render_en_hi_and_unknown_placeholder 
+tests/test_phase_q.py::test_send_window_and_thresholds 
+[gw1] [  5%] PASSED tests/test_phase_q.py::test_send_window_and_thresholds 
+tests/test_phase_q.py::test_reminder_settings_api_validation 
+[gw1] [  6%] PASSED tests/test_phase_q.py::test_reminder_settings_api_validation 
+tests/test_phase_q.py::test_send_now_registers_document_message_and_timeline 
+[gw0] [  8%] PASSED tests/test_phase_ps_pricing.py::test_generated_flats_have_no_area_or_price 
+tests/test_phase_ps_pricing.py::test_booked_flat_is_locked_individually 
+[gw0] [  9%] PASSED tests/test_phase_ps_pricing.py::test_booked_flat_is_locked_individually 
+tests/test_phase_ps_pricing.py::test_structure_edit_previews_and_refuses_to_drop_booked_floors 
+[gw1] [ 10%] PASSED tests/test_phase_q.py::test_send_now_registers_document_message_and_timeline 
+tests/test_phase_q.py::test_dedupe_unique_per_booking_threshold 
+[gw0] [ 12%] PASSED tests/test_phase_ps_pricing.py::test_structure_edit_previews_and_refuses_to_drop_booked_floors 
+tests/test_phase_ps_pricing.py::test_project_pricing_setup_roundtrip 
+[gw1] [ 13%] PASSED tests/test_phase_q.py::test_dedupe_unique_per_booking_threshold 
+tests/test_phase_q.py::test_nightly_job_runs_isolated_and_defers_outside_window 
+[gw0] [ 15%] PASSED tests/test_phase_ps_pricing.py::test_project_pricing_setup_roundtrip 
+tests/test_phase_ps_pricing.py::test_migration_every_flat_has_saleable_and_pricing_status 
+[gw1] [ 16%] PASSED tests/test_phase_q.py::test_nightly_job_runs_isolated_and_defers_outside_window 
+tests/test_phase_q.py::test_void_watermark_deterministic 
+[gw0] [ 17%] PASSED tests/test_phase_ps_pricing.py::test_migration_every_flat_has_saleable_and_pricing_status 
+tests/test_phase_ps_pricing.py::test_no_super_builtup_labels_in_frontend_or_documents 
+[gw0] [ 19%] PASSED tests/test_phase_ps_pricing.py::test_no_super_builtup_labels_in_frontend_or_documents 
+tests/test_phase_ps_pricing.py::test_api_outputs_expose_saleable_only 
+[gw0] [ 20%] PASSED tests/test_phase_ps_pricing.py::test_api_outputs_expose_saleable_only 
+tests/test_phase_ps_pricing.py::test_type_change_marks_review_and_keep_values 
+[gw1] [ 21%] PASSED tests/test_phase_q.py::test_void_watermark_deterministic 
+tests/test_phase_q.py::test_trends_tie_out_with_collections_report 
+[gw0] [ 23%] PASSED tests/test_phase_ps_pricing.py::test_type_change_marks_review_and_keep_values 
+tests/test_phase_ps_pricing.py::test_legacy_patch_accepts_pricing_fields 
+[gw1] [ 24%] PASSED tests/test_phase_q.py::test_trends_tie_out_with_collections_report 
+tests/test_phase_q.py::test_customer_consent_fields_roundtrip 
+[gw1] [ 26%] PASSED tests/test_phase_q.py::test_customer_consent_fields_roundtrip 
+tests/test_phase_n_reports.py::test_registry_lists_inventory_reports 
+[gw1] [ 27%] PASSED tests/test_phase_n_reports.py::test_registry_lists_inventory_reports 
+tests/test_phase_n_reports.py::test_shape_csv_pdf_etag[inventory-control] 
+[gw1] [ 28%] PASSED tests/test_phase_n_reports.py::test_shape_csv_pdf_etag[inventory-control] 
+tests/test_phase_n_reports.py::test_shape_csv_pdf_etag[landowner-share] 
+[gw1] [ 30%] PASSED tests/test_phase_n_reports.py::test_shape_csv_pdf_etag[landowner-share] 
+tests/test_phase_n_reports.py::test_shape_csv_pdf_etag[hold-register] 
+[gw1] [ 31%] PASSED tests/test_phase_n_reports.py::test_shape_csv_pdf_etag[hold-register] 
+tests/test_phase_n_reports.py::test_shape_csv_pdf_etag[masked-inventory] 
+[gw0] [ 32%] PASSED tests/test_phase_ps_pricing.py::test_legacy_patch_accepts_pricing_fields 
+tests/test_phase_ps_pricing.py::test_breakdown_preview_and_migration 
+[gw1] [ 34%] PASSED tests/test_phase_n_reports.py::test_shape_csv_pdf_etag[masked-inventory] 
+tests/test_phase_n_reports.py::test_tie_outs 
+[gw0] [ 35%] PASSED tests/test_phase_ps_pricing.py::test_breakdown_preview_and_migration 
+tests/test_phase_ps_pricing.py::test_booking_with_breakdown_demands_gst_proportionally 
+[gw1] [ 36%] PASSED tests/test_phase_n_reports.py::test_tie_outs 
+tests/test_phase_n_reports.py::test_masked_report_privileged_only 
+[gw0] [ 38%] PASSED tests/test_phase_ps_pricing.py::test_booking_with_breakdown_demands_gst_proportionally 
+tests/test_phase_ps_pricing.py::test_booking_accepts_own_attached_slot_and_cancel_restores_attached 
+[gw1] [ 39%] PASSED tests/test_phase_n_reports.py::test_masked_report_privileged_only 
+tests/test_phase_p2.py::test_cancelled_booking_demands_are_closed_everywhere 
+[gw0] [ 41%] PASSED tests/test_phase_ps_pricing.py::test_booking_accepts_own_attached_slot_and_cancel_restores_attached 
+tests/test_phase_ps_pricing.py::test_floor_and_structure_edits_never_delete_a_booked_flat 
+[gw0] [ 42%] PASSED tests/test_phase_ps_pricing.py::test_floor_and_structure_edits_never_delete_a_booked_flat 
+tests/test_phase_ps_pricing.py::test_one_parking_slot_cannot_be_allotted_twice 
+[gw1] [ 43%] PASSED tests/test_phase_p2.py::test_cancelled_booking_demands_are_closed_everywhere 
+tests/test_phase_p2.py::test_void_reports_real_ledger_delta_zero_when_ledger_never_held_it 
+[gw1] [ 45%] PASSED tests/test_phase_p2.py::test_void_reports_real_ledger_delta_zero_when_ledger_never_held_it 
+tests/test_phase_p2.py::test_register_overdue_equals_outstanding_report_overdue 
+[gw0] [ 46%] PASSED tests/test_phase_ps_pricing.py::test_one_parking_slot_cannot_be_allotted_twice 
+tests/test_phase_ps_pricing.py::test_snapshot_tolerates_legacy_lines 
+[gw1] [ 47%] PASSED tests/test_phase_p2.py::test_register_overdue_equals_outstanding_report_overdue 
+tests/test_phase_p2.py::test_share_link_signed_expired_and_tampered 
+[gw0] [ 49%] PASSED tests/test_phase_ps_pricing.py::test_snapshot_tolerates_legacy_lines 
+tests/test_phase_ps_pricing.py::test_loadtest_projects_hidden_from_reports_unless_explicit 
+[gw0] [ 50%] PASSED tests/test_phase_ps_pricing.py::test_loadtest_projects_hidden_from_reports_unless_explicit 
+tests/test_phase_n_inventory.py::test_hold_requires_expiry_and_reason 
+[gw0] [ 52%] PASSED tests/test_phase_n_inventory.py::test_hold_requires_expiry_and_reason 
+tests/test_phase_n_inventory.py::test_masked_flat_indistinguishable_from_sold_for_non_privileged 
+[gw1] [ 53%] PASSED tests/test_phase_p2.py::test_share_link_signed_expired_and_tampered 
+tests/test_phase_p2.py::test_customer360_live_bookings_rule_and_portal_flag 
+[gw1] [ 54%] PASSED tests/test_phase_p2.py::test_customer360_live_bookings_rule_and_portal_flag 
+tests/test_phase_p2.py::test_reports_accept_date_from_date_to 
+[gw1] [ 56%] PASSED tests/test_phase_p2.py::test_reports_accept_date_from_date_to 
+tests/test_phase_p.py::test_customer360_composite_payload 
+[gw1] [ 57%] PASSED tests/test_phase_p.py::test_customer360_composite_payload 
+tests/test_phase_p.py::test_documents_generate_register_share_sent_and_deterministic 
+[gw0] [ 58%] PASSED tests/test_phase_n_inventory.py::test_masked_flat_indistinguishable_from_sold_for_non_privileged 
+tests/test_phase_n_inventory.py::test_wizard_excludes_landowner_blocked_and_booking_rejects_unsaleable 
+[gw1] [ 60%] PASSED tests/test_phase_p.py::test_documents_generate_register_share_sent_and_deterministic 
+tests/test_phase_p.py::test_bulk_merged_pdf_and_zip 
+[gw1] [ 61%] PASSED tests/test_phase_p.py::test_bulk_merged_pdf_and_zip 
+tests/test_phase_p.py::test_demand_register_grouping_ties_out_to_ledger_udhar 
+[gw0] [ 63%] PASSED tests/test_phase_n_inventory.py::test_wizard_excludes_landowner_blocked_and_booking_rejects_unsaleable 
+tests/test_phase_n_inventory.py::test_expiry_sweep_releases_and_notifies 
+[gw1] [ 64%] PASSED tests/test_phase_p.py::test_demand_register_grouping_ties_out_to_ledger_udhar 
+tests/test_phase_p.py::test_manual_demand_ledger_effect_journey_and_void_is_final 
+[gw1] [ 65%] PASSED tests/test_phase_p.py::test_manual_demand_ledger_effect_journey_and_void_is_final 
+tests/test_phase_s1_templates.py::test_templates_end_to_end 
+[gw1] [ 67%] PASSED tests/test_phase_s1_templates.py::test_templates_end_to_end 
+tests/test_phase_s1_templates.py::test_no_internal_words_on_project_and_masters_pages 
+[gw1] [ 68%] PASSED tests/test_phase_s1_templates.py::test_no_internal_words_on_project_and_masters_pages 
+tests/test_phase_s1_templates.py::test_tower_from_template_never_silent_about_payment_plans 
+[gw1] [ 69%] PASSED tests/test_phase_s1_templates.py::test_tower_from_template_never_silent_about_payment_plans 
+tests/test_phase_s1_templates.py::test_payment_allocation_flag_and_agreement_signed 
+[gw1] [ 71%] PASSED tests/test_phase_s1_templates.py::test_payment_allocation_flag_and_agreement_signed 
+tests/test_phase_s2_wording.py::test_user_facing_wording_is_clean 
+[gw1] [ 72%] PASSED tests/test_phase_s2_wording.py::test_user_facing_wording_is_clean 
+tests/test_phase_s2_wording.py::test_sidebar_has_nine_primary_areas 
+[gw1] [ 73%] PASSED tests/test_phase_s2_wording.py::test_sidebar_has_nine_primary_areas 
+tests/test_phase_s2_wording.py::test_booking_wizard_has_three_steps 
+[gw1] [ 75%] PASSED tests/test_phase_s2_wording.py::test_booking_wizard_has_three_steps 
+tests/test_phase_s3_allocation.py::test_auto_allocation_oldest_first_then_advance_and_reversal 
+[gw1] [ 76%] PASSED tests/test_phase_s3_allocation.py::test_auto_allocation_oldest_first_then_advance_and_reversal 
+tests/test_phase_s3_allocation.py::test_auto_allocation_rejects_bad_flag 
+[gw1] [ 78%] PASSED tests/test_phase_s3_allocation.py::test_auto_allocation_rejects_bad_flag 
+tests/test_phase_s3_allocation.py::test_get_payment_includes_allocations_and_partial_detail 
+[gw1] [ 79%] PASSED tests/test_phase_s3_allocation.py::test_get_payment_includes_allocations_and_partial_detail 
+tests/test_phase_z1_backup.py::test_prune_keeps_n_per_db_and_under_cap 
+[gw1] [ 80%] PASSED tests/test_phase_z1_backup.py::test_prune_keeps_n_per_db_and_under_cap 
+tests/test_phase_z1_backup.py::test_preflight_skips_on_low_disk 
+[gw1] [ 82%] PASSED tests/test_phase_z1_backup.py::test_preflight_skips_on_low_disk 
+tests/test_phase_z1_backup.py::test_backups_endpoints_rbac 
+[gw0] [ 83%] PASSED tests/test_phase_n_inventory.py::test_expiry_sweep_releases_and_notifies 
+tests/test_phase_n_inventory.py::test_reports_tie_out 
+[gw1] [ 84%] PASSED tests/test_phase_z1_backup.py::test_backups_endpoints_rbac 
+tests/test_phase_s2_api.py::TestPaymentAllocation::test_invalid_allocation_422 
+[gw0] [ 86%] PASSED tests/test_phase_n_inventory.py::test_reports_tie_out 
+tests/test_phase_s2_api.py::TestAgreementSigned::test_mark_whatsapp_then_restore 
+[gw1] [ 87%] PASSED tests/test_phase_s2_api.py::TestPaymentAllocation::test_invalid_allocation_422 
+tests/test_phase_s2_api.py::TestPaymentAllocation::test_auto_allocation_persisted 
+[gw0] [ 89%] PASSED tests/test_phase_s2_api.py::TestAgreementSigned::test_mark_whatsapp_then_restore 
+tests/test_phase_s2_api.py::TestAgreementSigned::test_invalid_mode_422 
+[gw0] [ 90%] PASSED tests/test_phase_s2_api.py::TestAgreementSigned::test_invalid_mode_422 
+tests/test_phase_s2_api.py::TestAgreementSigned::test_unknown_booking_404 
+[gw0] [ 91%] PASSED tests/test_phase_s2_api.py::TestAgreementSigned::test_unknown_booking_404 
+tests/test_phase_z3_pace.py::test_weekly_series_ties_out_and_cancel_removes_from_week 
+[gw1] [ 93%] PASSED tests/test_phase_s2_api.py::TestPaymentAllocation::test_auto_allocation_persisted 
+tests/test_phase_y.py::test_tower_sales_real_vs_display_masking 
+[gw1] [ 94%] PASSED tests/test_phase_y.py::test_tower_sales_real_vs_display_masking 
+tests/test_phase_y.py::test_wizard_co_applicants_linked_on_letter_and_idempotent 
+[gw0] [ 95%] PASSED tests/test_phase_z3_pace.py::test_weekly_series_ties_out_and_cancel_removes_from_week 
+tests/test_phase_z3_pace.py::test_sales_payload_has_no_real_only_keys 
+[gw0] [ 97%] PASSED tests/test_phase_z3_pace.py::test_sales_payload_has_no_real_only_keys 
+tests/test_phase_z2_kyc.py::test_kyc_files_linked_on_booking_idempotent_and_gated 
+[gw1] [ 98%] PASSED tests/test_phase_y.py::test_wizard_co_applicants_linked_on_letter_and_idempotent 
+[gw0] [100%] PASSED tests/test_phase_z2_kyc.py::test_kyc_files_linked_on_booking_idempotent_and_gated 
+
+=============================== warnings summary ===============================
+tests/test_phase_q.py::test_pick_channel_consent_and_contact
+tests/test_phase_ps_pricing.py::test_legacy_patch_accepts_pricing_fields
+  /root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12: PendingDeprecationWarning: Please use `import python_multipart` instead.
+    import multipart
+
+tests/test_phase_q.py: 10 warnings
+  /root/.venv/lib/python3.11/site-packages/pypdf/_page.py:1368: DeprecationWarning: Calling `PageObject.replace_contents()` for pages not assigned to a writer is deprecated and will be removed in pypdf 7.0.0. Attach the page to the writer first or use `PdfWriter(clone_from=...)` directly. The existing approach has proved being unreliable.
+    self.replace_contents(ContentStream(new_content_array, self.pdf))
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================= 73 passed, 12 warnings in 42.63s =======================

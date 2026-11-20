@@ -1,0 +1,417 @@
+COMMIT ceeac3b files: tests/test_phase_11a.py tests/test_phase_11b.py tests/test_phase_11c.py tests/test_phase_11e.py tests/test_phase_11f.py tests/test_phase_1_5.py tests/test_phase_2.py tests/test_phase_3.py tests/test_phase_4.py tests/test_phase_4_full.py tests/test_phase_5.py tests/test_phase_7.py tests/test_phase_8b.py tests/test_phase_9.py
+============================= test session starts ==============================
+platform linux -- Python 3.11.18, pytest-9.1.1, pluggy-1.7.0 -- /root/.venv/bin/python
+rootdir: /app/backend
+configfile: pytest.ini
+plugins: locust-2.47.0, platformdirs-4.13.5, asyncio-1.4.0, anyio-4.15.1, xdist-3.8.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+created: 2/2 workers
+2 workers [193 items]
+
+scheduling tests via LoadScopeScheduling
+
+tests/test_phase_3.py::test_public_endpoint_200[/public/site] 
+tests/test_phase_4_full.py::test_reports_list_has_11 
+[gw0] [  0%] PASSED tests/test_phase_3.py::test_public_endpoint_200[/public/site] 
+tests/test_phase_3.py::test_public_endpoint_200[/public/home] 
+[gw0] [  1%] PASSED tests/test_phase_3.py::test_public_endpoint_200[/public/home] 
+tests/test_phase_3.py::test_public_endpoint_200[/public/projects] 
+[gw1] [  1%] PASSED tests/test_phase_4_full.py::test_reports_list_has_11 
+tests/test_phase_4_full.py::test_report_formats[collections] 
+[gw0] [  2%] PASSED tests/test_phase_3.py::test_public_endpoint_200[/public/projects] 
+tests/test_phase_3.py::test_public_endpoint_200[/public/projects/shree-ganesh-heights] 
+[gw0] [  2%] PASSED tests/test_phase_3.py::test_public_endpoint_200[/public/projects/shree-ganesh-heights] 
+tests/test_phase_3.py::test_public_endpoint_200[/public/projects/ganesh-green-villas] 
+[gw0] [  3%] PASSED tests/test_phase_3.py::test_public_endpoint_200[/public/projects/ganesh-green-villas] 
+tests/test_phase_3.py::test_public_endpoint_200[/public/flat-types] 
+[gw0] [  3%] PASSED tests/test_phase_3.py::test_public_endpoint_200[/public/flat-types] 
+tests/test_phase_3.py::test_public_endpoint_200[/public/published-projects] 
+[gw0] [  4%] PASSED tests/test_phase_3.py::test_public_endpoint_200[/public/published-projects] 
+tests/test_phase_3.py::test_public_endpoint_200[/public/posts] 
+[gw0] [  4%] PASSED tests/test_phase_3.py::test_public_endpoint_200[/public/posts] 
+tests/test_phase_3.py::test_public_endpoint_200[/public/posts/sgh-tower-a-60-percent] 
+[gw0] [  5%] PASSED tests/test_phase_3.py::test_public_endpoint_200[/public/posts/sgh-tower-a-60-percent] 
+tests/test_phase_3.py::test_public_endpoint_200[/public/pages/about] 
+[gw0] [  5%] PASSED tests/test_phase_3.py::test_public_endpoint_200[/public/pages/about] 
+tests/test_phase_3.py::test_public_endpoint_200[/public/pages/privacy] 
+[gw0] [  6%] PASSED tests/test_phase_3.py::test_public_endpoint_200[/public/pages/privacy] 
+tests/test_phase_3.py::test_public_endpoint_200[/public/pages/disclaimer] 
+[gw0] [  6%] PASSED tests/test_phase_3.py::test_public_endpoint_200[/public/pages/disclaimer] 
+tests/test_phase_3.py::test_public_endpoint_200[/public/gallery] 
+[gw0] [  7%] PASSED tests/test_phase_3.py::test_public_endpoint_200[/public/gallery] 
+tests/test_phase_3.py::test_public_endpoint_200[/public/sitemap.xml] 
+[gw0] [  7%] PASSED tests/test_phase_3.py::test_public_endpoint_200[/public/sitemap.xml] 
+tests/test_phase_3.py::test_public_endpoint_200[/public/robots.txt] 
+[gw0] [  8%] PASSED tests/test_phase_3.py::test_public_endpoint_200[/public/robots.txt] 
+tests/test_phase_3.py::test_public_etag_and_304[/public/site] 
+[gw0] [  8%] PASSED tests/test_phase_3.py::test_public_etag_and_304[/public/site] 
+tests/test_phase_3.py::test_public_etag_and_304[/public/home] 
+[gw0] [  9%] PASSED tests/test_phase_3.py::test_public_etag_and_304[/public/home] 
+tests/test_phase_3.py::test_public_etag_and_304[/public/projects] 
+[gw0] [  9%] PASSED tests/test_phase_3.py::test_public_etag_and_304[/public/projects] 
+tests/test_phase_3.py::test_public_etag_and_304[/public/projects/shree-ganesh-heights] 
+[gw0] [ 10%] PASSED tests/test_phase_3.py::test_public_etag_and_304[/public/projects/shree-ganesh-heights] 
+tests/test_phase_3.py::test_public_etag_and_304[/public/projects/ganesh-green-villas] 
+[gw0] [ 10%] PASSED tests/test_phase_3.py::test_public_etag_and_304[/public/projects/ganesh-green-villas] 
+tests/test_phase_3.py::test_public_etag_and_304[/public/flat-types] 
+[gw0] [ 11%] PASSED tests/test_phase_3.py::test_public_etag_and_304[/public/flat-types] 
+tests/test_phase_3.py::test_public_etag_and_304[/public/published-projects] 
+[gw0] [ 11%] PASSED tests/test_phase_3.py::test_public_etag_and_304[/public/published-projects] 
+tests/test_phase_3.py::test_public_etag_and_304[/public/posts] 
+[gw0] [ 12%] PASSED tests/test_phase_3.py::test_public_etag_and_304[/public/posts] 
+tests/test_phase_3.py::test_public_etag_and_304[/public/posts/sgh-tower-a-60-percent] 
+[gw0] [ 12%] PASSED tests/test_phase_3.py::test_public_etag_and_304[/public/posts/sgh-tower-a-60-percent] 
+tests/test_phase_3.py::test_public_etag_and_304[/public/pages/about] 
+[gw1] [ 13%] PASSED tests/test_phase_4_full.py::test_report_formats[collections] 
+tests/test_phase_4_full.py::test_report_formats[outstanding] 
+[gw0] [ 13%] PASSED tests/test_phase_3.py::test_public_etag_and_304[/public/pages/about] 
+tests/test_phase_3.py::test_public_etag_and_304[/public/pages/privacy] 
+[gw0] [ 14%] PASSED tests/test_phase_3.py::test_public_etag_and_304[/public/pages/privacy] 
+tests/test_phase_3.py::test_public_etag_and_304[/public/pages/disclaimer] 
+[gw0] [ 15%] PASSED tests/test_phase_3.py::test_public_etag_and_304[/public/pages/disclaimer] 
+tests/test_phase_3.py::test_public_etag_and_304[/public/gallery] 
+[gw0] [ 15%] PASSED tests/test_phase_3.py::test_public_etag_and_304[/public/gallery] 
+tests/test_phase_3.py::test_public_project_404 
+[gw0] [ 16%] PASSED tests/test_phase_3.py::test_public_project_404 
+tests/test_phase_3.py::test_sgh_detail_projection 
+[gw0] [ 16%] PASSED tests/test_phase_3.py::test_sgh_detail_projection 
+tests/test_phase_3.py::test_home_projection 
+[gw0] [ 17%] PASSED tests/test_phase_3.py::test_home_projection 
+tests/test_phase_3.py::test_ggv_price_on_request 
+[gw0] [ 17%] PASSED tests/test_phase_3.py::test_ggv_price_on_request 
+tests/test_phase_3.py::test_enquiry_invalid_phone 
+[gw0] [ 18%] PASSED tests/test_phase_3.py::test_enquiry_invalid_phone 
+tests/test_phase_3.py::test_enquiry_missing_consent 
+[gw0] [ 18%] PASSED tests/test_phase_3.py::test_enquiry_missing_consent 
+tests/test_phase_3.py::test_enquiry_honeypot 
+[gw1] [ 19%] PASSED tests/test_phase_4_full.py::test_report_formats[outstanding] 
+tests/test_phase_4_full.py::test_report_formats[advances] 
+[gw1] [ 19%] PASSED tests/test_phase_4_full.py::test_report_formats[advances] 
+tests/test_phase_4_full.py::test_report_formats[demand-vs-collection] 
+[gw1] [ 20%] PASSED tests/test_phase_4_full.py::test_report_formats[demand-vs-collection] 
+tests/test_phase_4_full.py::test_report_formats[inventory] 
+[gw1] [ 20%] PASSED tests/test_phase_4_full.py::test_report_formats[inventory] 
+tests/test_phase_4_full.py::test_report_formats[cheques] 
+[gw1] [ 21%] PASSED tests/test_phase_4_full.py::test_report_formats[cheques] 
+tests/test_phase_4_full.py::test_report_formats[cancellations] 
+[gw0] [ 21%] PASSED tests/test_phase_3.py::test_enquiry_honeypot 
+tests/test_phase_3.py::test_enquiry_success_and_lead 
+[gw1] [ 22%] PASSED tests/test_phase_4_full.py::test_report_formats[cancellations] 
+tests/test_phase_4_full.py::test_report_formats[sales-leads] 
+[gw1] [ 22%] PASSED tests/test_phase_4_full.py::test_report_formats[sales-leads] 
+tests/test_phase_4_full.py::test_report_formats[roznamcha-range] 
+[gw0] [ 23%] PASSED tests/test_phase_3.py::test_enquiry_success_and_lead 
+tests/test_phase_3.py::test_enquiry_rate_limit_429 
+[gw1] [ 23%] PASSED tests/test_phase_4_full.py::test_report_formats[roznamcha-range] 
+tests/test_phase_4_full.py::test_report_formats[bank-receipts] 
+[gw1] [ 24%] PASSED tests/test_phase_4_full.py::test_report_formats[bank-receipts] 
+tests/test_phase_4_full.py::test_report_formats[activity] 
+[gw0] [ 24%] PASSED tests/test_phase_3.py::test_enquiry_rate_limit_429 
+tests/test_phase_3.py::test_cms_site_401 
+[gw0] [ 25%] PASSED tests/test_phase_3.py::test_cms_site_401 
+tests/test_phase_3.py::test_cms_site_403_sales 
+[gw0] [ 25%] PASSED tests/test_phase_3.py::test_cms_site_403_sales 
+tests/test_phase_3.py::test_cms_site_200_admin 
+[gw0] [ 26%] PASSED tests/test_phase_3.py::test_cms_site_200_admin 
+tests/test_phase_3.py::test_cms_collection_counts[banners-3] 
+[gw0] [ 26%] PASSED tests/test_phase_3.py::test_cms_collection_counts[banners-3] 
+tests/test_phase_3.py::test_cms_collection_counts[gallery-18] 
+[gw0] [ 27%] PASSED tests/test_phase_3.py::test_cms_collection_counts[gallery-18] 
+tests/test_phase_3.py::test_cms_collection_counts[posts-5] 
+[gw0] [ 27%] PASSED tests/test_phase_3.py::test_cms_collection_counts[posts-5] 
+tests/test_phase_3.py::test_cms_collection_counts[pages-3] 
+[gw0] [ 28%] PASSED tests/test_phase_3.py::test_cms_collection_counts[pages-3] 
+tests/test_phase_3.py::test_cms_collection_counts[people-3] 
+[gw0] [ 29%] PASSED tests/test_phase_3.py::test_cms_collection_counts[people-3] 
+tests/test_phase_3.py::test_testimonial_crud 
+[gw0] [ 29%] PASSED tests/test_phase_3.py::test_testimonial_crud 
+tests/test_phase_3.py::test_project_website_get 
+[gw0] [ 30%] PASSED tests/test_phase_3.py::test_project_website_get 
+tests/test_phase_3.py::test_project_website_duplicate_slug 
+[gw0] [ 30%] PASSED tests/test_phase_3.py::test_project_website_duplicate_slug 
+tests/test_phase_3.py::test_project_website_unpublish_republish 
+[gw0] [ 31%] PASSED tests/test_phase_3.py::test_project_website_unpublish_republish 
+tests/test_phase_3.py::test_project_admin_scope 
+[gw0] [ 31%] PASSED tests/test_phase_3.py::test_project_admin_scope 
+tests/test_phase_3.py::test_reseed_wrong_body 
+[gw1] [ 32%] PASSED tests/test_phase_4_full.py::test_report_formats[activity] 
+tests/test_phase_4_full.py::test_reports_rbac 
+[gw0] [ 32%] PASSED tests/test_phase_3.py::test_reseed_wrong_body 
+tests/test_phase_3.py::test_reseed_forbidden_sales 
+[gw0] [ 33%] PASSED tests/test_phase_3.py::test_reseed_forbidden_sales 
+tests/test_phase_3.py::test_posts_only_published 
+[gw0] [ 33%] PASSED tests/test_phase_3.py::test_posts_only_published 
+tests/test_phase_3.py::test_post_draft_404 
+[gw0] [ 34%] PASSED tests/test_phase_3.py::test_post_draft_404 
+tests/test_phase_3.py::test_post_sgh_tower_a 
+[gw0] [ 34%] PASSED tests/test_phase_3.py::test_post_sgh_tower_a 
+tests/test_phase_11a.py::test_bucket_cap_race_exactly_one_succeeds 
+[gw1] [ 35%] PASSED tests/test_phase_4_full.py::test_reports_rbac 
+tests/test_phase_4_full.py::test_collections_totals_match_payments 
+[gw0] [ 35%] PASSED tests/test_phase_11a.py::test_bucket_cap_race_exactly_one_succeeds 
+tests/test_phase_11a.py::test_last_payment_ignores_reversed 
+[gw1] [ 36%] PASSED tests/test_phase_4_full.py::test_collections_totals_match_payments 
+tests/test_phase_4_full.py::test_outstanding_totals_match_bookings 
+[gw1] [ 36%] PASSED tests/test_phase_4_full.py::test_outstanding_totals_match_bookings 
+tests/test_phase_4_full.py::test_statement_pdf 
+[gw1] [ 37%] PASSED tests/test_phase_4_full.py::test_statement_pdf 
+tests/test_phase_4_full.py::test_allotment_pdf 
+[gw0] [ 37%] PASSED tests/test_phase_11a.py::test_last_payment_ignores_reversed 
+tests/test_phase_11a.py::test_document_project_scope_404 
+[gw1] [ 38%] PASSED tests/test_phase_4_full.py::test_allotment_pdf 
+tests/test_phase_4_full.py::test_receipt_pdf 
+[gw1] [ 38%] PASSED tests/test_phase_4_full.py::test_receipt_pdf 
+tests/test_phase_4_full.py::test_demand_letter_pdf 
+[gw0] [ 39%] PASSED tests/test_phase_11a.py::test_document_project_scope_404 
+tests/test_phase_11a.py::test_erasure_scrubs_portal_and_tickets 
+[gw1] [ 39%] PASSED tests/test_phase_4_full.py::test_demand_letter_pdf 
+tests/test_phase_4_full.py::test_report_presets_crud 
+[gw1] [ 40%] PASSED tests/test_phase_4_full.py::test_report_presets_crud 
+tests/test_phase_4_full.py::test_dashboard_admin 
+[gw0] [ 40%] PASSED tests/test_phase_11a.py::test_erasure_scrubs_portal_and_tickets 
+tests/test_phase_11a.py::test_visit_links_revoked_on_completed 
+[gw1] [ 41%] PASSED tests/test_phase_4_full.py::test_dashboard_admin 
+tests/test_phase_4_full.py::test_dashboard_accounts 
+[gw1] [ 41%] PASSED tests/test_phase_4_full.py::test_dashboard_accounts 
+tests/test_phase_4_full.py::test_dashboard_sales 
+[gw0] [ 42%] PASSED tests/test_phase_11a.py::test_visit_links_revoked_on_completed 
+tests/test_phase_11a.py::test_catalogue_bundle_etag_and_inline_add 
+[gw1] [ 43%] PASSED tests/test_phase_4_full.py::test_dashboard_sales 
+tests/test_phase_4_full.py::test_dashboard_project_admin 
+[gw1] [ 43%] PASSED tests/test_phase_4_full.py::test_dashboard_project_admin 
+tests/test_phase_4_full.py::test_notifications_website_enquiry 
+[gw0] [ 44%] PASSED tests/test_phase_11a.py::test_catalogue_bundle_etag_and_inline_add 
+tests/test_phase_11a.py::test_project_setup_hierarchy_errors 
+[gw0] [ 44%] PASSED tests/test_phase_11a.py::test_project_setup_hierarchy_errors 
+tests/test_phase_11a.py::test_crm_profile_communication_timeline 
+[gw0] [ 45%] PASSED tests/test_phase_11a.py::test_crm_profile_communication_timeline 
+tests/test_phase_11a.py::test_three_ledgers_and_customer_ledgers 
+[gw0] [ 45%] PASSED tests/test_phase_11a.py::test_three_ledgers_and_customer_ledgers 
+tests/test_phase_11a.py::test_bootstrap_include_cursor_snapshot 
+[gw1] [ 46%] PASSED tests/test_phase_4_full.py::test_notifications_website_enquiry 
+tests/test_phase_4_full.py::test_openapi_available 
+[gw0] [ 46%] PASSED tests/test_phase_11a.py::test_bootstrap_include_cursor_snapshot 
+tests/test_phase_11c.py::test_customers_list_filters_and_shape 
+[gw1] [ 47%] PASSED tests/test_phase_4_full.py::test_openapi_available 
+tests/test_phase_4_full.py::test_backup_rbac_and_zip 
+[gw0] [ 47%] PASSED tests/test_phase_11c.py::test_customers_list_filters_and_shape 
+tests/test_phase_11c.py::test_customers_filters_lifecycle_and_has_overdue 
+[gw1] [ 48%] PASSED tests/test_phase_4_full.py::test_backup_rbac_and_zip 
+tests/test_phase_4_full.py::test_health_ready 
+[gw1] [ 48%] PASSED tests/test_phase_4_full.py::test_health_ready 
+tests/test_phase_4_full.py::test_erasure_full_flow 
+[gw0] [ 49%] PASSED tests/test_phase_11c.py::test_customers_filters_lifecycle_and_has_overdue 
+tests/test_phase_11c.py::test_customers_rm_options 
+[gw0] [ 49%] PASSED tests/test_phase_11c.py::test_customers_rm_options 
+tests/test_phase_11c.py::test_payments_demands_open 
+[gw0] [ 50%] PASSED tests/test_phase_11c.py::test_payments_demands_open 
+tests/test_phase_11c.py::test_payments_requires_idempotency_key 
+[gw0] [ 50%] PASSED tests/test_phase_11c.py::test_payments_requires_idempotency_key 
+tests/test_phase_11c.py::test_payment_idempotency_replay 
+[gw1] [ 51%] PASSED tests/test_phase_4_full.py::test_erasure_full_flow 
+tests/test_phase_4_full.py::test_upload_magic_bytes 
+[gw0] [ 51%] PASSED tests/test_phase_11c.py::test_payment_idempotency_replay 
+tests/test_phase_11c.py::test_payment_cap_exceeds 
+[gw0] [ 52%] PASSED tests/test_phase_11c.py::test_payment_cap_exceeds 
+tests/test_phase_11c.py::test_customer_ledgers_combined_sum 
+[gw0] [ 52%] PASSED tests/test_phase_11c.py::test_customer_ledgers_combined_sum 
+tests/test_phase_11c.py::test_home_includes_ageing_counts 
+[gw0] [ 53%] PASSED tests/test_phase_11c.py::test_home_includes_ageing_counts 
+tests/test_phase_4.py::test_openapi_all_routes_require_auth 
+[gw1] [ 53%] PASSED tests/test_phase_4_full.py::test_upload_magic_bytes 
+tests/test_phase_4_full.py::test_marketing_permissions 
+[gw1] [ 54%] PASSED tests/test_phase_4_full.py::test_marketing_permissions 
+tests/test_phase_11e.py::test_reports_collections_csv 
+[gw1] [ 54%] PASSED tests/test_phase_11e.py::test_reports_collections_csv 
+tests/test_phase_11e.py::test_reports_presets_crud 
+[gw1] [ 55%] PASSED tests/test_phase_11e.py::test_reports_presets_crud 
+tests/test_phase_11e.py::test_flat_types_include_usage 
+[gw1] [ 55%] PASSED tests/test_phase_11e.py::test_flat_types_include_usage 
+tests/test_phase_11e.py::test_roles_list 
+[gw1] [ 56%] PASSED tests/test_phase_11e.py::test_roles_list 
+tests/test_phase_11e.py::test_create_and_update_user 
+[gw0] [ 56%] PASSED tests/test_phase_4.py::test_openapi_all_routes_require_auth 
+tests/test_phase_4.py::test_pdfs_download 
+[gw1] [ 57%] PASSED tests/test_phase_11e.py::test_create_and_update_user 
+tests/test_phase_11e.py::test_service_requests_list 
+[gw1] [ 58%] PASSED tests/test_phase_11e.py::test_service_requests_list 
+tests/test_phase_11e.py::test_quick_customer_create 
+[gw1] [ 58%] PASSED tests/test_phase_11e.py::test_quick_customer_create 
+tests/test_phase_7.py::TestPaymentPlanMaster::test_sum_not_100_rejected 
+[gw1] [ 59%] PASSED tests/test_phase_7.py::TestPaymentPlanMaster::test_sum_not_100_rejected 
+tests/test_phase_7.py::TestPaymentPlanMaster::test_duplicate_seq_rejected 
+[gw1] [ 59%] PASSED tests/test_phase_7.py::TestPaymentPlanMaster::test_duplicate_seq_rejected 
+tests/test_phase_7.py::TestPaymentPlanMaster::test_two_on_booking_rejected 
+[gw1] [ 60%] PASSED tests/test_phase_7.py::TestPaymentPlanMaster::test_two_on_booking_rejected 
+tests/test_phase_7.py::TestPaymentPlanMaster::test_on_stage_without_stage_rejected 
+[gw1] [ 60%] PASSED tests/test_phase_7.py::TestPaymentPlanMaster::test_on_stage_without_stage_rejected 
+tests/test_phase_7.py::TestPaymentPlanMaster::test_create_valid_plan_and_cleanup 
+[gw1] [ 61%] PASSED tests/test_phase_7.py::TestPaymentPlanMaster::test_create_valid_plan_and_cleanup 
+tests/test_phase_9.py::test_brochure_rate_limit 
+[gw0] [ 61%] PASSED tests/test_phase_4.py::test_pdfs_download 
+tests/test_phase_4.py::test_collections_report_matches_payments 
+[gw1] [ 62%] PASSED tests/test_phase_9.py::test_brochure_rate_limit 
+tests/test_phase_9.py::test_availability_from_param 
+[gw1] [ 62%] PASSED tests/test_phase_9.py::test_availability_from_param 
+tests/test_phase_9.py::test_cancel_reverts_lead_stage 
+[gw1] [ 63%] PASSED tests/test_phase_9.py::test_cancel_reverts_lead_stage 
+tests/test_phase_9.py::test_booking_capacity_ics_cancel_and_erp_outcome 
+[gw0] [ 63%] PASSED tests/test_phase_4.py::test_collections_report_matches_payments 
+tests/test_phase_4.py::test_backup_rbac 
+[gw1] [ 64%] PASSED tests/test_phase_9.py::test_booking_capacity_ics_cancel_and_erp_outcome 
+tests/test_phase_9.py::test_brochure_stats_and_portal_leak_free 
+[gw0] [ 64%] PASSED tests/test_phase_4.py::test_backup_rbac 
+tests/test_phase_4.py::test_upload_magic_bytes 
+[gw1] [ 65%] PASSED tests/test_phase_9.py::test_brochure_stats_and_portal_leak_free 
+tests/test_phase_11b.py::TestProjectSetupSave::test_put_stages_idempotent 
+[gw0] [ 65%] PASSED tests/test_phase_4.py::test_upload_magic_bytes 
+tests/test_phase_11f.py::test_customer_create_with_every_dropdown_persists 
+[gw1] [ 66%] PASSED tests/test_phase_11b.py::TestProjectSetupSave::test_put_stages_idempotent 
+tests/test_phase_11b.py::TestProjectSetupSave::test_put_plans_idempotent 
+[gw0] [ 66%] PASSED tests/test_phase_11f.py::test_customer_create_with_every_dropdown_persists 
+tests/test_phase_11f.py::test_profile_rejects_unknown_catalogue_id 
+[gw1] [ 67%] PASSED tests/test_phase_11b.py::TestProjectSetupSave::test_put_plans_idempotent 
+tests/test_phase_11b.py::TestProjectSetupSave::test_put_pricing_idempotent 
+[gw0] [ 67%] PASSED tests/test_phase_11f.py::test_profile_rejects_unknown_catalogue_id 
+tests/test_phase_11f.py::test_project_default_cash_percent_seeded 
+[gw1] [ 68%] PASSED tests/test_phase_11b.py::TestProjectSetupSave::test_put_pricing_idempotent 
+tests/test_phase_11b.py::TestProjectSetupSave::test_put_towers_name_only 
+[gw0] [ 68%] PASSED tests/test_phase_11f.py::test_project_default_cash_percent_seeded 
+tests/test_phase_11f.py::test_cancel_booking_flow 
+[gw1] [ 69%] PASSED tests/test_phase_11b.py::TestProjectSetupSave::test_put_towers_name_only 
+tests/test_phase_2.py::test_documents_upload_download_rbac 
+[gw0] [ 69%] PASSED tests/test_phase_11f.py::test_cancel_booking_flow 
+tests/test_phase_5.py::TestPortalAuth::test_login_ok 
+[gw1] [ 70%] PASSED tests/test_phase_2.py::test_documents_upload_download_rbac 
+tests/test_phase_2.py::test_leads_board_and_crud_and_convert 
+[gw0] [ 70%] PASSED tests/test_phase_5.py::TestPortalAuth::test_login_ok 
+tests/test_phase_5.py::TestPortalAuth::test_login_wrong_password 
+[gw0] [ 71%] PASSED tests/test_phase_5.py::TestPortalAuth::test_login_wrong_password 
+tests/test_phase_5.py::TestPortalAuth::test_erp_token_rejected_on_portal 
+[gw0] [ 72%] PASSED tests/test_phase_5.py::TestPortalAuth::test_erp_token_rejected_on_portal 
+tests/test_phase_5.py::TestPortalAuth::test_portal_token_rejected_on_erp 
+[gw0] [ 72%] PASSED tests/test_phase_5.py::TestPortalAuth::test_portal_token_rejected_on_erp 
+tests/test_phase_7.py::TestDownstream::test_customers_has_overdue_filter 
+[gw0] [ 73%] PASSED tests/test_phase_7.py::TestDownstream::test_customers_has_overdue_filter 
+tests/test_phase_7.py::TestDownstream::test_customer_360_plan_summary 
+[gw0] [ 73%] PASSED tests/test_phase_7.py::TestDownstream::test_customer_360_plan_summary 
+tests/test_phase_7.py::TestDownstream::test_reports_upcoming_dues 
+[gw0] [ 74%] PASSED tests/test_phase_7.py::TestDownstream::test_reports_upcoming_dues 
+tests/test_phase_7.py::TestDownstream::test_reports_demand_vs_collection 
+[gw1] [ 74%] PASSED tests/test_phase_2.py::test_leads_board_and_crud_and_convert 
+tests/test_phase_2.py::test_perf_projects_and_blocks 
+[gw0] [ 75%] PASSED tests/test_phase_7.py::TestDownstream::test_reports_demand_vs_collection 
+tests/test_phase_8b.py::test_health 
+[gw0] [ 75%] PASSED tests/test_phase_8b.py::test_health 
+tests/test_phase_8b.py::test_public_home 
+[gw0] [ 76%] PASSED tests/test_phase_8b.py::test_public_home 
+tests/test_phase_8b.py::test_flats_page_size_too_large_returns_422 
+[gw0] [ 76%] PASSED tests/test_phase_8b.py::test_flats_page_size_too_large_returns_422 
+tests/test_phase_8b.py::test_milestones_legacy_has_next_seq 
+[gw0] [ 77%] PASSED tests/test_phase_8b.py::test_milestones_legacy_has_next_seq 
+tests/test_phase_7.py::TestHealthAndMigration::test_health 
+[gw0] [ 77%] PASSED tests/test_phase_7.py::TestHealthAndMigration::test_health 
+tests/test_phase_7.py::TestHealthAndMigration::test_milestone_templates_gone 
+[gw0] [ 78%] PASSED tests/test_phase_7.py::TestHealthAndMigration::test_milestone_templates_gone 
+tests/test_phase_7.py::TestHealthAndMigration::test_legacy_block_milestones_alias 
+[gw0] [ 78%] PASSED tests/test_phase_7.py::TestHealthAndMigration::test_legacy_block_milestones_alias 
+tests/test_phase_7.py::TestPaymentPlanAssignments::test_sgh_tower_a_plans 
+[gw1] [ 79%] PASSED tests/test_phase_2.py::test_perf_projects_and_blocks 
+tests/test_phase_2.py::test_zzz_cleanup_cancel_bookings 
+[gw1] [ 79%] PASSED tests/test_phase_2.py::test_zzz_cleanup_cancel_bookings 
+tests/test_phase_5.py::TestErpServiceRequests::test_admin_list_and_counts 
+[gw0] [ 80%] PASSED tests/test_phase_7.py::TestPaymentPlanAssignments::test_sgh_tower_a_plans 
+tests/test_phase_7.py::TestPaymentPlanAssignments::test_ggv_villa_block_v_plans 
+[gw0] [ 80%] PASSED tests/test_phase_7.py::TestPaymentPlanAssignments::test_ggv_villa_block_v_plans 
+tests/test_phase_7.py::TestPaymentPlanAssignments::test_assign_stage_plan_to_villa_block_409 
+[gw1] [ 81%] PASSED tests/test_phase_5.py::TestErpServiceRequests::test_admin_list_and_counts 
+tests/test_phase_5.py::TestErpServiceRequests::test_marketing_forbidden 
+[gw1] [ 81%] PASSED tests/test_phase_5.py::TestErpServiceRequests::test_marketing_forbidden 
+tests/test_phase_5.py::TestErpServiceRequests::test_filters_and_detail_and_actions 
+[gw0] [ 82%] PASSED tests/test_phase_7.py::TestPaymentPlanAssignments::test_assign_stage_plan_to_villa_block_409 
+tests/test_phase_11b.py::TestDashboardHome::test_get_dashboard_home_200 
+[gw0] [ 82%] PASSED tests/test_phase_11b.py::TestDashboardHome::test_get_dashboard_home_200 
+tests/test_phase_11b.py::TestDashboardHome::test_dashboard_home_unauth 
+[gw0] [ 83%] PASSED tests/test_phase_11b.py::TestDashboardHome::test_dashboard_home_unauth 
+tests/test_phase_5.py::TestServiceRequests::test_categories_and_create_and_reply 
+[gw1] [ 83%] PASSED tests/test_phase_5.py::TestErpServiceRequests::test_filters_and_detail_and_actions 
+tests/test_phase_1_5.py::TestHealthHeaders::test_health_shape 
+[gw1] [ 84%] PASSED tests/test_phase_1_5.py::TestHealthHeaders::test_health_shape 
+tests/test_phase_1_5.py::TestHealthHeaders::test_auth_me 
+[gw0] [ 84%] PASSED tests/test_phase_5.py::TestServiceRequests::test_categories_and_create_and_reply 
+tests/test_phase_5.py::TestServiceRequests::test_internal_note_hidden_on_portal 
+[gw1] [ 85%] PASSED tests/test_phase_1_5.py::TestHealthHeaders::test_auth_me 
+tests/test_phase_11b.py::TestProjectSetupBundle::test_get_setup_shape 
+[gw1] [ 86%] PASSED tests/test_phase_11b.py::TestProjectSetupBundle::test_get_setup_shape 
+tests/test_phase_11b.py::TestFlatsPagination::test_flats_page_size_200 
+[gw1] [ 86%] PASSED tests/test_phase_11b.py::TestFlatsPagination::test_flats_page_size_200 
+tests/test_phase_1_5.py::TestOptimisticConcurrency::test_version_conflict_and_success 
+[gw0] [ 87%] PASSED tests/test_phase_5.py::TestServiceRequests::test_internal_note_hidden_on_portal 
+tests/test_phase_5.py::TestErpNotices::test_crud_admin 
+[gw1] [ 87%] PASSED tests/test_phase_1_5.py::TestOptimisticConcurrency::test_version_conflict_and_success 
+tests/test_phase_1_5.py::TestIdempotency::test_idempotent_replay 
+[gw1] [ 88%] PASSED tests/test_phase_1_5.py::TestIdempotency::test_idempotent_replay 
+tests/test_phase_1_5.py::TestETag::test_etag_304 
+[gw1] [ 88%] PASSED tests/test_phase_1_5.py::TestETag::test_etag_304 
+tests/test_phase_1_5.py::TestTowerC::test_tower_c_grid 
+[gw1] [ 89%] PASSED tests/test_phase_1_5.py::TestTowerC::test_tower_c_grid 
+tests/test_phase_1_5.py::TestParking::test_parking_list_bulk_patch 
+[gw1] [ 89%] PASSED tests/test_phase_1_5.py::TestParking::test_parking_list_bulk_patch 
+tests/test_phase_1_5.py::TestImports::test_import_template_preview_confirm 
+[gw0] [ 90%] PASSED tests/test_phase_5.py::TestErpNotices::test_crud_admin 
+tests/test_phase_5.py::TestErpNotices::test_sales_forbidden_post 
+[gw1] [ 90%] PASSED tests/test_phase_1_5.py::TestImports::test_import_template_preview_confirm 
+tests/test_phase_1_5.py::TestSearchHistory::test_search_and_history 
+[gw0] [ 91%] PASSED tests/test_phase_5.py::TestErpNotices::test_sales_forbidden_post 
+tests/test_phase_1_5.py::TestCursorPagination::test_cursor 
+[gw1] [ 91%] PASSED tests/test_phase_1_5.py::TestSearchHistory::test_search_and_history 
+tests/test_phase_1_5.py::TestMetricsRBAC::test_metrics_admin_ok_employee_forbidden 
+[gw0] [ 92%] PASSED tests/test_phase_1_5.py::TestCursorPagination::test_cursor 
+tests/test_phase_1_5.py::TestSoftDeleteRestore::test_soft_delete_and_restore 
+[gw1] [ 92%] PASSED tests/test_phase_1_5.py::TestMetricsRBAC::test_metrics_admin_ok_employee_forbidden 
+tests/test_phase_1_5.py::TestMFA::test_mfa_enroll_verify_login_disable 
+[gw0] [ 93%] PASSED tests/test_phase_1_5.py::TestSoftDeleteRestore::test_soft_delete_and_restore 
+tests/test_phase_1_5.py::TestSessions::test_list_and_revoke_other 
+[gw0] [ 93%] PASSED tests/test_phase_1_5.py::TestSessions::test_list_and_revoke_other 
+tests/test_phase_5.py::TestPortalData::test_booking_detail_and_subresources 
+[gw0] [ 94%] PASSED tests/test_phase_5.py::TestPortalData::test_booking_detail_and_subresources 
+tests/test_phase_5.py::TestConstructionAndHiddenPhoto::test_construction_and_hidden 
+[gw1] [ 94%] PASSED tests/test_phase_1_5.py::TestMFA::test_mfa_enroll_verify_login_disable 
+tests/test_phase_5.py::TestRefreshRotation::test_refresh_rotate_and_reuse 
+[gw1] [ 95%] PASSED tests/test_phase_5.py::TestRefreshRotation::test_refresh_rotate_and_reuse 
+tests/test_phase_5.py::TestPortalPDFs::test_pdfs 
+[gw1] [ 95%] PASSED tests/test_phase_5.py::TestPortalPDFs::test_pdfs 
+tests/test_phase_5.py::TestErpPortalMgmt::test_new_customer_enable_and_temp_password_flow 
+[gw1] [ 96%] PASSED tests/test_phase_5.py::TestErpPortalMgmt::test_new_customer_enable_and_temp_password_flow 
+tests/test_phase_5.py::TestErpConstructionPhotos::test_upload_valid_and_invalid_and_patch_delete 
+[gw1] [ 96%] PASSED tests/test_phase_5.py::TestErpConstructionPhotos::test_upload_valid_and_invalid_and_patch_delete 
+tests/test_phase_7.py::TestMigrationReport::test_migration_report_endpoint 
+[gw1] [ 97%] PASSED tests/test_phase_7.py::TestMigrationReport::test_migration_report_endpoint 
+tests/test_phase_7.py::TestPortalPhase7::test_portal_booking_payment_plan 
+[gw1] [ 97%] PASSED tests/test_phase_7.py::TestPortalPhase7::test_portal_booking_payment_plan 
+tests/test_phase_7.py::TestPortalLeaksSuite::test_portal_leaks_pytest_file_runs 
+[gw1] [ 98%] PASSED tests/test_phase_7.py::TestPortalLeaksSuite::test_portal_leaks_pytest_file_runs 
+[gw0] [ 98%] PASSED tests/test_phase_5.py::TestConstructionAndHiddenPhoto::test_construction_and_hidden 
+tests/test_phase_5.py::TestNotices::test_portal_notices_and_mark_read 
+[gw0] [ 99%] PASSED tests/test_phase_5.py::TestNotices::test_portal_notices_and_mark_read 
+tests/test_phase_5.py::TestProfileBank::test_patch_me_and_bank 
+[gw0] [100%] PASSED tests/test_phase_5.py::TestProfileBank::test_patch_me_and_bank 
+
+=============================== warnings summary ===============================
+tests/test_phase_5.py::TestPortalData::test_booking_detail_and_subresources
+  /root/.venv/lib/python3.11/site-packages/_pytest/python.py:171: PytestReturnNotNoneWarning: Test functions should return None, but tests/test_phase_5.py::TestPortalData::test_booking_detail_and_subresources returned <class 'str'>.
+  Did you mean to use `assert` instead of `return`?
+  See https://docs.pytest.org/en/stable/how-to/assert.html#return-not-none for more information.
+    warnings.warn(
+
+tests/test_phase_7.py::TestPortalPhase7::test_portal_booking_payment_plan
+tests/test_phase_7.py::TestPortalPhase7::test_portal_booking_payment_plan
+  /root/.venv/lib/python3.11/site-packages/_pytest/fixtures.py:1313: PytestRemovedIn10Warning: Class-scoped fixture defined as instance method is deprecated.
+  Instance attributes set in this fixture will NOT be visible to test methods,
+  as each test gets a new instance while the fixture runs only once per class.
+  Use @classmethod decorator and set attributes on cls instead.
+  See https://docs.pytest.org/en/stable/deprecations.html#class-scoped-fixture-as-instance-method
+    fixturefunc = resolve_fixture_function(fixturedef, request)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================= 193 passed, 3 warnings in 241.40s (0:04:01) ==================

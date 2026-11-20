@@ -1,0 +1,13 @@
+import { notificationTarget, notificationIcon } from "/app/mobile/src/notification-route.ts";
+import assert from "node:assert/strict";
+const b = "bk-1";
+assert.deepEqual(notificationTarget({ type: "demand.raised", booking_id: b, entity_type: "demand", entity_id: "d1" }), { pathname: "/payments", params: { tab: "demands" }, bookingId: b });
+assert.deepEqual(notificationTarget({ type: "demand.overdue", booking_id: b, entity_type: "demand", entity_id: "d1" }), { pathname: "/payments", params: { tab: "demands" }, bookingId: b });
+assert.deepEqual(notificationTarget({ type: "stage.completed", booking_id: b, entity_type: "block", entity_id: "x" }), { pathname: "/construction", bookingId: b });
+assert.deepEqual(notificationTarget({ type: "ticket.reply", booking_id: b, entity_type: "service_request", entity_id: "sr1" }), { pathname: "/requests/sr1" });
+assert.deepEqual(notificationTarget({ type: "ticket.reply", booking_id: null, entity_type: null, entity_id: null }), { pathname: "/requests" });
+assert.deepEqual(notificationTarget({ type: "notice.published", booking_id: null, entity_type: "notice", entity_id: "n1" }), { pathname: "/notices/n1" });
+assert.equal(notificationTarget({ type: "unknown.thing", booking_id: null, entity_type: null, entity_id: null }), null);
+assert.equal(notificationIcon("demand.overdue"), "alert-triangle");
+assert.equal(notificationIcon("demand.raised"), "file-text");
+console.log("notification routing: 9/9 assertions passed");

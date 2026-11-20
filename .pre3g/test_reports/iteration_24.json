@@ -1,0 +1,18 @@
+{
+  "summary": "Retest of three fixes from iteration_23 on preview as admin@kkt.in (Super Admin). All three PASS. (1) '/' on /customers now focuses [data-testid=customer-search] (type=search, aria-label 'Search customers') after clicking a blank header area — activeElement went from BODY → INPUT/customer-search. (2) Settings → System Health route-group table now has an 'Avg q' column with cells data-testid=ops-avgq-<group>; 15 groups rendered, 14/15 numeric values match /api/admin/ops.requests.by_group.<group>.avg_queries exactly (admin showed 40.1 in UI vs 39.4 from a subsequent API fetch — this is expected rolling-window drift since my follow-up fetch itself increments admin-group counters, not a bug). (3) Notification bell button has aria-label='Notifications' when there is no unread count (and the code sets it to '<n> unread notifications' when unread>0, with the badge carrying aria-hidden='true', confirmed via source review).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": ["/app/test_reports/iteration_24.json"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "CommandPalette.jsx '/' handler now correctly queries 'main input[type=search], main input[data-search], main input[placeholder*=Search i], input[type=search], ...' and focus+select. Good escape via `typing(e)` guard so it won't hijack while typing.",
+    "SystemHealth.jsx header colSpan on the empty-state row is still 7 but the table now has 8 columns after adding Avg q — cosmetic only (affects empty 'No requests in window yet.' row alignment)."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A", "frontend": "3/3 retest items pass"},
+  "test_credentials": "admin@kkt.in / Kkt@12345",
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All iteration_23 deviations resolved. Minor: SystemHealth empty-state <td colSpan={7}> should be 8 after Avg q column was added. Rolling-window ops averages drift between fetches — don't assert strict equality in automated tests; assert cell is numeric and header present."
+}

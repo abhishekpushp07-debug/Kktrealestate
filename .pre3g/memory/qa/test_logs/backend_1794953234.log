@@ -1,0 +1,94 @@
+(trapped) error reading bcrypt version
+Traceback (most recent call last):
+  File "/root/.venv/lib/python3.11/site-packages/passlib/handlers/bcrypt.py", line 620, in _load_backend_mixin
+    version = _bcrypt.__about__.__version__
+              ^^^^^^^^^^^^^^^^^
+AttributeError: module 'bcrypt' has no attribute '__about__'
+index audit_logs.id skipped: An existing index has the same name as the requested index. When index names are not specified, they are auto generated 
+[startup] indexes ensured in 0.10s
+UoW mode: ordered-writes+compensation
+KKT backend serving after 0.11s (uow=ordered-writes+compensation); background startup tasks running
+[startup] another replica holds the startup lease; skipping migrations here
+{"request_id": "419f687666fa48ee", "method": "GET", "path": "/api/health", "status": 200, "duration_ms": 2.4, "user_id": null}
+Object storage initialized
+{"request_id": "c28dde98be684748", "method": "POST", "path": "/api/auth/login", "status": 200, "duration_ms": 215.5, "user_id": null}
+{"request_id": "2c4444cf528243ea", "method": "POST", "path": "/api/admin/hard-purge", "status": 200, "duration_ms": 59.7, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "1f85172bf9cf48d7", "method": "POST", "path": "/api/auth/login", "status": 200, "duration_ms": 208.0, "user_id": null}
+{"request_id": "f4dbac5bffa94dcf", "method": "GET", "path": "/api/projects", "status": 200, "duration_ms": 11.4, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "f725f4413e744bb1", "method": "GET", "path": "/api/master/block-types", "status": 200, "duration_ms": 4.4, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "f189a9dbb22f400b", "method": "GET", "path": "/api/master/flat-types", "status": 200, "duration_ms": 5.0, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "56f56c1d406d4c11", "method": "POST", "path": "/api/blocks", "status": 201, "duration_ms": 46.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "9262e91069c6465f", "method": "GET", "path": "/api/master/payment-plans", "status": 200, "duration_ms": 6.1, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "a73a59ab6752419b", "method": "POST", "path": "/api/payment-plan-assignments", "status": 201, "duration_ms": 19.2, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "96ab622a8a0444cd", "method": "GET", "path": "/api/flats", "status": 200, "duration_ms": 8.1, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "bd8c2325ca564d6a", "method": "PATCH", "path": "/api/flats/9eda03dd-e326-4c52-bd48-6ea7bbf10d4b/pricing", "status": 200, "duration_ms": 15.5, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "bb46a355949c4fda", "method": "GET", "path": "/api/flats/9eda03dd-e326-4c52-bd48-6ea7bbf10d4b", "status": 200, "duration_ms": 14.2, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "ebd645a1f74a4d44", "method": "PATCH", "path": "/api/flats/f0dbc9f8-1717-4006-bea5-54a8814997c7/pricing", "status": 200, "duration_ms": 11.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "d4b835dab0c240b0", "method": "GET", "path": "/api/flats/f0dbc9f8-1717-4006-bea5-54a8814997c7", "status": 200, "duration_ms": 8.7, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "8021195400f141c2", "method": "PATCH", "path": "/api/flats/a32692e1-7248-4bdf-86e9-18af234d0534/pricing", "status": 200, "duration_ms": 17.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "8dbe872dfa084f3b", "method": "GET", "path": "/api/flats/a32692e1-7248-4bdf-86e9-18af234d0534", "status": 200, "duration_ms": 7.1, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "3f463d3e251c48c5", "method": "PATCH", "path": "/api/flats/62c8d5db-f402-41bd-ad88-70128f21b55d/pricing", "status": 200, "duration_ms": 17.0, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "4b0857bde3514d83", "method": "GET", "path": "/api/flats/62c8d5db-f402-41bd-ad88-70128f21b55d", "status": 200, "duration_ms": 6.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "90f072d54582458e", "method": "PATCH", "path": "/api/flats/5710c04e-2e84-47b4-a26d-2f2da74cbb08/pricing", "status": 200, "duration_ms": 12.0, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "34dab92c752c488a", "method": "GET", "path": "/api/flats/5710c04e-2e84-47b4-a26d-2f2da74cbb08", "status": 200, "duration_ms": 6.1, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "153e003daeb54664", "method": "PATCH", "path": "/api/flats/dd20edf7-93e4-4324-aa36-8b36a6f6f983/pricing", "status": 200, "duration_ms": 12.1, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "a55a5a038df741f3", "method": "GET", "path": "/api/flats/dd20edf7-93e4-4324-aa36-8b36a6f6f983", "status": 200, "duration_ms": 6.4, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "4a97d4b9524641b5", "method": "PATCH", "path": "/api/flats/57e8bf24-7ccb-4da0-ac96-231f53f3f234/pricing", "status": 200, "duration_ms": 11.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "bdb3314ff0c64b17", "method": "GET", "path": "/api/flats/57e8bf24-7ccb-4da0-ac96-231f53f3f234", "status": 200, "duration_ms": 6.5, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "e9a67ef011c247e2", "method": "PATCH", "path": "/api/flats/33318b66-36ba-41a7-aa1c-af76feb97cb4/pricing", "status": 200, "duration_ms": 13.2, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "89ee1b42fd704590", "method": "GET", "path": "/api/flats/33318b66-36ba-41a7-aa1c-af76feb97cb4", "status": 200, "duration_ms": 5.9, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "746c01ee05434687", "method": "PATCH", "path": "/api/flats/b27f7e13-7487-4d48-a6e3-8b32900ff126/pricing", "status": 200, "duration_ms": 11.5, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "1553490441d14837", "method": "GET", "path": "/api/flats/b27f7e13-7487-4d48-a6e3-8b32900ff126", "status": 200, "duration_ms": 6.2, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "4e5f920e923a422a", "method": "PATCH", "path": "/api/flats/fcd41690-8611-4c45-8047-6b66b32d7c7e/pricing", "status": 200, "duration_ms": 11.5, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "d2f328221a4846a3", "method": "GET", "path": "/api/flats/fcd41690-8611-4c45-8047-6b66b32d7c7e", "status": 200, "duration_ms": 6.2, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "20557362ab494db5", "method": "PATCH", "path": "/api/flats/9f829cee-dc36-473d-9f36-ee1bb2ae5c67/pricing", "status": 200, "duration_ms": 11.2, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "ea0939169d324e9d", "method": "GET", "path": "/api/flats/9f829cee-dc36-473d-9f36-ee1bb2ae5c67", "status": 200, "duration_ms": 6.2, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "94a8c11024e6450e", "method": "PATCH", "path": "/api/flats/52f33f16-0368-4a20-aaf9-f68885c11eaf/pricing", "status": 200, "duration_ms": 11.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "57dc3090d24b41af", "method": "GET", "path": "/api/flats/52f33f16-0368-4a20-aaf9-f68885c11eaf", "status": 200, "duration_ms": 6.4, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "60ff1f385ee34944", "method": "PATCH", "path": "/api/flats/d8fdd3de-b7e5-44a0-bc74-aba0b6bb257c/pricing", "status": 200, "duration_ms": 12.0, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "edea98a4bb644ea8", "method": "GET", "path": "/api/flats/d8fdd3de-b7e5-44a0-bc74-aba0b6bb257c", "status": 200, "duration_ms": 5.9, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "8759790aa34844bc", "method": "PATCH", "path": "/api/flats/618c7698-3861-4f69-9f18-95e214c2a2d5/pricing", "status": 200, "duration_ms": 12.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "0b3f14b50a284412", "method": "GET", "path": "/api/flats/618c7698-3861-4f69-9f18-95e214c2a2d5", "status": 200, "duration_ms": 6.0, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "845e3b9c2aea4b8a", "method": "PATCH", "path": "/api/flats/d8f66098-e0fa-49de-a618-b3c369ed1172/pricing", "status": 200, "duration_ms": 10.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "ddd8909692e04c38", "method": "GET", "path": "/api/flats/d8f66098-e0fa-49de-a618-b3c369ed1172", "status": 200, "duration_ms": 6.2, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "e1be730bdfee4c45", "method": "PATCH", "path": "/api/flats/7ed8e3c1-0669-4bf4-8378-3ac0c23d8f74/pricing", "status": 200, "duration_ms": 11.2, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "89f1e9bec21f4e15", "method": "GET", "path": "/api/flats/7ed8e3c1-0669-4bf4-8378-3ac0c23d8f74", "status": 200, "duration_ms": 6.0, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "e57fbb36dc32412d", "method": "PATCH", "path": "/api/flats/b5076c6f-3cb3-43da-8baa-3c31b52cf404/pricing", "status": 200, "duration_ms": 10.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "65775385ad6d4f07", "method": "GET", "path": "/api/flats/b5076c6f-3cb3-43da-8baa-3c31b52cf404", "status": 200, "duration_ms": 6.0, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "55a8cf4648a64581", "method": "PATCH", "path": "/api/flats/6d10a368-883b-485c-95ff-05de7d3dab17/pricing", "status": 200, "duration_ms": 1093.4, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796", "slow": true}
+{"request_id": "739790f15e3a4b6b", "method": "GET", "path": "/api/flats/6d10a368-883b-485c-95ff-05de7d3dab17", "status": 200, "duration_ms": 15.3, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "32149ff5da8d4362", "method": "PATCH", "path": "/api/flats/6b0ab7ca-b15d-452c-b42d-41c09858b271/pricing", "status": 200, "duration_ms": 18.0, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "100f276636a84879", "method": "GET", "path": "/api/flats/6b0ab7ca-b15d-452c-b42d-41c09858b271", "status": 200, "duration_ms": 7.9, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "77a2d256f0d742ae", "method": "PATCH", "path": "/api/flats/ea692e24-378a-4f71-884a-ea07cc6fa692/pricing", "status": 200, "duration_ms": 12.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "7ae81b56bac04562", "method": "GET", "path": "/api/flats/ea692e24-378a-4f71-884a-ea07cc6fa692", "status": 200, "duration_ms": 7.9, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "00d354eafe4d4d91", "method": "PATCH", "path": "/api/flats/a5e8eef3-83c4-4ed2-965a-bf33450276f6/pricing", "status": 200, "duration_ms": 13.1, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "c2fc3b4e8a0242e5", "method": "GET", "path": "/api/flats/a5e8eef3-83c4-4ed2-965a-bf33450276f6", "status": 200, "duration_ms": 7.4, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "f505bcb347744b99", "method": "PATCH", "path": "/api/flats/8ecfe551-2bff-4736-8d36-6ce47395ab73/pricing", "status": 200, "duration_ms": 13.5, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "c5f7cc0f0ea04c4c", "method": "GET", "path": "/api/flats/8ecfe551-2bff-4736-8d36-6ce47395ab73", "status": 200, "duration_ms": 6.5, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "b0961f9902834067", "method": "PATCH", "path": "/api/flats/057b421b-5879-4dd7-9c2f-82c200dafd78/pricing", "status": 200, "duration_ms": 12.3, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "aac34851480e4fe3", "method": "GET", "path": "/api/flats/057b421b-5879-4dd7-9c2f-82c200dafd78", "status": 200, "duration_ms": 6.5, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "f44fa26c58fa4402", "method": "PATCH", "path": "/api/flats/f481c807-2962-4ec1-8513-501b5b0a54dd/pricing", "status": 200, "duration_ms": 11.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "5ad77eeb8e4a4298", "method": "GET", "path": "/api/flats/f481c807-2962-4ec1-8513-501b5b0a54dd", "status": 200, "duration_ms": 6.3, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "8049e9d24b12428c", "method": "PATCH", "path": "/api/flats/274cd8ec-c21b-4749-852e-69fe1622478c/pricing", "status": 200, "duration_ms": 12.0, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "5679c50351354177", "method": "GET", "path": "/api/flats/274cd8ec-c21b-4749-852e-69fe1622478c", "status": 200, "duration_ms": 6.9, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "9e50ca7b5a4e4d45", "method": "PATCH", "path": "/api/flats/591ec94a-1faf-4c60-9df3-5f0969716752/pricing", "status": 200, "duration_ms": 11.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "79a827b0a5a94029", "method": "GET", "path": "/api/flats/591ec94a-1faf-4c60-9df3-5f0969716752", "status": 200, "duration_ms": 6.6, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "857ad213f6874199", "method": "PATCH", "path": "/api/flats/08f81b0d-7aa4-4524-8556-070fe04bffdc/pricing", "status": 200, "duration_ms": 12.4, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "4e4ee1d8e3b84ba1", "method": "GET", "path": "/api/flats/08f81b0d-7aa4-4524-8556-070fe04bffdc", "status": 200, "duration_ms": 6.3, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "1b7b90b87eb34859", "method": "PATCH", "path": "/api/flats/77581277-f052-4bc4-b6f0-4e65bdec6cda/pricing", "status": 200, "duration_ms": 10.9, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "9e9b054e4db44ff1", "method": "GET", "path": "/api/flats/77581277-f052-4bc4-b6f0-4e65bdec6cda", "status": 200, "duration_ms": 6.1, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "f8e04f8bb494483c", "method": "PATCH", "path": "/api/flats/2142db0a-2147-4b9a-b8be-a020dddfc94d/pricing", "status": 200, "duration_ms": 11.7, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "6d2f9e837ee041f6", "method": "GET", "path": "/api/flats/2142db0a-2147-4b9a-b8be-a020dddfc94d", "status": 200, "duration_ms": 5.9, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "3f471e4e37284890", "method": "PATCH", "path": "/api/flats/144a4505-d771-45f7-a776-6b310b410638/pricing", "status": 200, "duration_ms": 11.5, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "3bd995694d2b4a1e", "method": "GET", "path": "/api/flats/144a4505-d771-45f7-a776-6b310b410638", "status": 200, "duration_ms": 5.9, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "3f1584d6e08d480d", "method": "GET", "path": "/api/health", "status": 200, "duration_ms": 1.2, "user_id": null}
+{"request_id": "b9f343d90a4d4702", "method": "GET", "path": "/api/master/payment-modes", "status": 200, "duration_ms": 4.3, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "727732c8d43c4e23", "method": "GET", "path": "/api/master/bank-accounts", "status": 200, "duration_ms": 5.0, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "3993c4aed5ac4e9e", "method": "GET", "path": "/api/master/payment-plans", "status": 200, "duration_ms": 5.3, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "822c5e7320c64019", "method": "POST", "path": "/api/payment-plan-assignments", "status": 201, "duration_ms": 12.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "adb76f72bcd042b4", "method": "POST", "path": "/api/customers", "status": 201, "duration_ms": 21.3, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "45784c8bd3054c8e", "method": "POST", "path": "/api/bookings", "status": 422, "duration_ms": 12.8, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+raw access to ledger_entries: ledger projection rebuild
+raw access to ledger_entries: ledger projection rebuild
+{"request_id": "110a2905e9cb4fc3", "method": "POST", "path": "/api/bookings", "status": 201, "duration_ms": 95.4, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
+{"request_id": "8a3ea6f285d94322", "method": "GET", "path": "/api/bookings/79d1adc0-7986-416a-beae-b3ff75bf86c8", "status": 200, "duration_ms": 8.9, "user_id": "339d6c4e-ea55-4f63-b4cf-1b9578080796"}
