@@ -5,6 +5,7 @@ import asyncio
 import gzip
 import hashlib
 import re
+from collections import OrderedDict
 from datetime import date, timedelta
 
 import orjson
@@ -254,26 +255,11 @@ async def _enrich(rows: list[dict], known: dict | None = None):
     return rows
 
 
-async def _reconcile(user: dict, project_id: str | None, block_id: str | None) -> dict:
+def _bridge(per: dict) -> dict:
     """JRN-36: the register lists raised BILLS only; Outstanding also counts demanded other charges. Show the bridge."""
-    scope = {
-        "company_id": user["company_id"],
-        **report_scope_filter(user),
-        **({"project_id": project_id} if project_id else {}),
-        **({"block_id": block_id} if block_id else {}),
-    }
-    from services.money_snapshot import bills_for
-
-    bills, other, out = 0, 0, 0
-    bks = await db.bookings.find(
-        definitions.live_bookings_match(scope), {"_id": 0, "id": 1, "summary": 1, "money_rev": 1, "money_snapshot": 1}
-    ).to_list(None)
-    for b in bks:
-        o = definitions.outstanding(b.get("summary") or {})
-        other += o["other_charges_paise"]
-        out += o["total_paise"]
-    for ds in (await bills_for(bks)).values():  # 3I REQ-355: kept-ready bills (open ones = open_demands_match)
-        bills += sum(definitions.demand_balance(d) for d in ds if d.get("status") in definitions.OPEN_DEMAND_STATUSES)
+    bills = sum(x[0] for x in per.values())
+    other = sum(x[1] for x in per.values())
+    out = sum(x[2] for x in per.values())
     return {
         "basis": "Raised bills only (instalment bills). Outstanding also includes billed other charges.",
         "bills_open_paise": bills,
@@ -281,6 +267,159 @@ async def _reconcile(user: dict, project_id: str | None, block_id: str | None) -
         "adjustment_paise": out - bills - other,  # per-bucket netting (money paid beyond a bill sits on the bucket)
         "outstanding_paise": out,
     }
+
+
+async def _bridge_parts(user: dict, project_id: str | None, block_id: str | None, ids: list | None = None) -> dict:
+    """{booking_id: (open bills, other charges due, outstanding)} for the live bookings in scope (`ids`: only those)."""
+    from services.money_snapshot import bills_for
+
+    scope = {
+        "company_id": user["company_id"],
+        **report_scope_filter(user),
+        **({"project_id": project_id} if project_id else {}),
+        **({"block_id": block_id} if block_id else {}),
+        **({"id": {"$in": ids}} if ids is not None else {}),
+    }
+    bks = await db.bookings.find(
+        definitions.live_bookings_match(scope), {"_id": 0, "id": 1, "summary": 1, "money_rev": 1, "money_snapshot": 1}
+    ).to_list(None)
+    dem = await bills_for(bks)  # 3I REQ-355: kept-ready bills (open ones = open_demands_match)
+    out = {}
+    for b in bks:
+        o = definitions.outstanding(b.get("summary") or {})
+        ds = dem.get(b["id"], [])
+        bills = sum(definitions.demand_balance(d) for d in ds if d.get("status") in definitions.OPEN_DEMAND_STATUSES)
+        out[b["id"]] = (bills, o["other_charges_paise"], o["total_paise"])
+    return out
+
+
+async def _reconcile(user: dict, project_id: str | None, block_id: str | None) -> dict:
+    return _bridge(await _bridge_parts(user, project_id, block_id))
+
+
+def _assemble(rows: list[dict], rec: dict, basis: str, per_group: int, today: str) -> dict:
+    days: dict = {}
+    grand = _tot0()
+    for r in rows:  # 3I: one pass — every group's totals add up as its rows are placed (was re-summed per group)
+        dkey = r["due_date"] if basis == "due" else r["demand_date"]
+        dg = days.get(dkey)
+        if dg is None:
+            dg = days[dkey] = {"date": dkey, "projects": {}, "t": _tot0()}
+        pg = dg["projects"].get(r["project_id"])
+        if pg is None:
+            pg = dg["projects"][r["project_id"]] = {
+                "project_id": r["project_id"],
+                "project_name": r["project_name"],
+                "towers": {},
+                "t": _tot0(),
+            }
+        tg = pg["towers"].get(r["block_id"])
+        if tg is None:
+            tg = pg["towers"][r["block_id"]] = {
+                "block_id": r["block_id"],
+                "block_name": r["block_name"],
+                "rows": [],
+                "t": _tot0(),
+            }
+        tg["rows"].append(r)
+        for t in (grand, dg["t"], pg["t"], tg["t"]):
+            _add(t, r)
+    out = []
+    for dg in sorted(days.values(), key=lambda x: x["date"], reverse=True):
+        projects = []
+        for pg in sorted(dg["projects"].values(), key=lambda x: x["project_name"] or ""):
+            towers = [
+                {
+                    "block_id": tg["block_id"],
+                    "block_name": tg["block_name"],
+                    "totals": tg["t"],
+                    "rows": tg["rows"][:per_group],
+                    "more": max(0, len(tg["rows"]) - per_group),
+                }
+                for tg in sorted(pg["towers"].values(), key=lambda x: x["block_name"] or "")
+            ]
+            projects.append(
+                {
+                    "project_id": pg["project_id"],
+                    "project_name": pg["project_name"],
+                    "totals": pg["t"],
+                    "towers": towers,
+                }
+            )
+        out.append({"date": dg["date"], "totals": dg["t"], "projects": projects})
+    return {
+        "basis": basis,
+        "as_of": today,
+        "groups": out,
+        "totals": grand,
+        "row_count": len(rows),
+        "statuses": list(STATUSES),
+        "sources": SOURCES,
+        "tie_out": {
+            "rows_total_paise": sum(r["total_paise"] for r in rows if not r["voided"]),
+            "groups_total_paise": sum(g["totals"]["total_paise"] for g in out),
+        },
+        "reconcile": rec,
+    }
+
+
+# 3I REQ-355: the last answer per filter set, per booking, with the booking markers it was read under. A save that
+# moves only money figures re-reads just the bookings whose marker moved (any server: markers live in the database).
+_KEPT: "OrderedDict[str, dict]" = OrderedDict()
+_KEPT_MAX = 6
+_LIMIT = 5000
+_NON_MONEY = ("bookings", "leads", "inventory", "service", "other", "bills")
+
+
+async def _bills(q: dict, field: str, scope: dict, ids: list | None = None) -> list[dict]:
+    qq = {"$and": [q, {"booking_id": {"$in": ids}}]} if ids is not None else q
+    nf = scope | ({"id": {"$in": ids}} if ids is not None else {})
+    raw, known = await asyncio.gather(
+        db.demands.find(qq, _ROW_FIELDS).sort([(field, -1), ("demand_number", -1)]).limit(_LIMIT).to_list(None),
+        _names(nf),
+    )
+    return await _enrich(raw, known)
+
+
+async def _register_rows(user, q, field, today, project_id, block_id, base: str):
+    """(rows in register order, bridge). Full read the first time / after a non-money save; else only moved bookings."""
+    from services import stamps
+    from services.booking_marks import PROJ, mark
+
+    scope = {"company_id": user["company_id"], **report_scope_filter(user)}
+    st = await stamps.read(user["company_id"], _NON_MONEY)
+    marks = {m["id"]: mark(m) for m in await db.bookings.find(scope, PROJ).to_list(None)}  # markers first, then rows
+    nscope = scope | {k: v for k, v in (("project_id", project_id), ("block_id", block_id)) if v}
+    prev = _KEPT.get(base)
+    moved = None
+    if prev is not None and prev["st"] == st and prev["today"] == today:
+        moved = [i for i in marks.keys() | prev["marks"].keys() if prev["marks"].get(i) != marks.get(i)]
+        if len(moved) > 200:
+            moved = None
+    if moved is None:
+        raw, parts = await asyncio.gather(_bills(q, field, nscope), _bridge_parts(user, project_id, block_id))
+        by_bk: dict = {}
+        for d in raw:
+            by_bk.setdefault(d["booking_id"], []).append(_row(d, today))
+    else:
+        raw, new_parts = await asyncio.gather(
+            _bills(q, field, nscope, moved) if moved else asyncio.sleep(0, []),
+            _bridge_parts(user, project_id, block_id, moved) if moved else asyncio.sleep(0, {}),
+        )
+        by_bk = {k: v for k, v in prev["by_bk"].items() if k not in moved}
+        for d in raw:
+            by_bk.setdefault(d["booking_id"], []).append(_row(d, today))
+        parts = {k: v for k, v in prev["parts"].items() if k not in moved} | new_parts
+    rows = [r for rs in by_bk.values() for r in rs]
+    rows.sort(key=lambda r: (r[field] or "", r["demand_number"] or ""), reverse=True)  # = the bills' read order
+    if len(rows) < _LIMIT and by_bk.keys() <= marks.keys():  # every row's booking is tracked: safe to build on
+        _KEPT[base] = {"st": st, "today": today, "marks": marks, "by_bk": by_bk, "parts": parts}
+        _KEPT.move_to_end(base)
+        while len(_KEPT) > _KEPT_MAX:
+            _KEPT.popitem(last=False)
+    else:
+        _KEPT.pop(base, None)
+    return rows, _bridge(parts)
 
 
 @router.get("/register")
@@ -342,93 +481,21 @@ async def register(
     key = f"dreg:{user['company_id']}:{hash(repr(sorted(q.items(), key=str)))}:{per_group}:{source}:{int(bool(user.get('project_scope')))}"
 
     async def compute():
-        async def bills():
-            # 3I: the scope's booking names are read beside the bills (any booking outside it is fetched after)
-            scope = {"company_id": user["company_id"], **report_scope_filter(user)}
-            scope |= {k: v for k, v in (("project_id", project_id), ("block_id", block_id)) if v}
-            raw, known = await asyncio.gather(
-                db.demands.find(q, _ROW_FIELDS).sort([(field, -1), ("demand_number", -1)]).limit(5000).to_list(None),
-                _names(scope),
-            )
-            return await _enrich(raw, known)
+        from core.timing import Laps
 
-        # 3I: the Outstanding bridge reads bookings, not the rows — read beside them
-        raw, rec = await asyncio.gather(bills(), _reconcile(user, project_id, block_id))
-        rows = [_row(d, today) for d in raw]
+        lap = Laps("dreg")
+        rows, rec = await _register_rows(user, q, field, today, project_id, block_id, key)
+        lap("read")
         if source:
             rows = [r for r in rows if r["source"] == source]
-        days: dict = {}
-        grand = _tot0()
-        for r in rows:  # 3I: one pass — every group's totals add up as its rows are placed (was re-summed per group)
-            dkey = r["due_date"] if basis == "due" else r["demand_date"]
-            dg = days.get(dkey)
-            if dg is None:
-                dg = days[dkey] = {"date": dkey, "projects": {}, "t": _tot0()}
-            pg = dg["projects"].get(r["project_id"])
-            if pg is None:
-                pg = dg["projects"][r["project_id"]] = {
-                    "project_id": r["project_id"],
-                    "project_name": r["project_name"],
-                    "towers": {},
-                    "t": _tot0(),
-                }
-            tg = pg["towers"].get(r["block_id"])
-            if tg is None:
-                tg = pg["towers"][r["block_id"]] = {
-                    "block_id": r["block_id"],
-                    "block_name": r["block_name"],
-                    "rows": [],
-                    "t": _tot0(),
-                }
-            tg["rows"].append(r)
-            for t in (grand, dg["t"], pg["t"], tg["t"]):
-                _add(t, r)
-        out = []
-        for dg in sorted(days.values(), key=lambda x: x["date"], reverse=True):
-            projects = []
-            for pg in sorted(dg["projects"].values(), key=lambda x: x["project_name"] or ""):
-                towers = [
-                    {
-                        "block_id": tg["block_id"],
-                        "block_name": tg["block_name"],
-                        "totals": tg["t"],
-                        "rows": tg["rows"][:per_group],
-                        "more": max(0, len(tg["rows"]) - per_group),
-                    }
-                    for tg in sorted(pg["towers"].values(), key=lambda x: x["block_name"] or "")
-                ]
-                projects.append(
-                    {
-                        "project_id": pg["project_id"],
-                        "project_name": pg["project_name"],
-                        "totals": pg["t"],
-                        "towers": towers,
-                    }
-                )
-            out.append({"date": dg["date"], "totals": dg["t"], "projects": projects})
-        data = {
-            "basis": basis,
-            "as_of": today,
-            "groups": out,
-            "totals": grand,
-            "row_count": len(rows),
-            "statuses": list(STATUSES),
-            "sources": SOURCES,
-            "tie_out": {
-                "rows_total_paise": sum(r["total_paise"] for r in rows if not r["voided"]),
-                "groups_total_paise": sum(g["totals"]["total_paise"] for g in out),
-            },
-            "reconcile": rec,
-        }
+        data = _assemble(rows, rec, basis, per_group, today)
+        lap("group")
         # REQ-211: serialise + tag once per cached answer, not on every hit
         raw_body = orjson.dumps(data, default=str, option=orjson.OPT_PASSTHROUGH_DATETIME | orjson.OPT_NON_STR_KEYS)
         text = raw_body.decode()  # 3I: orjson ≈ 1/10 the time of json.dumps on the 4 MB answer; same JSON
-        return {
-            "_rows": rows,
-            "_body": text,
-            "_gz": gzip.compress(raw_body, 1),  # 3I: compressed once per cached answer; level 1 ≈ ¼ the time of 5
-            "_etag": '"' + hashlib.sha256(raw_body).hexdigest()[:16] + '"',
-        }
+        gz = gzip.compress(raw_body, 1)  # 3I: compressed once per cached answer; level 1 ≈ ¼ the time of 5
+        lap("serial")
+        return {"_rows": rows, "_body": text, "_gz": gz, "_etag": '"' + hashlib.sha256(raw_body).hexdigest()[:16] + '"'}
 
     data = await ttlcache.cached(key, 30, compute)
     rows = data["_rows"]

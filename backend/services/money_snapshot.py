@@ -184,6 +184,8 @@ async def in_step_check(repair_missing: bool = True) -> dict:
             if not _same(b["money_snapshot"]["bills"], src[b["id"]]):
                 differ += 1
                 examples.append(b["id"])
+                # moving the rev also moves the booking marker: figures kept per booking on any server recompute
+                await db.bookings.update_one({"id": b["id"]}, {"$inc": {"money_rev": 1}})
                 await repair(b["id"])
     res = {
         "name": "report_figures",

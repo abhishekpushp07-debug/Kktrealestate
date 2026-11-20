@@ -7,6 +7,7 @@ import subprocess
 import sys
 import time
 import uuid
+from contextlib import contextmanager
 
 import pytest
 import requests
@@ -15,11 +16,12 @@ from pymongo import MongoClient
 from tests.conftest import BASE, BYPASS_TOKEN, TEST_DB, TEST_PORT
 
 PORT2 = TEST_PORT + 7
-B2 = f"http://127.0.0.1:{PORT2}"
 
 
-@pytest.fixture(scope="module")
-def second_server():
+@contextmanager
+def spawn_backend(port: int):
+    """A second backend process on the same test database (another server behind the load balancer)."""
+    base = f"http://127.0.0.1:{port}"
     env = {
         **os.environ,
         "DB_NAME": TEST_DB,
@@ -29,9 +31,9 @@ def second_server():
         "DEMO_AUTO_REFRESH": "false",
         "KKT_NO_SCHEDULER": "1",
     }
-    with open("/tmp/kkt_test_backend2.log", "w") as log:
+    with open(f"/tmp/kkt_test_backend_{port}.log", "w") as log:
         p = subprocess.Popen(
-            [sys.executable, "-m", "uvicorn", "server:app", "--host", "127.0.0.1", "--port", str(PORT2)],
+            [sys.executable, "-m", "uvicorn", "server:app", "--host", "127.0.0.1", "--port", str(port)],
             cwd=os.path.join(os.path.dirname(__file__), ".."),
             env=env,
             stdout=log,
@@ -40,16 +42,22 @@ def second_server():
     try:
         for _ in range(120):
             try:
-                if requests.get(f"{B2}/api/health", timeout=2).status_code == 200:
+                if requests.get(f"{base}/api/health", timeout=2).status_code == 200:
                     break
             except requests.exceptions.RequestException:
                 pass
             time.sleep(1)
         else:
-            raise RuntimeError("second backend did not start: /tmp/kkt_test_backend2.log")
-        yield B2
+            raise RuntimeError(f"second backend did not start: /tmp/kkt_test_backend_{port}.log")
+        yield base
     finally:
         p.kill()
+
+
+@pytest.fixture(scope="module")
+def second_server():
+    with spawn_backend(PORT2) as b:
+        yield b
 
 
 @pytest.fixture(scope="module")

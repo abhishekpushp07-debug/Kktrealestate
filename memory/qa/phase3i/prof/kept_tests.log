@@ -1,0 +1,11 @@
+bringing up nodes...
+bringing up nodes...
+
+...........                                                              [100%]
+=============================== warnings summary ===============================
+tests/test_phase3i_noise_surfaces.py::test_noise_actions_move_no_figure_but_follow_ups_still_move_the_call_list
+  /root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12: PendingDeprecationWarning: Please use `import python_multipart` instead.
+    import multipart
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+11 passed, 1 warning in 7.08s

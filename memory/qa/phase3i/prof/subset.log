@@ -1,0 +1,82 @@
+bringing up nodes...
+bringing up nodes...
+
+...................................FF................................... [ 97%]
+..                                                                       [100%]
+=================================== FAILURES ===================================
+________________________ test_backend_ruff_format_clean ________________________
+[gw0] linux -- Python 3.11.18 /root/.venv/bin/python
+tests/test_format_gate.py:26: in test_backend_ruff_format_clean
+    assert r.returncode == 0, r.stdout[-2000:]
+E   AssertionError: EACT_APP_BACKEND_URL", "https://flat-ledger-11--18pq6xp9.preview.emergentagent.com"
+E        - ).rstrip("/")
+E     10 + BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://flat-ledger-11--18pq6xp9.preview.emergentagent.com").rstrip(
+E     11 +     "/"
+E     12 + )
+E     13 |
+E        |
+E     
+E     unformatted: File would be reformatted
+E       --> tests/test_phase_c_refocus.py:26:27
+E        |
+E     25 |
+E        - BASE_URL = os.environ.get(
+E        -     "REACT_APP_BACKEND_URL", "https://flat-ledger-11--18pq6xp9.preview.emergentagent.com"
+E        - ).rstrip("/")
+E     26 + BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://flat-ledger-11--18pq6xp9.preview.emergentagent.com").rstrip(
+E     27 +     "/"
+E     28 + )
+E     29 | ADMIN_EMAIL = "admin@kkt.in"
+E        |
+E     
+E     unformatted: File would be reformatted
+E        --> tools/db_audit_drills.py:655:14
+E         |
+E     654 |             f"engagement_{label}{'_redis' if redis_url else ''}",
+E         -             {"reps": reps, "tower": blk, "customers": len(cids), "checks_same": same, "checks": len(rows),
+E         -              "scores_moved_by_the_save": moved, "pass": same == len(rows), "rows": rows},  # fmt: skip
+E     655 +             {
+E     656 +                 "reps": reps,
+E     657 +                 "tower": blk,
+E     658 +                 "customers": len(cids),
+E     659 +                 "checks_same": same,
+E     660 +                 "checks": len(rows),
+E     661 +                 "scores_moved_by_the_save": moved,
+E     662 +                 "pass": same == len(rows),
+E     663 +                 "rows": rows,
+E     664 +             },  # fmt: skip
+E     665 |         )
+E     --------------------------------------------------------------------------------
+E     763 |     ap = argparse.ArgumentParser()
+E         -     ap.add_argument("what", choices=["setup", "races", "stale", "engagement", "startup", "dupstart", "teardown", "serve"])
+E     764 +     ap.add_argument(
+E     765 +         "what", choices=["setup", "races", "stale", "engagement", "startup", "dupstart", "teardown", "serve"]
+E     766 +     )
+E     767 |     ap.add_argument("--label", default="run")
+E         |
+E     
+E     8 files would be reformatted, 371 files already formatted
+E     
+E   assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['/root/.venv/bin/python', '-m', 'ruff', 'format', '--check', '.'], returncode=1, stdout='unform...d_argument("--label", default="run")\n    |\n\n8 files would be reformatted, 371 files already formatted\n', stderr='').returncode
+_________________________ test_backend_imports_sorted __________________________
+[gw0] linux -- Python 3.11.18 /root/.venv/bin/python
+tests/test_format_gate.py:31: in test_backend_imports_sorted
+    assert r.returncode == 0, r.stdout[-2000:]
+E   AssertionError: services/definitions.py:619:5: I001 [*] Import block is un-sorted or un-formatted
+E     Found 1 error.
+E     [*] 1 fixable with `--fix`.
+E     
+E   assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['/root/.venv/bin/python', '-m', 'ruff', 'check', '--select', 'I', '--output-format', 'concise',...y:619:5: I001 [*] Import block is un-sorted or un-formatted\nFound 1 error.\n[*] 1 fixable with `--fix`.\n', stderr='').returncode
+=============================== warnings summary ===============================
+tests/test_oc_parts_ageing.py::test_back_billed_stage_part_keeps_its_bill_day_apart_from_posting_time
+tests/test_phase3i_noise_surfaces.py::test_noise_actions_move_no_figure_but_follow_ups_still_move_the_call_list
+  /root/.venv/lib/python3.11/site-packages/starlette/formparsers.py:12: PendingDeprecationWarning: Please use `import python_multipart` instead.
+    import multipart
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_format_gate.py::test_backend_ruff_format_clean - AssertionE...
+FAILED tests/test_format_gate.py::test_backend_imports_sorted - AssertionErro...
+2 failed, 72 passed, 2 warnings in 33.45s

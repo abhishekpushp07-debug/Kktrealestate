@@ -411,7 +411,7 @@ async def _rebuild(booking_id: str, also_set: dict | None = None) -> list[dict]:
     if rows:
         await db.ledger_entries.insert_many([dict(r) for r in rows])
     done = {**also_set, "summary": summary, "other_charges": list(lines.values()), "ledger_rebuilt_at": now_iso()}
-    bump = {"$inc": {"money_rev": 1}} if writes else {}
+    bump = {"$inc": {"money_rev": 1, "ledger_rev": 1} if writes else {"ledger_rev": 1}}  # 3I: booking_marks
     # 3I: the snapshot lands only if no other bill write moved the rev since this rebuild read the booking
     flt = {"id": booking_id, "money_rev": rev0} if rev0 else {"id": booking_id, "money_rev": {"$in": [None, 0]}}
     snapshot = {"rev": rev0 + (1 if writes else 0), "bills": snap}

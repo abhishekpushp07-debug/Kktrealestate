@@ -608,21 +608,39 @@ def overdue_of(bands: dict) -> int:
     return sum(v for k, v in bands.items() if k != "Not due")
 
 
+_AGE_MEMO = __import__("services.booking_marks", fromlist=["Memo"]).Memo()
+
+
 async def ageing_for_bookings(booking_match: dict, as_of: date | None = None) -> tuple[dict, dict]:
     """Returns (total bands, {booking_id: bands}) for live bookings matching booking_match."""
     from db import db
 
     as_of = as_of or clock.today()
+    from services.booking_marks import PROJ, mark
     from services.money_snapshot import bills_for
 
-    proj = {"_id": 0, "id": 1, "summary": 1, "other_charges": 1, "money_rev": 1, "money_snapshot": 1}
-    bks = await db.bookings.find(live_bookings_match(booking_match), proj).to_list(None)
-    dem = await bills_for(bks)  # 3I REQ-355: kept-ready bills per booking (bills read only for out-of-date ones)
-    per = {}
-    for i, b in enumerate(bks):
-        per[b["id"]] = ageing_bands(b.get("summary") or {}, dem.get(b["id"], []), b.get("other_charges") or [], as_of)
-        if i % 250 == 249:
-            await asyncio.sleep(0)  # 3I: a company-wide pass lets waiting requests in between slices
+    # 3I REQ-355: only the markers of every booking; full money fields only for bookings changed since last time
+    marks = await db.bookings.find(live_bookings_match(booking_match), PROJ).to_list(None)
+    per, todo = {}, {}
+    for m in marks:
+        hit = _AGE_MEMO.get((m["id"], as_of), mark(m))
+        if hit is None:
+            todo[m["id"]] = mark(m)
+        else:
+            per[m["id"]] = dict(hit)  # a caller may add to its row: the kept copy stays as computed
+    proj = {"_id": 0, "id": 1, "summary": 1, "other_charges": 1, "money_rev": 1, "money_snapshot": 1, **PROJ}
+    ids = list(todo)
+    for i in range(0, len(ids), 500):
+        bks = await db.bookings.find({"id": {"$in": ids[i : i + 500]}}, proj).to_list(None)
+        dem = await bills_for(bks)  # kept-ready bills per booking (bills read only for out-of-date ones)
+        for j, b in enumerate(bks):
+            bands = ageing_bands(b.get("summary") or {}, dem.get(b["id"], []), b.get("other_charges") or [], as_of)
+            per[b["id"]] = bands
+            if mark(b) == todo[b["id"]]:  # read after its marker: kept only under the marker it was read with
+                _AGE_MEMO.put((b["id"], as_of), mark(b), dict(bands))
+            if j % 250 == 249:
+                await asyncio.sleep(0)  # 3I: a company-wide pass lets waiting requests in between slices
+    per = {m["id"]: per[m["id"]] for m in marks if m["id"] in per}  # same order as before (booking scan order)
     total = {k: sum(p[k] for p in per.values()) for k in BANDS}
     return total, per
 

@@ -1,0 +1,8 @@
+/api/home/bundle?period=month post 76.8 | get total;dur=74.4, db;dur=202.3, dbq;dur=44;desc="queries", app;dur=0.0, hb_money;dur=59.8, w_attention;dur=59.6, w_inflow_30;dur=41.0, hb_call;dur=25.8, w_call_today;dur=25.8, w_due_vs_received;dur=22.7, w_ageing;dur=19.8, hb_age;dur=19.8, w_money_today;dur=12.0, hb_static;dur=6.5
+/api/home/bundle?period=month post 68.3 | get total;dur=75.5, db;dur=250.8, dbq;dur=44;desc="queries", app;dur=0.0, hb_money;dur=61.2, w_attention;dur=60.9, hb_call;dur=59.9, w_call_today;dur=59.9, w_due_vs_received;dur=50.3, w_inflow_30;dur=47.5, hb_age;dur=30.5, w_ageing;dur=30.4, w_money_today;dur=12.7, hb_static;dur=9.6
+/api/home/bundle?period=month post 65.5 | get total;dur=74.4, db;dur=169.0, dbq;dur=44;desc="queries", app;dur=0.0, hb_money;dur=60.8, w_attention;dur=60.6, w_inflow_30;dur=48.0, hb_call;dur=30.1, w_call_today;dur=30.1, w_due_vs_received;dur=27.8, w_ageing;dur=22.8, hb_age;dur=22.7, w_money_today;dur=17.4, hb_static;dur=1.9
+RESULT /api/home/bundle?period=month p50 72.3 p95 75.5 max 75.5
+/api/demands/register?page_size=50 post 71.4 | get total;dur=72.7, db;dur=15.6, dbq;dur=11;desc="queries", app;dur=57.1, dreg_serial;dur=26.1, dreg_group;dur=18.7, dreg_read;dur=17.9
+/api/demands/register?page_size=50 post 63.2 | get total;dur=74.4, db;dur=13.8, dbq;dur=11;desc="queries", app;dur=60.6, dreg_serial;dur=28.7, dreg_group;dur=18.8, dreg_read;dur=16.4
+/api/demands/register?page_size=50 post 67.9 | get total;dur=70.8, db;dur=11.4, dbq;dur=11;desc="queries", app;dur=59.4, dreg_serial;dur=27.2, dreg_group;dur=18.7, dreg_read;dur=14.3
+RESULT /api/demands/register?page_size=50 p50 71.3 p95 74.4 max 74.4

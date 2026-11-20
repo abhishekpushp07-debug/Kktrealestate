@@ -6,6 +6,7 @@
     python -m tools.db_audit_drills races  --label before [--reps 20]
     python -m tools.db_audit_drills stale  --label before [--redis redis://127.0.0.1:6390/0]
     python -m tools.db_audit_drills startup --label before [--reps 10]
+    python -m tools.db_audit_drills engagement [--reps 10]  # JRN-196 / M-12: Customer 360 score on B after A's stage
     python -m tools.db_audit_drills dupstart          # JRN-133: a repeat in the copy never stops startup
     python -m tools.db_audit_drills teardown           # drops kkt_audit_scratch
 Two backend processes (A :8101, B :8102) share the scratch DB, exactly like 2 live replicas share Atlas.
@@ -605,6 +606,67 @@ def stale(label, reps, redis_url=None):
         [p.kill() for p in procs]
 
 
+# ---------------------------------------------------------------- JRN-196 / M-12: engagement score on both servers
+def _scores(c, cids):
+    out = {}
+    for cid in cids:
+        r = c.get(f"/api/customers/{cid}")
+        out[cid] = r.json().get("engagement_score") if r.status_code == 200 else f"HTTP {r.status_code}"
+    return out
+
+
+def engagement(label, reps, redis_url=None):
+    extra = {"REDIS_URL": redis_url} if redis_url else None
+    procs = [start(p, extra) for p in PORTS]
+    try:
+        [wait_up(p) for p in PORTS]
+        A, B = client(PORTS[0]), client(PORTS[1])
+        db = mdb()
+        blk = sid = None
+        for b in db.blocks.find({}, {"_id": 0, "id": 1}):
+            n = db.bookings.count_documents({"block_id": b["id"], "status": "Active"})
+            st = A.get(f"/api/blocks/{b['id']}/construction").json().get("stages") or [] if 0 < n <= 60 else []
+            pend = [s for s in st if s["status"] != "Completed"]
+            if pend:
+                blk, sid = b["id"], pend[0]["stage_id"]
+                break
+        assert blk, "no tower with a pending stage"
+        bks = list(db.bookings.find({"block_id": blk, "status": "Active"}, {"_id": 0, "customer_id": 1, "summary": 1}))
+        bks.sort(key=lambda b: -((b.get("summary") or {}).get("advance_paise") or 0))  # advance pays the new bill
+        cids = list(dict.fromkeys(b["customer_id"] for b in bks))[:8]
+        rows, same, moved = [], 0, 0
+        for i in range(reps):
+            for step in ("stage complete", "stage undo"):
+                before = _scores(B, cids)  # B's caches warm with the old figures
+                _scores(B, cids)
+                if step == "stage complete":
+                    r = A.post(f"/api/blocks/{blk}/construction/stage",
+                               json={"stage_id": sid, "completed_on": TODAY, "notes": "drill engagement"})  # fmt: skip
+                else:
+                    r = A.post(f"/api/blocks/{blk}/construction/undo", json={"reason": "drill engagement"})
+                assert r.status_code in (200, 201), r.text[:200]
+                a, b = _scores(A, cids), _scores(B, cids)
+                ok = a == b
+                same += ok
+                moved += sum(1 for c in cids if before[c] != a[c])
+                rows.append({"rep": i + 1, "step": step, "same_on_A_and_B": ok, "A": a, "B": b, "before_on_B": before})
+        save(
+            f"engagement_{label}{'_redis' if redis_url else ''}",
+            {
+                "reps": reps,
+                "tower": blk,
+                "customers": len(cids),
+                "checks_same": same,
+                "checks": len(rows),
+                "scores_moved_by_the_save": moved,
+                "pass": same == len(rows),
+                "rows": rows,
+            },  # fmt: skip
+        )
+    finally:
+        [p.kill() for p in procs]
+
+
 def _diff(a, b, p=""):
     if isinstance(a, dict) and isinstance(b, dict):
         for k in sorted(set(a) | set(b)):
@@ -699,7 +761,9 @@ def save(name, obj):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("what", choices=["setup", "races", "stale", "startup", "dupstart", "teardown", "serve"])
+    ap.add_argument(
+        "what", choices=["setup", "races", "stale", "engagement", "startup", "dupstart", "teardown", "serve"]
+    )
     ap.add_argument("--label", default="run")
     ap.add_argument("--reps", type=int, default=20)
     ap.add_argument("--redis")
@@ -717,6 +781,8 @@ def main():
             [p.kill() for p in procs]
     elif a.what == "stale":
         stale(a.label, a.reps, a.redis)
+    elif a.what == "engagement":
+        engagement(a.label, a.reps, a.redis)
     elif a.what == "startup":
         startup(a.label, a.reps)
     elif a.what == "dupstart":

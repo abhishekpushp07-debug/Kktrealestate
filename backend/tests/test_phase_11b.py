@@ -7,9 +7,9 @@ import requests
 
 TEST_PASSWORD = os.environ["TEST_PASSWORD"]  # seeded-user password from backend/.env (loaded by conftest)
 
-BASE_URL = os.environ.get(
-    "REACT_APP_BACKEND_URL", "https://flat-ledger-11--18pq6xp9.preview.emergentagent.com"
-).rstrip("/")
+BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://flat-ledger-11--18pq6xp9.preview.emergentagent.com").rstrip(
+    "/"
+)
 API = f"{BASE_URL}/api"
 
 ADMIN_EMAIL = "admin@kkt.in"

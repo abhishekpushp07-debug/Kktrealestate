@@ -23,9 +23,9 @@ def _raw_get(path):
         return e.code, e.read().decode("utf-8", "replace")
 
 
-BASE_URL = os.environ.get(
-    "REACT_APP_BACKEND_URL", "https://flat-ledger-11--18pq6xp9.preview.emergentagent.com"
-).rstrip("/")
+BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://flat-ledger-11--18pq6xp9.preview.emergentagent.com").rstrip(
+    "/"
+)
 ADMIN_EMAIL = "admin@kkt.in"
 ADMIN_PASSWORD = TEST_PASSWORD
 

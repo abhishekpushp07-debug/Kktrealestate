@@ -6,6 +6,7 @@ import asyncio
 from datetime import date, timedelta
 from urllib.parse import quote
 
+from core.timing import SPANS
 from db import db
 from services import clock, definitions
 from services.definitions import (
@@ -806,4 +807,8 @@ async def guarded(fn, *a):
         __import__("logging").getLogger("kkt").exception("home widget %s", getattr(fn, "__name__", fn))
         return {"ok": False, "error": "Couldn't load", "detail": type(e).__name__}
     finally:
-        WIDGET_MS[getattr(fn, "__name__", "?")] = round(1000 * (__import__("time").perf_counter() - t0))
+        ms = 1000 * (__import__("time").perf_counter() - t0)
+        WIDGET_MS[getattr(fn, "__name__", "?")] = round(ms)
+        acc = SPANS.get()
+        if acc is not None:
+            acc[f"w_{getattr(fn, '__name__', '?')}"] = ms

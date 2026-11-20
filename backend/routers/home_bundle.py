@@ -86,7 +86,8 @@ async def bundle(
             # 3I: kept ready across saves that don't touch them (a receipt never recomputes towers / stock / pipeline);
             # the per-domain stamp is shared by every process, so another server's save is seen at once
             st = await stamps.read(user["company_id"], STATIC_DEPS)
-            skey = f"home:static:{key}:{','.join(sorted(want & set(STATIC)))}:{st}"
+            # "hstatic:" — not under "home:", which every local receipt event drops (the domain stamp keeps it right)
+            skey = f"hstatic:{key}:{','.join(sorted(want & set(STATIC)))}:{st}"
             return await ttlcache.cached(skey, 300, compute_static, stamped=True, stamp=st)
 
         # 3I: ageing runs beside every other widget; Call today starts at once and waits only for ageing's list
@@ -99,7 +100,15 @@ async def bundle(
         async def call():
             return await H.guarded(H.call_today, user, base, project_id, today, per) if "call_today" in want else None
 
-        res, m, s, ct = await asyncio.gather(age_task, money(), static_widgets(), call())
+        from core.timing import span
+
+        async def timed(name, aw):
+            with span(f"hb_{name}"):
+                return await aw
+
+        res, m, s, ct = await asyncio.gather(
+            timed("age", age_task), timed("money", money()), timed("static", static_widgets()), timed("call", call())
+        )
         others = m | s
         if res is not None:
             if res["ok"]:
