@@ -40,6 +40,7 @@ Worked example (owner's mockup): 1,250 sq ft × ₹4,500 = ₹56,25,000; discoun
 - REQ-394 [always] A flat shall be "Ready for booking" only when its saleable area > 0 and its flat value > 0 have been saved; the status shows on the Flat cost screen, the unit grid and the stacking plan.
 - REQ-395 [always] "Apply to many flats" shall set the same cost lines on every selected flat (by tower, floor or flat type), recomputing per-sq-ft lines with each flat's own saleable area, after a preview of the flats and totals affected.
 - REQ-396 [state] While a flat is Booked or Sold, its cost and parking shall be locked with "Booked — change the price through the booking's agreement revision" (HANDOFF rule 9).
+- REQ-422 [unwanted] If the flats selected in "Apply to many flats" include Booked or Sold flats, then the system shall leave them unchanged and show "N booked flats skipped" in the preview and after confirm. (interpreted, owner approved 2026-11-20)
 - REQ-397 [always] Editing a flat's cost shall never change an existing booking (the booking keeps its own snapshot).
 - REQ-398 [always] Only users with the pricing permission (Owner / Admin / Accounts by default) shall edit Flat cost and Parking & flats; Sales shall see them read-only.
 
@@ -53,6 +54,8 @@ Worked example (owner's mockup): 1,250 sq ft × ₹4,500 = ₹56,25,000; discoun
 - REQ-405 [always] Maintenance GST and each other cost's GST shall be auto-set to 18 % and editable (0–28 %), with the same "set by you · use auto".
 - REQ-406 [always] Totals shall show, in this order: Agreement value (account + GST), Cash component, Package deal cost, Maintenance, Maintenance GST, Other costs, Other costs GST, Final cost — exactly the money model above.
 - REQ-407 [unwanted] If Cash component is empty, or the split doesn't add up, then Next shall stay disabled with the reason shown under it.
+- REQ-423 [unwanted] If In account is ₹0 (the whole Flat + parking typed as cash), then Next shall stay disabled with "In account can't be ₹0 — the agreement needs a value", and the server shall refuse the same booking. (interpreted, owner approved 2026-11-20)
+- REQ-424 [always] The automatic GST rate on account shall use only the ₹45,00,000 test on In account (no carpet-area test); the rate stays editable for exceptions. (owner decision 2026-11-20)
 - REQ-408 [always] The server shall recompute every figure from the flat's saved cost and the three editable inputs (discount, cash/account, GST rates) and refuse a booking whose locked lines differ from the flat's saved cost ("The flat's cost changed — review the price").
 - REQ-409 [always] The booking shall store a complete price snapshot (every line, mode, rate, area, GST rate + source auto/set by you, and every total) so later flat-cost edits never move it.
 

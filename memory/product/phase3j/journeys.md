@@ -28,6 +28,10 @@ Logins: `/app/memory/test_credentials.md`. Example flat: 1,250 sq ft saleable. M
   - steps: Open the project Pricing tab and the flat drawer for the same flat.
   - expected: Same figures, read-only, with "Edit in Flat cost" opening the master; Sales sees Flat cost read-only.
 
+- **JRN-228** Apply to many skips booked flats (interpreted)
+  - steps: In Apply to many flats, select a floor that has 1 booked flat and 3 available flats; apply a new rate; confirm.
+  - expected: Preview and result say "1 booked flats skipped" (or "1 booked flat skipped"); the booked flat's cost and its booking are unchanged; the 3 others take the new rate.
+
 ## 3J-B Booking
 - **JRN-207** Only ready flats can be picked
   - steps: As sales, New booking → pick customer → project → tower → floor.
@@ -56,6 +60,9 @@ Logins: `/app/memory/test_credentials.md`. Example flat: 1,250 sq ft saleable. M
 - **JRN-215** Cash empty → can't continue
   - steps: Leave cash empty.
   - expected: Next disabled with "Type the cash component (0 is allowed)".
+- **JRN-229** Account can't be zero (interpreted)
+  - steps: Type cash equal to the whole Flat + parking (in account becomes ₹0); then send the same booking straight to the API.
+  - expected: Next disabled with "In account can't be ₹0 — the agreement needs a value"; the API refuses it; no booking created.
 - **JRN-216** Tamper refused
   - steps: Send POST /api/bookings with a changed flat value, parking, maintenance or other cost.
   - expected: Refused ("The flat's cost changed — review the price"); no booking created.

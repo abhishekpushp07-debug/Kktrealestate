@@ -9,7 +9,16 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-DROP = {"generated_at", "stamp", "took_ms", "request_id", "hours_left"}  # hours_left moves with the clock
+DROP = {
+    "generated_at",
+    "stamp",
+    "took_ms",
+    "request_id",
+    "hours_left",
+    "computed_at",
+    "business_hour",
+    "data_age_s",
+}  # hours_left moves with the clock
 
 
 def matrix(spec: dict, projects: list[str]) -> list[dict]:
@@ -44,6 +53,20 @@ def clean(o):
     return o
 
 
+def hot_matrix(projects: list[str]) -> list[tuple[str, dict]]:
+    reg = [{}, {"basis": "due"}, {"include_void": "true"}, {"bucket": "cash"}, {"bucket": "account"}]
+    reg += [{"status": s} for s in ("Overdue", "Open", "Partially Paid", "Paid", "Voided", "Cancelled")]
+    reg += [{"source": s} for s in ("manual", "plan_stage", "other_charge")] + [{"stale_days": 30}, {"customer": "a"}]
+    reg += [{"project_id": p} for p in projects[:2]] + [{"project_id": p, "basis": "due"} for p in projects[:1]]
+    home = [{"period": p} for p in ("today", "month", "fy")] + [
+        {"period": "month", "project_id": p} for p in projects[:2]
+    ]
+    out = [("/api/demands/register", q) for q in reg] + [("/api/home/bundle", q) for q in home]
+    return (
+        out + [("/api/dashboard/home", {})] + [("/api/reports/outstanding-v2", q) for q in ({}, {"group": "customer"})]
+    )
+
+
 async def dump(dbname: str, path: str):
     os.environ["DB_NAME"] = dbname
     from dotenv import load_dotenv
@@ -67,6 +90,9 @@ async def dump(dbname: str, path: str):
             for q in matrix(spec, projects):
                 r = await c.get(f"/api/reports/v3/{k}", headers=h, params=q | {"page_size": 100000})
                 res[f"{k}?{json.dumps(q, sort_keys=True)}"] = [r.status_code, clean(r.json())]
+        for path_, q in hot_matrix(projects):  # 3I close-out: the kept-ready hot reads (Bills raised, Home, ageing)
+            r = await c.get(path_, headers=h, params=q)
+            res[f"{path_}?{json.dumps(q, sort_keys=True)}"] = [r.status_code, clean(r.json())]
     json.dump(res, open(path, "w"), default=str)
     print(len(res), "requests dumped")
 
